@@ -1,2 +1,4 @@
 tablero:tR@2O50.
 dashboard_user:tR@2O50.
+  "email": "admin@correo.com",
+  "password": "password123"

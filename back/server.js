@@ -12,6 +12,8 @@ const websocketService = require('./services/websocketService');
 const authRoutes = require('./routes/auth');
 const permissionRoutes = require('./routes/permissions');
 const roleRoutes = require('./routes/roles');
+const utilityRoutes = require('./routes/utility');
+const userRoutes = require('./routes/users');
 // --- Configuración de Express ---
 const app = express();
 
@@ -29,7 +31,12 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/roles', roleRoutes);
+app.use('/api/users', userRoutes);
 
+// Solo habilitar esta ruta en entorno de desarrollo
+if (process.env.NODE_ENV !== 'production') {
+  app.use('/api/utility', utilityRoutes); // <-- Añadir
+}
 // --- Configuración del Servidor HTTP y WebSocket ---
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });

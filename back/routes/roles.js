@@ -2,7 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const roleController = require('../controllers/roleController');
-
+const authMiddleware = require('../middleware/authMiddleware');
+router.use(authMiddleware);
 // CRUD Básico para Roles
 router.post('/', roleController.createRole);
 router.get('/', roleController.getAllRoles);

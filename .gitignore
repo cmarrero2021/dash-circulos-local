@@ -11,3 +11,4 @@ yarn-error.log*
 
 # Otros
 .DS_Store
+back/table.txt
