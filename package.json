@@ -1,0 +1,22 @@
+{
+  "name": "dash-circulos",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "//--- DESARROLLO LOCAL (Ambos servicios a la vez) ---//": "",
+    "dev": "npm-run-all --parallel dev:backend dev:frontend",
+
+    "//--- SCRIPTS DEL BACKEND ---//": "",
+    "install:backend": "cd back && npm install",
+    "dev:backend": "nodemon back/server.js",
+    "start:backend": "node back/server.js",
+    
+    "//--- SCRIPTS DEL FRONTEND ---//": "",
+    "install:frontend": "cd front && npm install",
+    "dev:frontend": "cd front && npm run dev"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1",
+    "npm-run-all": "^4.1.5"
+  }
+}
