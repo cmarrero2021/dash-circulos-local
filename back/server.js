@@ -8,6 +8,10 @@ require('dotenv').config();
 const { startListening } = require('./services/notificationListener');
 const websocketService = require('./services/websocketService');
 
+// --- Importar rutas ---
+const authRoutes = require('./routes/auth');
+const permissionRoutes = require('./routes/permissions');
+const roleRoutes = require('./routes/roles');
 // --- Configuración de Express ---
 const app = express();
 
@@ -20,12 +24,19 @@ app.get('/', (req, res) => {
   res.send('API del Dashboard de Registros está en funcionamiento.');
 });
 
+// --- Usar las rutas ---
+// Todas las rutas definidas en auth.js estarán prefijadas con /api/auth
+app.use('/api/auth', authRoutes);
+app.use('/api/permissions', permissionRoutes);
+app.use('/api/roles', roleRoutes);
+
 // --- Configuración del Servidor HTTP y WebSocket ---
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
 // Inicializar el servicio de WebSocket
 websocketService.initialize(wss);
+
 
 wss.on('connection', (ws) => {
   console.log('🔗 Cliente conectado al WebSocket');
