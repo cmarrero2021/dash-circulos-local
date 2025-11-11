@@ -2,3 +2,67 @@ tablero:tR@2O50.
 dashboard_user:tR@2O50.
   "email": "admin@correo.com",
   "password": "password123"
+  CREACION DE TABLAS FORÁNEAS
+  DROP SERVER registro_server_local CASCADE;
+CREATE SERVER registro_server_local
+    FOREIGN DATA WRAPPER postgres_fdw
+    OPTIONS (host '192.168.0.17', dbname 'registro', port '5432');
+
+CREATE USER MAPPING FOR CURRENT_USER
+    SERVER registro_server_local
+    OPTIONS (user 'tablero', password 'tR@2O50.');  
+
+CREATE FOREIGN TABLE IF NOT EXISTS public.rm_circulos_remoto(
+    id integer,
+    estado_id integer,
+    estado text,
+    municipio_id integer,
+    municipio text,
+    parroquia_id integer,
+    parroquia text,
+    comuna_id integer,
+    comuna text,
+    circulo text,
+    participantes integer,
+    constitucion date,
+    certificacion date
+)
+    SERVER registro_server_local
+    OPTIONS (schema_name 'public', table_name 'vresumen_circulos');
+
+
+
+CREATE FOREIGN TABLE IF NOT EXISTS public.rm_comunas(
+    estado_id integer,
+    estado text,
+    municipio_id integer,
+    municipio text,
+    parroquia_id integer,
+    comuna_id integer,
+    comuna text,
+    codigo text
+)
+    SERVER registro_server_local
+    OPTIONS (schema_name 'public', table_name 'vcomunas');
+
+CREATE FOREIGN TABLE IF NOT EXISTS public.rm_data_circulos(
+    id integer,
+    estado_id integer,
+    estado text,
+    municipio_id integer,
+    municipio text,
+    parroquia_id integer,
+    parroquia text,
+    comuna_id integer,
+    comuna text,
+    circulo text,
+    participantes bigint,
+    femeninas bigint,
+    masculinos bigint,
+    venezolanos bigint,
+    extranjeros bigint,
+    constitucion date,
+    certificacion date
+)
+    SERVER registro_server_local
+    OPTIONS (schema_name 'public', table_name 'vdata_circulos');

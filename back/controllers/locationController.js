@@ -7,7 +7,7 @@ exports.getAllStates = async (req, res) => {
     // Usamos DISTINCT ON para obtener cada estado_id solo una vez.
     const query = `
       SELECT DISTINCT ON (estado_id) estado_id, estado
-      FROM comunas_remoto
+      FROM rm_comunas
       ORDER BY estado_id, estado;
     `;
     const result = await pool.query(query);
@@ -24,7 +24,7 @@ exports.getMunicipalitiesByState = async (req, res) => {
   try {
     const query = `
       SELECT DISTINCT ON (municipio_id) municipio_id, municipio
-      FROM comunas_remoto
+      FROM rm_comunas
       WHERE estado_id = $1
       ORDER BY municipio_id, municipio;
     `;

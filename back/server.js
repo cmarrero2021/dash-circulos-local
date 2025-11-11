@@ -16,6 +16,7 @@ const utilityRoutes = require('./routes/utility');
 const userRoutes = require('./routes/users');
 const geoPermissionRoutes = require('./routes/geoPermissions');
 const locationRoutes = require('./routes/locations');
+const dashboardRoutes = require('./routes/dashboard');
 // --- Configuración de Express ---
 const app = express();
 
@@ -36,7 +37,7 @@ app.use('/api/roles', roleRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/geo-permissions', geoPermissionRoutes);
 app.use('/api/locations', locationRoutes);
-
+app.use('/api/dashboard', dashboardRoutes);
 // Solo habilitar esta ruta en entorno de desarrollo
 if (process.env.NODE_ENV !== 'production') {
   app.use('/api/utility', utilityRoutes); // <-- Añadir

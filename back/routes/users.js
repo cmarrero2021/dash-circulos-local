@@ -13,15 +13,15 @@ const authorize = require('../middleware/authorizationMiddleware');
 router.use(authMiddleware);
 
 // Esta función SÍ debe ser llamada con paréntesis, porque es una "fábrica"
-const manageUsersAuthorize = authorize('manage_users');
+// const manageUsersAuthorize = authorize('manage_users');
 
 // ==================================================================
 // PUNTO #2 DE REVISIÓN: Las funciones del controlador NO deben tener paréntesis.
 // CORRECTO: userController.getAllUsers
 // INCORRECTO: userController.getAllUsers()
 // ==================================================================
-router.get('/', manageUsersAuthorize, userController.getAllUsers);
-router.post('/', manageUsersAuthorize, userController.createUser);
-router.put('/:id', manageUsersAuthorize, userController.updateUser);
+router.get('/', authorize('user:view'), userController.getAllUsers);
+router.post('/', authorize('user:create'), userController.createUser);
+router.put('/:id', authorize('user:edit'), userController.updateUser);
 
 module.exports = router;

@@ -73,7 +73,7 @@ exports.assignMunicipalityToUser = async (req, res) => {
 
         // 1. PASO DE VALIDACIÓN: Verificar si el municipio pertenece al estado.
         const validationQuery = `
-            SELECT 1 FROM comunas_remoto 
+            SELECT 1 FROM rm_comunas 
             WHERE estado_id = $1 AND municipio_id = $2 
             LIMIT 1;
         `;
