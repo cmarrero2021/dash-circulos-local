@@ -1,24 +1,36 @@
-import { defineBoot } from '#q-app/wrappers'
-import axios from 'axios'
+// src/boot/axios.js
+import { boot } from 'quasar/wrappers';
+import axios from 'axios';
+import { useAuthStore } from 'stores/auth-store';
+import { storeInstance, routerInstance } from 'src/router/index'; // <-- Importación clave
 
-// Be careful when using SSR for cross-request state pollution
-// due to creating a Singleton instance here;
-// If any client changes this (global) instance, it might be a
-// good idea to move this instance creation inside of the
-// "export default () => {}" function below (which runs individually
-// for each client)
-const api = axios.create({ baseURL: 'https://api.example.com' })
+const api = axios.create({ baseURL: 'http://localhost:3000/api' });
 
-export default defineBoot(({ app }) => {
-  // for use inside Vue files (Options API) through this.$axios and this.$api
+// Ya no necesitamos pasar { store, router } a la función boot
+export default boot(({ app }) => {
+  const authStore = useAuthStore(storeInstance);
 
-  app.config.globalProperties.$axios = axios
-  // ^ ^ ^ this will allow you to use this.$axios (for Vue Options API form)
-  //       so you won't necessarily have to import axios in each vue file
+  api.interceptors.request.use((config) => {
+    if (authStore.isAuthenticated) {
+      config.headers.Authorization = `Bearer ${authStore.authToken}`;
+    }
+    return config;
+  });
 
-  app.config.globalProperties.$api = api
-  // ^ ^ ^ this will allow you to use this.$api (for Vue Options API form)
-  //       so you can easily perform requests against your app's API
-})
+  api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      if (error.response && error.response.status === 401) {
+        if (routerInstance.currentRoute.value.path !== '/login') {
+          console.log('[Axios Interceptor] Token inválido o expirado. Forzando logout.');
+          authStore.logout();
+        }
+      }
+      return Promise.reject(error);
+    }
+  );
 
-export { api }
+  app.config.globalProperties.$api = api;
+});
+
+export { api };

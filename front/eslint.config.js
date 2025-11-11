@@ -1,73 +1,60 @@
-import js from '@eslint/js'
-import globals from 'globals'
-import pluginVue from 'eslint-plugin-vue'
-import pluginQuasar from '@quasar/app-vite/eslint'
-import prettierSkipFormatting from '@vue/eslint-config-prettier/skip-formatting'
+// eslint.config.js
+
+import globals from 'globals';
+import pluginJs from '@eslint/js';
+import pluginVue from 'eslint-plugin-vue';
+import eslintConfigPrettier from 'eslint-config-prettier';
 
 export default [
-  {
-    /**
-     * Ignore the following files.
-     * Please note that pluginQuasar.configs.recommended() already ignores
-     * the "node_modules" folder for you (and all other Quasar project
-     * relevant folders and files).
-     *
-     * ESLint requires "ignores" key to be the only one in this object
-     */
-    // ignores: []
-  },
+  // Configuración base de ESLint
+  pluginJs.configs.recommended,
 
-  ...pluginQuasar.configs.recommended(),
-  js.configs.recommended,
+  // Configuración específica para archivos .vue
+  ...pluginVue.configs['flat/recommended'],
 
-  /**
-   * https://eslint.vuejs.org
-   *
-   * pluginVue.configs.base
-   *   -> Settings and rules to enable correct ESLint parsing.
-   * pluginVue.configs[ 'flat/essential']
-   *   -> base, plus rules to prevent errors or unintended behavior.
-   * pluginVue.configs["flat/strongly-recommended"]
-   *   -> Above, plus rules to considerably improve code readability and/or dev experience.
-   * pluginVue.configs["flat/recommended"]
-   *   -> Above, plus rules to enforce subjective community defaults to ensure consistency.
-   */
-  ...pluginVue.configs['flat/essential'],
+  // Configuración para desactivar reglas que entran en conflicto con Prettier
+  eslintConfigPrettier,
 
   {
     languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-
       globals: {
         ...globals.browser,
-        ...globals.node, // SSR, Electron, config files
-        process: 'readonly', // process.env.*
-        ga: 'readonly', // Google Analytics
-        cordova: 'readonly',
-        Capacitor: 'readonly',
-        chrome: 'readonly', // BEX related
-        browser: 'readonly', // BEX related
+        ...globals.node,
+        // --- Añade tus variables globales aquí si es necesario ---
+        // Por ejemplo, si Quasar las define globalmente:
+        // 'quasar': 'readonly',
+      },
+      // Especifica el parser correcto para Vue
+      parser: pluginVue.parser,
+      parserOptions: {
+        parser: '@babel/eslint-parser', // O '@typescript-eslint/parser' si usas TS
+        sourceType: 'module',
+        ecmaVersion: 'latest',
+        requireConfigFile: false, // Importante para Babel
+        babelOptions: {
+          parserOpts: {
+            plugins: ['importAssertions'],
+          },
+        },
       },
     },
-
-    // add your custom rules here
+    // Reglas personalizadas
     rules: {
-      'prefer-promise-reject-errors': 'off',
-
-      // allow debugger during development only
-      'no-debugger': process.env.NODE_ENV === 'production' ? 'error' : 'off',
+      // Puedes añadir o sobrescribir reglas de ESLint aquí
+      // Por ejemplo, para ser menos estricto con variables no usadas en desarrollo:
+      'no-unused-vars': process.env.NODE_ENV === 'production' ? 'error' : 'warn',
+      'vue/multi-word-component-names': 'off', // Desactiva la regla que exige nombres de componente de varias palabras
     },
   },
-
   {
-    files: ['src-pwa/custom-service-worker.js'],
-    languageOptions: {
-      globals: {
-        ...globals.serviceworker,
-      },
-    },
+    // Ignorar carpetas y archivos específicos
+    ignores: [
+      '.quasar/',
+      'dist/',
+      'node_modules/',
+      'public/',
+      'src-capacitor/',
+      'src-cordova/',
+    ],
   },
-
-  prettierSkipFormatting,
-]
+];

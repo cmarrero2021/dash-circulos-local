@@ -1,11 +1,12 @@
-import { defineRouter } from '#q-app/wrappers'
+// src/router/index.js
+import { route } from 'quasar/wrappers';
 import {
   createRouter,
   createMemoryHistory,
   createWebHistory,
   createWebHashHistory,
-} from 'vue-router'
-import routes from './routes'
+} from 'vue-router';
+import routes from './routes';
 
 /*
  * If not building with SSR mode, you can
@@ -16,22 +17,35 @@ import routes from './routes'
  * with the Router instance.
  */
 
-export default defineRouter(function (/* { store, ssrContext } */) {
+// ==========================================================
+let routerInstance = null;
+let storeInstance = null; // <-- Variable para guardar la instancia del store
+// ==========================================================
+
+export default route(function ({ store /*, ssrContext */ }) {
+  // ==========================================================
+  storeInstance = store; // <-- Guardamos la instancia
+  // ==========================================================
+
   const createHistory = process.env.SERVER
     ? createMemoryHistory
     : process.env.VUE_ROUTER_MODE === 'history'
-      ? createWebHistory
-      : createWebHashHistory
+    ? createWebHistory
+    : createWebHashHistory;
 
   const Router = createRouter({
     scrollBehavior: () => ({ left: 0, top: 0 }),
     routes,
-
-    // Leave this as is and make changes in quasar.conf.js instead!
-    // quasar.conf.js -> build -> vueRouterMode
-    // quasar.conf.js -> build -> publicPath
     history: createHistory(process.env.VUE_ROUTER_BASE),
-  })
+  });
 
-  return Router
-})
+  // ==========================================================
+  routerInstance = Router; // <-- Guardamos la instancia del router
+  // ==========================================================
+  return Router;
+});
+
+// ==========================================================
+// Exportamos las instancias para poder usarlas en otros archivos
+export { routerInstance, storeInstance };
+// ==========================================================
