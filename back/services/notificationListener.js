@@ -2,7 +2,8 @@
 
 require('dotenv').config();
 const { Client } = require('pg');
-require('dotenv').config();
+const cache = require('./cacheService');
+const { refreshDashboardCache } = require('./dashboardWorker');
 const websocketService = require('./websocketService'); // Importamos el servicio de broadcast
 
 // Configuración de la conexión a la base de datos de ORIGEN ('registro')
@@ -37,17 +38,19 @@ const startListening = () => {
   });
 
   client.on('notification', (msg) => {
-    console.log('🔔 Notificación recibida del canal:', msg.channel);
-    try {
-      const payload = JSON.parse(msg.payload);
-      console.log('   Payload:', payload);
+    console.log('🔔 Notificación recibida. Disparando refresco en segundo plano.');
+    websocketService.broadcast({ event: 'data_is_updating' });
+    refreshDashboardCache();    
+    // try {
+    //   const payload = JSON.parse(msg.payload);
+    //   console.log('   Payload:', payload);
       
-      // Enviamos el payload a todos los clientes conectados a través de nuestro servicio WebSocket
-      websocketService.broadcast(payload);
+    //   // Enviamos el payload a todos los clientes conectados a través de nuestro servicio WebSocket
+    //   websocketService.broadcast(payload);
 
-    } catch (error) {
-      console.error('Error al parsear el payload de la notificación:', error);
-    }
+    // } catch (error) {
+    //   console.error('Error al parsear el payload de la notificación:', error);
+    // }
   });
   
   client.on('end', () => {
