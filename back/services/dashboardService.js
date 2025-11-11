@@ -97,9 +97,9 @@ const buildFilterClause = async (userId, voluntaryFilters = {}) => {
 exports.getCirclesByState = async (userId, filters) => {
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
-        SELECT estado, COUNT(id) as total_circulos
-        FROM rm_circulos_remoto ${whereClause}
-        GROUP BY estado ORDER BY estado;
+        SELECT estado, circulos_certificados, meta_circulos
+        FROM vcumplimiento_metas ${whereClause}
+        ORDER BY estado;
     `;
     const result = await pool.query(query, params);
     return result.rows;

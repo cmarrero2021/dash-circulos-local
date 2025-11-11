@@ -20,10 +20,17 @@
           <!-- v-show mantiene el componente en el DOM pero oculto -->
           <DataVisualizer
             v-show="!dashboardStore.isLoading"
-            title="Círculos por Estado"
+            title="Cumplimiento de Metas por Estado"
             :data="dashboardStore.circlesByState"
             type="bar"
-            :column-map="{ label: 'estado', value: 'total_circulos' }"
+            :column-map="{ 
+              label: 'estado', 
+              value: [
+                { name: 'Círculos Certificados', key: 'circulos_certificados' },
+                { name: 'Meta de Círculos', key: 'meta_circulos' }
+              ] 
+            }"
+            stacked
           />
         </q-card>
       </div>
@@ -36,10 +43,17 @@
           </q-inner-loading>
           <DataVisualizer
             v-show="!dashboardStore.isLoading"
-            title="Tabla: Círculos por Estado"
+            title="Tabla: Cumplimiento de Metas por Estado"
             :data="dashboardStore.circlesByState"
             type="table"
-            :column-map="{ label: 'estado', value: 'total_circulos' }"
+            :column-map="{ 
+              label: 'estado', 
+              labelHeader: 'Estado',
+              value: [
+                { name: 'Círculos Certificados', key: 'circulos_certificados' },
+                { name: 'Meta de Círculos', key: 'meta_circulos' }
+              ] 
+            }"
           />
         </q-card>
       </div>
