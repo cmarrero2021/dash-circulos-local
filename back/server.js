@@ -20,6 +20,10 @@ const dashboardRoutes = require('./routes/dashboard');
 // --- Configuración de Express ---
 const app = express();
 
+//////////EOLO EN DESARROLLO, ELIMINAR ANTES DEL DEPLOY///////////
+app.disable('etag'); 
+//////////EOLO EN DESARROLLO, ELIMINAR ANTES DEL DEPLOY///////////
+
 app.use(cors()); // Habilita CORS para todas las rutas
 app.use(helmet()); // Añade cabeceras de seguridad
 app.use(express.json()); // Permite al servidor entender JSON en las peticiones

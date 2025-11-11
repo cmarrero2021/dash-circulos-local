@@ -1,6 +1,7 @@
 // middleware/authMiddleware.js
 
 const jwt = require('jsonwebtoken');
+const cache = require('../services/cacheService'); // Importar el servicio de caché
 require('dotenv').config();
 
 module.exports = function (req, res, next) {
@@ -13,6 +14,12 @@ module.exports = function (req, res, next) {
 
   try {
     const token = authHeader.split(' ')[1];
+
+    // Verificar si el token está en la "blocklist" de la caché
+    if (cache.has(token)) {
+      return res.status(401).json({ message: 'Token inválido o sesión cerrada.' });
+    }
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     req.user = decoded.user;

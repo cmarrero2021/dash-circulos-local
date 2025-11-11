@@ -1,147 +1,151 @@
 // services/dashboardService.js
-
-const pool = require('../config/db'); // Necesitamos el pool para consultar los permisos del usuario
-const cache = require('./cacheService'); // Importamos nuestro servicio de caché
+const pool = require('../config/db');
 
 /**
- * Función de utilidad para obtener los permisos geográficos de un usuario.
- * Esta función SÍ consulta la BD de permisos, pero estas tablas son pequeñas y rápidas.
- * @param {number} userId - El ID del usuario.
- * @returns {Promise<{accessType: 'national'|'state'|'municipality'|'none', states: number[], munis: Map<number, number[]>}>}
+ * Construye la cláusula WHERE y los parámetros para las consultas del dashboard
+ * basándose en los permisos geográficos del usuario.
+ * @param {number} userId - El ID del usuario que realiza la solicitud.
+ * @param {object} voluntaryFilters - Filtros opcionales de la query string (estado_id, municipio_id).
+ * @returns {Promise<object>} Un objeto con { whereClause, params }.
  */
-const getUserGeoPermissions = async (userId) => {
-    // Primero, revisamos si los permisos de este usuario ya están cacheados para evitar consultas repetidas
-    const cacheKey = `user_permissions:${userId}`;
-    if (cache.has(cacheKey)) {
-        return cache.get(cacheKey);
-    }
-
-    const client = await pool.connect();
-    try {
-        const nationalAccessRes = await client.query(
-            "SELECT 1 FROM roles_permisos rp JOIN usuarios u ON u.rol_id = rp.rol_id JOIN permisos p ON rp.permiso_id = p.id WHERE u.id = $1 AND p.nombre = 'dashboard:view-unrestricted'",
-            [userId]
+const buildFilterClause = async (userId, voluntaryFilters = {}) => {
+    // 1. Verificar si el usuario tiene permiso de dashboard nacional
+    const nationalAccessQuery = `
+        SELECT EXISTS (
+            SELECT 1
+            FROM usuarios u
+            LEFT JOIN roles_permisos rp ON u.rol_id = rp.rol_id AND rp.permiso_id = (SELECT id FROM permisos WHERE nombre = 'ver_dashboard_nacional')
+            LEFT JOIN usuarios_permisos up ON u.id = up.usuario_id AND up.permiso_id = (SELECT id FROM permisos WHERE nombre = 'ver_dashboard_nacional')
+            WHERE u.id = $1 AND (rp.permiso_id IS NOT NULL OR up.permiso_id IS NOT NULL)
         );
-        if (nationalAccessRes.rowCount > 0) {
-            const permissions = { accessType: 'national', states: [], munis: new Map() };
-            cache.set(cacheKey, permissions);
-            return permissions;
+    `;
+    const { rows: nationalAccessRows } = await pool.query(nationalAccessQuery, [userId]);
+    const hasNationalAccess = nationalAccessRows[0].exists;
+
+    // Si tiene acceso nacional, no se aplica ningún filtro geográfico.
+    if (hasNationalAccess) {
+        // Pero sí puede aplicar filtros voluntarios
+        let whereClause = '';
+        const params = [];
+        let paramIndex = 1;
+        if (voluntaryFilters.estado_id) {
+            whereClause += ` WHERE estado_id = $${paramIndex++}`;
+            params.push(voluntaryFilters.estado_id);
         }
-
-        const statesRes = await client.query('SELECT estado_id FROM usuarios_estados_permitidos WHERE usuario_id = $1', [userId]);
-        const munisRes = await client.query('SELECT estado_id, municipio_id FROM usuarios_municipios_permitidos WHERE usuario_id = $1', [userId]);
-
-        const allowedStates = statesRes.rows.map(r => r.estado_id);
-        const allowedMunis = new Map();
-        munisRes.rows.forEach(r => {
-            if (!allowedMunis.has(r.estado_id)) {
-                allowedMunis.set(r.estado_id, []);
-            }
-            allowedMunis.get(r.estado_id).push(r.municipio_id);
-        });
-        
-        const accessType = allowedStates.length > 0 ? 'state' : (allowedMunis.size > 0 ? 'municipality' : 'none');
-        const permissions = { accessType, states: allowedStates, munis: allowedMunis };
-        cache.set(cacheKey, permissions); // Cachear los permisos del usuario por un tiempo
-        return permissions;
-
-    } finally {
-        client.release();
+        if (voluntaryFilters.municipio_id) {
+            whereClause += (whereClause ? ' AND' : ' WHERE') + ` municipio_id = $${paramIndex++}`;
+            params.push(voluntaryFilters.municipio_id);
+        }
+        return { whereClause, params };
     }
+
+    // 2. Si no tiene acceso nacional, obtener sus permisos geográficos específicos
+    const statesQuery = 'SELECT estado_id FROM usuarios_estados_permitidos WHERE usuario_id = $1';
+    const municipalitiesQuery = 'SELECT estado_id, municipio_id FROM usuarios_municipios_permitidos WHERE usuario_id = $1';
+    
+    const [statesResult, municipalitiesResult] = await Promise.all([
+        pool.query(statesQuery, [userId]),
+        pool.query(municipalitiesQuery, [userId])
+    ]);
+
+    const allowedStates = statesResult.rows.map(r => r.estado_id);
+    const allowedMunicipalities = municipalitiesResult.rows;
+
+    const conditions = [];
+    const params = [];
+    let paramIndex = 1;
+
+    // Construir condiciones basadas en permisos
+    if (allowedStates.length > 0) {
+        conditions.push(`estado_id = ANY($${paramIndex++})`);
+        params.push(allowedStates);
+    }
+    if (allowedMunicipalities.length > 0) {
+        const munConditions = allowedMunicipalities.map(m => {
+            const estadoParam = paramIndex++;
+            const municipioParam = paramIndex++;
+            params.push(m.estado_id, m.municipio_id);
+            return `(estado_id = $${estadoParam} AND municipio_id = $${municipioParam})`;
+        });
+        conditions.push(`(${munConditions.join(' OR ')})`);
+    }
+
+    // Si no hay permisos geográficos, no debe ver nada.
+    if (conditions.length === 0) {
+        return { whereClause: 'WHERE 1 = 0', params: [] }; // Condición que siempre es falsa
+    }
+
+    let whereClause = `WHERE (${conditions.join(' OR ')})`;
+
+    // Aplicar filtros voluntarios si el usuario los proporciona en la URL
+    // Estos filtros deben respetar los permisos del usuario
+    if (voluntaryFilters.estado_id) {
+        whereClause += ` AND estado_id = $${paramIndex++}`;
+        params.push(voluntaryFilters.estado_id);
+    }
+    if (voluntaryFilters.municipio_id) {
+        whereClause += ` AND municipio_id = $${paramIndex++}`;
+        params.push(voluntaryFilters.municipio_id);
+    }
+
+    return { whereClause, params };
 };
 
 
-// --- Endpoints del Servicio ---
+// --- Funciones de Agregación ---
 
 exports.getCirclesByState = async (userId, filters) => {
-    const permissions = await getUserGeoPermissions(userId);
-    const allData = cache.get('dashboard:by-state') || {}; // Obtener datos pre-agregados
-
-    if (permissions.accessType === 'none') {
-        return [];
-    }
-    if (permissions.accessType === 'national') {
-        return allData; // El admin nacional ve todo
-    }
-
-    // Filtrar en memoria
-    const filteredData = {};
-    for (const stateId in allData) {
-        const numericStateId = parseInt(stateId, 10);
-        // El usuario tiene acceso si el estado está en su lista de estados permitidos...
-        if (permissions.states.includes(numericStateId) || 
-            // ...o si tiene permiso para al menos un municipio dentro de ese estado.
-            permissions.munis.has(numericStateId)) {
-            filteredData[stateId] = allData[stateId];
-        }
-    }
-    return filteredData;
+    const { whereClause, params } = await buildFilterClause(userId, filters);
+    const query = `
+        SELECT estado, COUNT(id) as total_circulos
+        FROM rm_circulos_remoto ${whereClause}
+        GROUP BY estado ORDER BY estado;
+    `;
+    const result = await pool.query(query, params);
+    return result.rows;
 };
 
 exports.getCirclesByMunicipality = async (userId, filters) => {
-    const permissions = await getUserGeoPermissions(userId);
-    const allData = cache.get('dashboard:by-municipality') || {};
-    
-    if (permissions.accessType === 'none') {
-        return {};
-    }
-    if (permissions.accessType === 'national') {
-        return allData;
-    }
-
-    // Filtrar en memoria
-    const filteredData = {};
-    for (const key in allData) { // key es "estado_id|municipio_id"
-        const [stateId, muniId] = key.split('|').map(Number);
-
-        // El usuario tiene acceso si tiene permiso para el estado completo...
-        if (permissions.states.includes(stateId)) {
-            filteredData[key] = allData[key];
-        } 
-        // ...o si tiene permiso específico para ese municipio.
-        else if (permissions.munis.has(stateId) && permissions.munis.get(stateId).includes(muniId)) {
-            filteredData[key] = allData[key];
-        }
-    }
-    return filteredData;
+    const { whereClause, params } = await buildFilterClause(userId, filters);
+    const query = `
+        SELECT estado, municipio, COUNT(id) as total_circulos
+        FROM rm_circulos_remoto ${whereClause}
+        GROUP BY estado, municipio ORDER BY estado, municipio;
+    `;
+    const result = await pool.query(query, params);
+    return result.rows;
 };
 
 exports.getTotalCircles = async (userId, filters) => {
-    // Para el total, no podemos simplemente devolver el total cacheado.
-    // Debemos calcularlo basado en los permisos del usuario.
-    const permissions = await getUserGeoPermissions(userId);
-    
-    if (permissions.accessType === 'none') return { total: 0 };
-    if (permissions.accessType === 'national') return { total: cache.get('dashboard:total') || 0 };
-
-    // Si el acceso es parcial, necesitamos los datos por municipio para sumar
-    const byMunicipalityData = cache.get('dashboard:by-municipality') || {};
-    let total = 0;
-
-    for (const key in byMunicipalityData) {
-        const [stateId, muniId] = key.split('|').map(Number);
-
-        if (permissions.states.includes(stateId) ||
-           (permissions.munis.has(stateId) && permissions.munis.get(stateId).includes(muniId))) {
-            total += byMunicipalityData[key];
-        }
-    }
-    return { total };
+    const { whereClause, params } = await buildFilterClause(userId, filters);
+    const query = `SELECT COUNT(id) as total FROM rm_circulos_remoto ${whereClause}`;
+    const result = await pool.query(query, params);
+    return result.rows[0] || { total: 0 };
 };
 
+exports.getDailyAverage = async (userId, filters) => {
+    const { whereClause, params } = await buildFilterClause(userId, filters);
+    const query = `
+        SELECT 
+            COUNT(id) as total_circulos,
+            COUNT(DISTINCT certificacion::date) as total_dias,
+            COUNT(id)::DECIMAL / GREATEST(COUNT(DISTINCT certificacion::date), 1) as promedio_diario
+        FROM rm_circulos_remoto ${whereClause};
+    `;
+    const result = await pool.query(query, params);
+    return result.rows[0];
+};
 
-// Para la "tabla dinámica", devolvemos los datos crudos, pero filtrados.
-// ¡ADVERTENCIA! Esto puede seguir siendo muy pesado si el permiso de un usuario
-// abarca muchos miles de registros. La paginación en el endpoint es OBLIGATORIA.
 exports.getRawData = async (userId, filters) => {
-    const permissions = await getUserGeoPermissions(userId);
-    const allRawData = cache.get('dashboard:raw-data') || [];
-
-    if (permissions.accessType === 'none') return [];
-    if (permissions.accessType === 'national') return allRawData;
-
-    return allRawData.filter(row => {
-        return permissions.states.includes(row.estado_id) ||
-               (permissions.munis.has(row.estado_id) && permissions.munis.get(row.estado_id).includes(row.municipio_id));
-    });
+    const { whereClause, params } = await buildFilterClause(userId, filters);
+    const limit = filters.limit || 100;
+    const offset = filters.page ? (filters.page - 1) * limit : 0;
+    
+    const query = `
+        SELECT * FROM rm_circulos_remoto ${whereClause} 
+        ORDER BY estado, municipio, parroquia 
+        LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+    
+    const result = await pool.query(query, [...params, limit, offset]);
+    return result.rows;
 };

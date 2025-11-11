@@ -6,12 +6,20 @@
     "//--- SCRIPTS INDIVIDUALES ---//": "",
     "dev:backend": "nodemon back/server.js",
     "dev:frontend": "cd front && quasar dev",
-    
     "//--- SCRIPTS DE INSTALACIÓN ---//": "",
     "install:backend": "cd back && npm install",
     "install:frontend": "cd front && npm install"
   },
   "devDependencies": {
+    "@babel/eslint-parser": "^7.28.5",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-vue": "^10.5.1",
     "nodemon": "^3.1.0"
+  },
+  "dependencies": {
+    "apexcharts": "^5.3.6",
+    "file-saver": "^2.0.5",
+    "vue3-apexcharts": "^1.10.0",
+    "xlsx": "^0.18.5"
   }
 }

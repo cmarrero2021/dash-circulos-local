@@ -69,7 +69,7 @@ exports.login = async (req, res) => {
     const payload = {
       user: {
         id: user.id,
-        // Aquí puedes añadir más datos al token si lo necesitas, como el rol.
+        rol: user.id_rol_fk // <-- Añadir el rol al payload
       },
       auditId: auditId // Incluimos el ID de la auditoría en el token para el logout
     };
@@ -87,27 +87,47 @@ exports.login = async (req, res) => {
 };
 
 
+const cache = require('../services/cacheService');
+
 /**
  * Maneja el logout de un usuario.
+ * Invalida el token y registra el evento.
  */
 exports.logout = async (req, res) => {
-  // El ID de auditoría vendrá del token decodificado por un middleware que crearemos después.
-  const auditId = req.auditId;
-
-  if (!auditId) {
-    return res.status(400).json({ message: 'No hay sesión de auditoría válida para cerrar.' });
-  }
+  const auditId = req.auditId; // Obtenido del middleware de autenticación
 
   try {
-    const query = `
-      UPDATE auditoria_sesiones
-      SET timestamp_logout = CURRENT_TIMESTAMP
-      WHERE id = $1;
-    `;
-    await pool.query(query, [auditId]);
+    // 1. Invalidar el token añadiéndolo a la caché de "blocklist"
+    const authHeader = req.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.decode(token);
+
+      if (decoded && decoded.exp) {
+        const expiresAt = decoded.exp * 1000; // `exp` está en segundos, convertir a ms
+        const remainingTime = Math.ceil((expiresAt - Date.now()) / 1000); // TTL en segundos
+
+        if (remainingTime > 0) {
+          // La clave es el token, el valor es 'invalidated', y el TTL es el tiempo que le queda al token
+          cache.set(token, 'invalidated', remainingTime);
+        }
+      }
+    }
+
+    // 2. Actualizar la tabla de auditoría (si aplica)
+    if (auditId) {
+      const query = `
+        UPDATE auditoria_sesiones
+        SET timestamp_logout = CURRENT_TIMESTAMP
+        WHERE id = $1;
+      `;
+      await pool.query(query, [auditId]);
+    }
+
     res.status(200).json({ message: 'Sesión cerrada exitosamente.' });
+
   } catch (error) {
-    console.error('Error al registrar el logout:', error);
+    console.error('Error al procesar el logout:', error);
     res.status(500).send('Error del servidor');
   }
 };
