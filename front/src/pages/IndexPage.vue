@@ -89,18 +89,21 @@ const { indicators: rawIndicators } = storeToRefs(dashboardStore);
 
 const indicators = computed(() => {
   const data = rawIndicators.value || {};
-  const formattedDate = data.fecha_maxima 
+  const formattedFechaMaxima = data.fecha_maxima
     ? new Date(data.fecha_maxima).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
     : 'N/A';
 
   return [
-    { label: 'Certificados', value: data.certificados || 0, icon: 'emoji_events', color: 'green-5' },
-    { label: 'Faltantes', value: data.faltantes || 0, icon: 'flag', color: 'orange-5' },
-    { label: 'Promedio Diario', value: Math.round(data.promedio_diario || 0), icon: 'speed', color: 'blue-5' },
-    { label: 'Fecha Máxima', value: formattedDate, icon: 'event', color: 'purple-5' }
+    { label: 'Meta', value: data.meta || 0, icon: 'flag', color: 'blue-grey-8' },
+    { label: 'Acumulado', value: data.acumulado || 0, icon: 'leaderboard', color: 'green-7' },
+    { label: 'Diferencia', value: data.diferencia || 0, icon: 'trending_down', color: 'red-7' },
+    { label: 'Días Faltantes', value: data.dias_faltantes || 0, icon: 'calendar_today', color: 'orange-8' },
+    { label: 'Promedio Necesario', value: data.promedio_necesario || 0, icon: 'speed', color: 'purple-8' },
+    { label: 'Promedio Diario', value: data.promedio_diario || 0, icon: 'bar_chart', color: 'teal-7' },
+    { label: 'Máximo por Fecha', value: data.maximo_por_fecha || 0, icon: 'military_tech', color: 'indigo-7' },
+    { label: 'Fecha Máxima', value: formattedFechaMaxima, icon: 'event', color: 'brown-6' }
   ];
 });
-
 
 onMounted(() => {
   dashboardStore.fetchCirclesByState();
