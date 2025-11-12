@@ -8,6 +8,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   // --- STATE ---
   const circlesByState = ref([]);
   const indicators = ref({});
+  const dailyCertifications = ref([]);
   const isLoading = ref(false);
   // Marca de actualización para WS
   const isUpdatingFromBackend = ref(false);
@@ -55,6 +56,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     await Promise.allSettled([
       fetchIndicators(),
       fetchCirclesByState(),
+      fetchDailyCertifications(),
     ]);
     lastUpdateAt.value = Date.now();
   };
@@ -66,6 +68,16 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const notifyDataUpdated = async () => {
     isUpdatingFromBackend.value = false;
     await refetchAll();
+  };
+
+  const fetchDailyCertifications = async (filters = {}) => {
+    try {
+      const response = await api.get('/dashboard/daily-certifications', { params: filters });
+      dailyCertifications.value = response.data;
+    } catch (error) {
+      console.error('Error al obtener las certificaciones diarias:', error);
+      dailyCertifications.value = [];
+    }
   };
 
   // Aplicar delta puntual de un estado
@@ -153,10 +165,13 @@ export const useDashboardStore = defineStore('dashboard', () => {
     // Actions
     fetchCirclesByState,
     fetchIndicators,
+  fetchDailyCertifications,
     refetchAll,
     notifyDataIsUpdating,
     notifyDataUpdated,
     applyStateUpdate,
     highlightState,
+  // State
+  dailyCertifications,
   };
 });

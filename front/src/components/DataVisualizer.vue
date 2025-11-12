@@ -41,17 +41,17 @@
 
     <q-card-section>
       <!-- Renderizado de la TABLA -->
-      <q-table
-        v-if="type === 'table'"
-        ref="tableRef"
-        v-model:pagination="pagination"
-        :rows="data"
-        :columns="tableColumns"
-        :row-key="rowKey"
-        :row-class="rowClass"
-        flat
-        dense
-      />
+          <q-table
+            v-if="type === 'table'"
+            ref="tableRef"
+            v-model:pagination="pagination"
+            :rows="tableRows"
+            :columns="tableColumns"
+            :row-key="rowKey"
+            :row-class="rowClass"
+            flat
+            dense
+          />
 
       <!-- Renderizado del GRÁFICO -->
       <div :id="`chart-container-${title.replace(/\s+/g, '-')}`">
@@ -107,45 +107,57 @@ const formatNumber = (value) => {
 
 // Calcular columnas una sola vez (no es computed para evitar re-renders)
 const buildTableColumns = () => {
+  const isDateLabel = props.columnMap && props.columnMap.label && String(props.columnMap.label).toLowerCase().includes('fecha');
+  const formatDate = (val) => {
+    if (!val) return '';
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    return `${day}/${month}/${year}`;
+  };
+
   const columns = [
-    { name: 'label', label: props.columnMap.labelHeader || 'Categoría', field: props.columnMap.label, align: 'left', sortable: true }
+    { name: 'label', label: props.columnMap.labelHeader || 'Categoría', field: props.columnMap.label, align: 'left', sortable: true, format: isDateLabel ? formatDate : undefined }
   ];
 
   if (Array.isArray(props.columnMap.value)) {
-    const metaColumnInfo = props.columnMap.value.find(c => c.key === 'meta_circulos');
-    const certColumnInfo = props.columnMap.value.find(c => c.key === 'circulos_certificados');
-
-    if (metaColumnInfo) {
+    // Push a column for each provided series
+    props.columnMap.value.forEach(series => {
       columns.push({
-        name: metaColumnInfo.key,
-        label: metaColumnInfo.name,
-        field: metaColumnInfo.key,
+        name: series.key,
+        label: series.name,
+        field: series.key,
         align: 'right',
         sortable: true,
         format: formatNumber,
       });
-    }
-
-    if (certColumnInfo) {
-      columns.push({
-        name: certColumnInfo.key,
-        label: certColumnInfo.name,
-        field: certColumnInfo.key,
-        align: 'right',
-        sortable: true,
-        format: formatNumber,
-      });
-    }
-
-    // Columna de porcentaje de cumplimiento
-    columns.push({
-      name: 'cumplimiento',
-      label: '% Cumplimiento',
-      align: 'right',
-      sortable: true,
-      field: row => (row.meta_circulos > 0 ? row.circulos_certificados / row.meta_circulos : 0),
-      format: val => `${(val * 100).toFixed(2).replace('.', ',')}%`
     });
+
+    // Determine numerator (certified) and denominator (meta) keys for % cumplimiento
+    const findCertKey = () => {
+      const cert = props.columnMap.value.find(c => /certif|participantes_certificados|certificados/i.test(c.key) || /certif|participadores|participantes_certificados|certificados/i.test(c.name));
+      return cert ? cert.key : null;
+    };
+    const findMetaKey = () => {
+      const meta = props.columnMap.value.find(c => /meta/i.test(c.key) || /meta/i.test(c.name));
+      return meta ? meta.key : null;
+    };
+
+    const certKey = findCertKey();
+    const metaKey = findMetaKey();
+
+    if (certKey && metaKey) {
+      columns.push({
+        name: 'cumplimiento',
+        label: '% Cumplimiento',
+        align: 'right',
+        sortable: true,
+        field: row => (row[metaKey] > 0 ? row[certKey] / row[metaKey] : 0),
+        format: val => `${(val * 100).toFixed(2).replace('.', ',')}%`
+      });
+    }
 
   } else {
     columns.push({
@@ -162,53 +174,139 @@ const buildTableColumns = () => {
 
 const tableColumns = ref(buildTableColumns());
 
+// Prepare rows for table rendering. If label is a date, sort descending and keep formatted date via column format
+const tableRows = computed(() => {
+  if (!props.data) return [];
+  const rows = (props.data || []).slice();
+  if (props.columnMap && props.columnMap.label && String(props.columnMap.label).toLowerCase().includes('fecha')) {
+    rows.sort((a, b) => new Date(b[props.columnMap.label]) - new Date(a[props.columnMap.label]));
+  }
+  return rows;
+});
+
 
 // --- Lógica del GRÁFICO ---
-const chartOptions = computed(() => ({
-  chart: {
-    id: `chart-${props.title.replace(/\s+/g, '-')}`,
-    toolbar: { show: false },
-    stacked: props.stacked,
-  },
-   plotOptions: {
-    bar: {
-      horizontal: false,
-      columnWidth: props.stacked ? '70%' : '55%',
-    },
-  },
-  labels: props.data.map(item => item[props.columnMap.label]),
-  xaxis: {
-    categories: (props.type === 'bar' || props.type === 'line') ? props.data.map(item => item[props.columnMap.label]) : undefined,
-  },
-  legend: { position: 'bottom' },
-  dataLabels: {
-    enabled: true,
-    style: {
-      colors: ['#000']
+const chartOptions = computed(() => {
+  // Work with a copy of data for date/time charts (ensure chronological order)
+  const dataForChart = (props.type === 'line' && props.columnMap && props.columnMap.label && String(props.columnMap.label).toLowerCase().includes('fecha'))
+    ? (props.data || []).slice().sort((a,b) => new Date(a[props.columnMap.label]) - new Date(b[props.columnMap.label]))
+    : (props.data || []);
+
+  const labels = dataForChart.map(item => item[props.columnMap.label]);
+  const categories = (props.type === 'bar' || props.type === 'line') ? labels.map(l => {
+    // if it's a date, convert to ISO string for datetime axis
+    if (props.type === 'line' && props.columnMap && props.columnMap.label && String(props.columnMap.label).toLowerCase().includes('fecha')) {
+      const d = new Date(l);
+      return isNaN(d.getTime()) ? l : d.toISOString();
     }
-  },
-  tooltip: {
-    y: {
-      formatter: function (val) {
-        return val;
+    return l;
+  }) : undefined;
+
+  const baseOptions = {
+    chart: {
+      id: `chart-${props.title.replace(/\s+/g, '-')}`,
+      toolbar: { show: false },
+      stacked: props.stacked,
+    },
+    plotOptions: {
+      bar: {
+        horizontal: false,
+        columnWidth: props.stacked ? '70%' : '55%',
+      },
+    },
+    labels,
+    xaxis: {
+      categories,
+      type: (props.type === 'line' && String(props.columnMap.label).toLowerCase().includes('fecha')) ? 'datetime' : undefined,
+    },
+    legend: { position: 'bottom' },
+    // Data labels: show only for the primary series (main data) when a trend series exists
+    dataLabels: (() => {
+      let cfg = { enabled: true, style: { colors: ['#000'] }, formatter: function (val) { return formatNumber(val); } };
+      try {
+        const hasTrend = Array.isArray(chartSeries.value) && chartSeries.value.length > 1 && chartSeries.value[1] && String(chartSeries.value[1].name).toLowerCase().includes('tendencia');
+        if (hasTrend) {
+          cfg.enabledOnSeries = [0];
+        }
+      } catch {
+        // ignore
+      }
+      return cfg;
+    })(),
+    tooltip: {
+      y: {
+        formatter: function (val) {
+          return formatNumber(val);
+        }
       }
     }
+  };
+
+  // Add stroke options for line charts (smooth)
+  if (props.type === 'line') {
+    // If there's a trend series, render it dashed and slightly thinner
+    const hasTrend = Array.isArray(chartSeries.value) && chartSeries.value.length > 1 && chartSeries.value[1] && String(chartSeries.value[1].name).toLowerCase().includes('tendencia');
+    if (hasTrend) {
+      baseOptions.stroke = { curve: 'smooth', width: [3, 2], dashArray: [0, 6] };
+      // Set a clear color for the trend (gray) and a blue for main series
+      baseOptions.colors = ['#008FFB', '#9E9E9E'];
+    } else {
+      baseOptions.stroke = { curve: 'smooth', width: 3 };
+    }
   }
-}));
+
+  return baseOptions;
+});
+
 
 const chartSeries = computed(() => {
+  const labelKey = props.columnMap && props.columnMap.label ? props.columnMap.label : null;
+  const isDateLabel = labelKey && String(labelKey).toLowerCase().includes('fecha');
+
+  // Determine the data order used for the chart (ascending for date labels)
+  const dataForChart = (props.type === 'line' && isDateLabel)
+    ? (props.data || []).slice().sort((a, b) => new Date(a[labelKey]) - new Date(b[labelKey]))
+    : (props.data || []);
+
   if (Array.isArray(props.columnMap.value)) {
     return props.columnMap.value.map(series => ({
       name: series.name,
-      data: props.data.map(item => item[series.key] || 0)
+      data: dataForChart.map(item => item[series.key] != null ? Number(item[series.key]) : 0)
     }));
   }
 
-  const seriesData = props.data.map(item => item[props.columnMap.value]);
+  const seriesData = dataForChart.map(item => item[props.columnMap.value] != null ? Number(item[props.columnMap.value]) : 0);
   if (props.type === 'pie' || props.type === 'donut') {
     return seriesData;
   }
-  return [{ name: props.title, data: seriesData }];
+
+  const mainSeries = { name: props.title, data: seriesData };
+
+  // If it's a time-series line chart, compute a simple linear trend and append it as a second series
+  if (props.type === 'line' && isDateLabel && dataForChart && dataForChart.length > 1) {
+    try {
+      const xy = dataForChart.map(d => ({ x: new Date(d[labelKey]).getTime(), y: Number(d[props.columnMap.value] || 0) }))
+        .filter(p => !isNaN(p.x));
+      if (xy.length >= 2) {
+        const n = xy.length;
+        let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+        xy.forEach(p => { sumX += p.x; sumY += p.y; sumXY += p.x * p.y; sumXX += p.x * p.x; });
+        const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX || 1);
+        const intercept = (sumY - slope * sumX) / n;
+        const trend = dataForChart.map(d => {
+          const x = new Date(d[labelKey]).getTime();
+          if (isNaN(x)) return null;
+          return Math.round((slope * x + intercept) * 100) / 100;
+        }).map(v => v == null ? 0 : v);
+
+        return [mainSeries, { name: 'Tendencia', data: trend }];
+      }
+    } catch (e) {
+      console.error('[DataVisualizer] trend calc error', e);
+    }
+  }
+
+  return [mainSeries];
 });
 
 // --- Watcher para actualizar gráfico de forma granular ---
@@ -334,61 +432,75 @@ const updateRowDomValues = (stateKey, payload = {}, rowData = {}) => {
 watch(
   () => props.data,
   (newData) => {
-    // Solo actualizar si el gráfico está renderizado y no es tabla
+    // Only update for charts (not tables) and when chart instance exists
     if (!chartRef.value || props.type === 'table' || !newData || newData.length === 0) return;
 
-    // Si es la primera vez, guardar los datos y no hacer nada
+    // Determine ordering used by the chart: ascending by date when label is fecha
+    const labelKey = props.columnMap && props.columnMap.label ? props.columnMap.label : null;
+    const isDateLabel = labelKey && String(labelKey).toLowerCase().includes('fecha');
+
+    const buildChartOrdered = (arr) => {
+      if (!Array.isArray(arr)) return [];
+      if (props.type === 'line' && isDateLabel) {
+        return arr.slice().sort((a, b) => new Date(a[labelKey]) - new Date(b[labelKey]));
+      }
+      return arr.slice();
+    };
+
+    const newOrdered = buildChartOrdered(newData);
+
+    // If first time, store ordered data and do nothing
     if (!previousData.value) {
-      previousData.value = JSON.parse(JSON.stringify(newData));
+      previousData.value = JSON.parse(JSON.stringify(newOrdered));
       return;
     }
 
-    // Detectar qué índices cambiaron
+    // Detect which indices changed by comparing ordered arrays
     const changedIndices = [];
-    for (let i = 0; i < newData.length; i++) {
+    const maxLen = Math.max(previousData.value.length, newOrdered.length);
+    for (let i = 0; i < maxLen; i++) {
       const oldItem = previousData.value[i];
-      const newItem = newData[i];
-
-      if (!oldItem || JSON.stringify(oldItem) !== JSON.stringify(newItem)) {
+      const newItem = newOrdered[i];
+      if (!oldItem || !newItem || JSON.stringify(oldItem) !== JSON.stringify(newItem)) {
         changedIndices.push(i);
       }
     }
 
-    // Si hay cambios, actualizar la serie usando updateSeries
-      if (changedIndices.length > 0) {
-        try {
-          if (!chartRef.value || !chartRef.value.updateSeries) {
-            previousData.value = JSON.parse(JSON.stringify(newData));
-            return;
-          }
+    if (changedIndices.length === 0) {
+      previousData.value = JSON.parse(JSON.stringify(newOrdered));
+      return;
+    }
 
-          // Build a shallow copy of current series and update only the changed indices
-          // This avoids re-creating all data points and keeps the chart instance intact.
-          if (Array.isArray(props.columnMap.value)) {
-            // multiple series case
-            const existingSeries = chartSeries.value.map(s => ({ name: s.name, data: Array.isArray(s.data) ? s.data.slice() : [] }));
-            changedIndices.forEach(i => {
-              props.columnMap.value.forEach((seriesCfg, si) => {
-                const val = (newData[i] && newData[i][seriesCfg.key]) != null ? newData[i][seriesCfg.key] : 0;
-                if (!existingSeries[si]) existingSeries[si] = { name: seriesCfg.name, data: [] };
-                existingSeries[si].data[i] = val;
-              });
-            });
-            chartRef.value.updateSeries(existingSeries, false);
-          } else {
-            // single series case
-            const existing = chartSeries.value[0] ? { name: chartSeries.value[0].name, data: Array.isArray(chartSeries.value[0].data) ? chartSeries.value[0].data.slice() : [] } : { name: props.title, data: [] };
-            changedIndices.forEach(i => {
-              const val = (newData[i] && newData[i][props.columnMap.value]) != null ? newData[i][props.columnMap.value] : 0;
-              existing.data[i] = val;
-            });
-            chartRef.value.updateSeries([existing], false);
-          }
-        } catch (e) {
-          console.error('[DataVisualizer] Error actualizando serie:', e);
-        }
-        previousData.value = JSON.parse(JSON.stringify(newData));
+    try {
+      if (!chartRef.value || !chartRef.value.updateSeries) {
+        previousData.value = JSON.parse(JSON.stringify(newOrdered));
+        return;
       }
+
+      // Build a shallow copy of current series and update only the changed indices
+      if (Array.isArray(props.columnMap.value)) {
+        const existingSeries = chartSeries.value.map(s => ({ name: s.name, data: Array.isArray(s.data) ? s.data.slice() : [] }));
+        changedIndices.forEach(i => {
+          props.columnMap.value.forEach((seriesCfg, si) => {
+            const val = (newOrdered[i] && newOrdered[i][seriesCfg.key]) != null ? newOrdered[i][seriesCfg.key] : 0;
+            if (!existingSeries[si]) existingSeries[si] = { name: seriesCfg.name, data: [] };
+            existingSeries[si].data[i] = val;
+          });
+        });
+        chartRef.value.updateSeries(existingSeries, false);
+      } else {
+        const existing = chartSeries.value[0] ? { name: chartSeries.value[0].name, data: Array.isArray(chartSeries.value[0].data) ? chartSeries.value[0].data.slice() : [] } : { name: props.title, data: [] };
+        changedIndices.forEach(i => {
+          const val = (newOrdered[i] && newOrdered[i][props.columnMap.value]) != null ? newOrdered[i][props.columnMap.value] : 0;
+          existing.data[i] = val;
+        });
+        chartRef.value.updateSeries([existing], false);
+      }
+    } catch (e) {
+      console.error('[DataVisualizer] Error actualizando serie:', e);
+    }
+
+    previousData.value = JSON.parse(JSON.stringify(newOrdered));
   },
   { deep: true }
 );

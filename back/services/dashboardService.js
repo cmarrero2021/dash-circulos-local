@@ -104,7 +104,7 @@ exports.getIndicators = async () => {
 exports.getCirclesByState = async (userId, filters) => {
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
-        SELECT estado, circulos_certificados, meta_circulos
+        SELECT *
         FROM vcumplimiento_metas ${whereClause}
         ORDER BY estado;
     `;
@@ -154,5 +154,18 @@ exports.getRawData = async (userId, filters) => {
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
     
     const result = await pool.query(query, [...params, limit, offset]);
+    return result.rows;
+};
+
+// --- Función para certificaciones diarias (vista vcertificaciones_diarias)
+exports.getDailyCertifications = async (userId, filters) => {
+    const { whereClause, params } = await buildFilterClause(userId, filters);
+    // The view contains fecha (date) and certificaciones (bigint)
+    const query = `
+        SELECT fecha, certificaciones
+        FROM vcertificaciones_diarias ${whereClause}
+        ORDER BY fecha DESC;
+    `;
+    const result = await pool.query(query, params);
     return result.rows;
 };

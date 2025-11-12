@@ -28,7 +28,10 @@ export default boot(() => {
           case 'data_updated':
             // Update only the indicator cards (no table refresh and no user notification)
             try {
-              await dashboardStore.fetchIndicators();
+              await Promise.all([
+                dashboardStore.fetchIndicators(),
+                dashboardStore.fetchDailyCertifications(),
+              ]);
             } catch (e) {
               console.error('[WS] Error fetching indicators after data_updated', e);
             }

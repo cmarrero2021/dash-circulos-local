@@ -35,3 +35,4 @@ exports.getCirclesByMunicipality = (req, res) => handleRequest(dashboardService.
 exports.getTotalCircles = (req, res) => handleRequest(dashboardService.getTotalCircles, req, res);
 exports.getDailyAverage = (req, res) => handleRequest(dashboardService.getDailyAverage, req, res);
 exports.getRawData = (req, res) => handleRequest(dashboardService.getRawData, req, res);
+exports.getDailyCertifications = (req, res) => handleRequest(dashboardService.getDailyCertifications, req, res);

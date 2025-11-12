@@ -28,6 +28,40 @@
       </div>
 
       <!-- Indicador: Círculos por Estado (Gráfico) -->
+      <!-- Par inicial: Certificaciones Diarias (Gráfico) -->
+      <div class="col-12 col-md-6">
+        <q-card flat bordered style="min-height: 425px;">
+          <q-inner-loading :showing="dashboardStore.isLoading">
+            <q-spinner-dots size="50px" color="primary" />
+          </q-inner-loading>
+          <DataVisualizer
+            v-show="!dashboardStore.isLoading"
+            title="CERTIFICACIONES DIARIAS"
+            :data="dashboardStore.dailyCertifications"
+            type="line"
+            row-key="fecha"
+            :column-map="{ label: 'fecha', value: 'certificaciones' }"
+          />
+        </q-card>
+      </div>
+
+      <!-- Par inicial: Certificaciones Diarias (Tabla) -->
+      <div class="col-12 col-md-6">
+        <q-card flat bordered style="min-height: 425px;">
+          <q-inner-loading :showing="dashboardStore.isLoading">
+            <q-spinner-dots size="50px" color="primary" />
+          </q-inner-loading>
+          <DataVisualizer
+            v-show="!dashboardStore.isLoading"
+            title="Certificaciones Diarias"
+            :data="dashboardStore.dailyCertifications"
+            type="table"
+            row-key="fecha"
+            :column-map="{ label: 'fecha', labelHeader: 'Fecha', value: 'certificaciones' }"
+          />
+        </q-card>
+      </div>
+
       <div class="col-12 col-md-6">
         <q-card flat bordered style="min-height: 425px;">
           <!-- El spinner ahora se muestra SOBRE el contenido -->
@@ -37,7 +71,7 @@
           <!-- v-show mantiene el componente en el DOM pero oculto -->
           <DataVisualizer
             v-show="!dashboardStore.isLoading"
-            title="Cumplimiento de Metas por Estado"
+            title="CÍRCULOS CUMPLIMIENTO vs META"
             :data="dashboardStore.circlesByState"
             type="bar"
             row-key="estado"
@@ -61,7 +95,7 @@
           </q-inner-loading>
           <DataVisualizer
             v-show="!dashboardStore.isLoading"
-            title="Tabla: Cumplimiento de Metas por Estado"
+            title="Círculos por Estado"
             :data="dashboardStore.circlesByState"
             type="table"
             row-key="estado"
@@ -71,6 +105,54 @@
               value: [
                 { name: 'Círculos Certificados', key: 'circulos_certificados' },
                 { name: 'Meta de Círculos', key: 'meta_circulos' }
+              ]
+            }"
+          />
+        </q-card>
+      </div>
+
+      <!-- Nuevo par: Participantes por Estado (Gráfico) -->
+      <div class="col-12 col-md-6">
+        <q-card flat bordered style="min-height: 425px;">
+          <q-inner-loading :showing="dashboardStore.isLoading">
+            <q-spinner-dots size="50px" color="primary" />
+          </q-inner-loading>
+          <DataVisualizer
+            v-show="!dashboardStore.isLoading"
+            title="PARTICIPANTES CUMPLIMIENTO vs META"
+            :data="dashboardStore.circlesByState"
+            type="bar"
+            row-key="estado"
+            :column-map="{
+              label: 'estado',
+              value: [
+                { name: 'Participantes Certificados', key: 'participantes_certificados' },
+                { name: 'Meta de Participantes', key: 'meta_participantes' }
+              ]
+            }"
+            stacked
+          />
+        </q-card>
+      </div>
+
+      <!-- Nuevo par: Participantes por Estado (Tabla) -->
+      <div class="col-12 col-md-6">
+        <q-card flat bordered style="min-height: 425px;">
+          <q-inner-loading :showing="dashboardStore.isLoading">
+            <q-spinner-dots size="50px" color="primary" />
+          </q-inner-loading>
+          <DataVisualizer
+            v-show="!dashboardStore.isLoading"
+            title="Participantes por Estado"
+            :data="dashboardStore.circlesByState"
+            type="table"
+            row-key="estado"
+            :column-map="{
+              label: 'estado',
+              labelHeader: 'Estado',
+              value: [
+                { name: 'Participantes Certificados', key: 'participantes_certificados' },
+                { name: 'Meta de Participantes', key: 'meta_participantes' }
               ]
             }"
           />
@@ -177,6 +259,7 @@ const indicators = computed(() => {
 onMounted(() => {
   dashboardStore.fetchCirclesByState();
   dashboardStore.fetchIndicators();
+  dashboardStore.fetchDailyCertifications();
 });
 
 // (debug logs removed)
