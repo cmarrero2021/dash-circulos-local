@@ -11,7 +11,7 @@ let wss = null; // Variable para mantener la instancia del servidor WebSocket
  */
 const initialize = (webSocketServer) => {
   wss = webSocketServer;
-  console.log('✅ Servicio de WebSocket inicializado.');
+  // WebSocket service initialized
 };
 
 /**
@@ -25,7 +25,6 @@ const broadcast = (data) => {
   }
 
   const message = JSON.stringify(data);
-  console.log(`📢 Transmitiendo a ${wss.clients.size} cliente(s): ${message}`);
 
   wss.clients.forEach((client) => {
     // Solo enviar si la conexión está abierta

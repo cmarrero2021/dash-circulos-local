@@ -55,10 +55,10 @@ websocketService.initialize(wss);
 
 
 wss.on('connection', (ws) => {
-  console.log('🔗 Cliente conectado al WebSocket');
+  // Client connected to WebSocket
   
   ws.on('close', () => {
-    console.log('✖️ Cliente desconectado del WebSocket');
+    // Client disconnected
   });
 
   ws.on('error', console.error);
@@ -68,7 +68,6 @@ wss.on('connection', (ws) => {
 const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, () => {
-  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
-  // Iniciar el listener de notificaciones de la base de datos 'registro'
+  // Server started
   startListening();
 });

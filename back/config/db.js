@@ -12,7 +12,7 @@ const pool = new Pool({
 });
 
 pool.on('connect', () => {
-  console.log('✅ Conectado a la base de datos "dashboard_registros"');
+  // Database connected
 });
 
 module.exports = pool;

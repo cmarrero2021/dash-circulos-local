@@ -5,6 +5,4 @@ const NodeCache = require('node-cache');
 // checkperiod: Cada cuánto se revisan las claves expiradas.
 const cache = new NodeCache({ stdTTL: 3600, checkperiod: 600 });
 
-console.log('✅ Servicio de Caché inicializado.');
-
 module.exports = cache;

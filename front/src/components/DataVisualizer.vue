@@ -215,19 +215,13 @@ const chartSeries = computed(() => {
 // Mantener referencia de los datos anteriores para detectar cambios puntuales
 const previousData = ref(null);
 
-// Row highlight: show a temporary background for rows that were marked as changed
-const HIGHLIGHT_DURATION = 5000; // ms
+// Row highlight: remain highlighted while the store keeps __highlightedAt on the row
 const rowClass = (row) => {
   if (!row) return '';
   const ts = row.__highlightedAt;
   if (!ts) return '';
-  const age = Date.now() - ts;
-  const isHighlighted = age >= 0 && age < HIGHLIGHT_DURATION;
-  if (isHighlighted) {
-    // debug
-    console.debug('[DataVisualizer] rowClass: highlighting', row.estado || row.estado_id, 'age(ms):', age);
-  }
-  return isHighlighted ? 'row-highlight' : '';
+  // persistent highlight for debugging removed
+  return 'row-highlight';
 };
 
 // Debug: watch data prop to detect highlighted flags on incoming rows
@@ -237,7 +231,6 @@ watch(
     if (!newData) return;
     const highlighted = newData.filter(r => r && r.__highlightedAt);
     if (highlighted.length > 0) {
-      console.debug('[DataVisualizer] detected highlighted rows in props.data:', highlighted.map(r => r.estado || r.estado_id));
       // Apply DOM-level highlight to matching table rows so the user sees the change
       highlighted.forEach(r => {
         const key = r.estado || r.estado_id;
@@ -279,21 +272,17 @@ const applyDomHighlight = (stateKey) => {
     });
   });
 
-  if (!target) {
-    console.debug('[DataVisualizer] applyDomHighlight: no DOM row found for', stateKey);
-    return;
-  }
+    if (!target) {
+      return;
+    }
 
   target.classList.add('row-highlight');
   target.__wasHighlightedByScript = true;
 
-  // Remove after same duration
-  setTimeout(() => {
-    if (target && target.__wasHighlightedByScript) {
-      target.classList.remove('row-highlight');
-      target.__wasHighlightedByScript = false;
-    }
-  }, HIGHLIGHT_DURATION);
+  // Leave the DOM-applied highlight in place; the store will clear
+  // the __highlightedAt flag on the previously highlighted row when a
+  // new state is highlighted, and the next props.data change will
+  // trigger clearing of the element via the initial cleanup above.
 };
 
 // Update specific cells in the row for given stateKey using payload values (no table re-render)
@@ -322,7 +311,6 @@ const updateRowDomValues = (stateKey, payload = {}, rowData = {}) => {
   });
 
   if (!target) {
-    console.debug('[DataVisualizer] updateRowDomValues: no DOM row found for', stateKey);
     return;
   }
 
@@ -499,15 +487,15 @@ const exportChart = async (format) => {
 .data-card {
   height: 100%;
 }
-  /* Highlighted row style for temporary change indication */
+  /* Highlighted row style for persistent change indication (green) */
   .row-highlight {
-    background-color: rgba(255, 0, 0, 0.12) !important;
+    background-color: rgba(0, 128, 0, 0.12) !important;
   }
 </style>
 
 <!-- Global style so QTable internal rows (rendered by child component) pick up the class -->
 <style>
   .row-highlight {
-    background-color: rgba(255, 0, 0, 0.12) !important;
+    background-color: rgba(0, 128, 0, 0.12) !important;
   }
 </style>

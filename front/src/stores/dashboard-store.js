@@ -3,7 +3,6 @@
 import { defineStore } from 'pinia';
 import { api } from 'boot/axios';
 import { ref } from 'vue';
-import { Notify } from 'quasar'; // Importamos Notify para mostrar errores
 
 export const useDashboardStore = defineStore('dashboard', () => {
   // --- STATE ---
@@ -26,10 +25,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
     } catch (error) {
       console.error('Error al obtener los indicadores:', error);
       indicators.value = {};
-      Notify.create({
-        type: 'negative',
-        message: 'No se pudieron cargar los indicadores principales.',
-      });
     }
   };
 
@@ -39,22 +34,17 @@ export const useDashboardStore = defineStore('dashboard', () => {
       const response = await api.get('/dashboard/by-state', { params: filters });
       circlesByState.value = response.data;
       // Re-apply highlights to freshly loaded rows if any highlighted keys are active
-      const now = Date.now();
-      const HIGHLIGHT_DURATION = 5000;
       circlesByState.value.forEach(row => {
         const key = row.estado_id != null ? String(row.estado_id) : String((row.estado || '').toUpperCase());
         const ts = highlightedStates.value[key];
-        if (ts && (now - ts) < HIGHLIGHT_DURATION) {
+        if (ts) {
+          // Reapply any active highlight for this key (persist until another WS signal)
           row.__highlightedAt = ts;
         }
       });
     } catch (error) {
       console.error('Error al obtener los círculos por estado:', error);
       circlesByState.value = [];
-      Notify.create({
-        type: 'negative',
-        message: 'No se pudieron cargar los datos de círculos por estado.',
-      });
     } finally {
       isLoading.value = false;
     }
@@ -104,14 +94,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
     lastUpdateAt.value = Date.now();
   };
 
-  // Marcar una fila como "cambiada" para destacar sin actualizar sus valores
-  const HIGHLIGHT_DURATION = 5000; // ms
   const highlightState = (payload) => {
     // First, clear any existing highlights on all rows
     circlesByState.value.forEach(r => {
       if (r && r.__highlightedAt) {
-        // debug
-        console.debug('[store] clearing highlight for', r.estado || r.estado_id);
+        // previously highlighted; clearing mark
         delete r.__highlightedAt;
       }
     });
@@ -128,7 +115,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     };
 
   const idx = findIndex();
-  console.debug('[store] highlightState payload:', payload, 'foundIdx:', idx);
+  // highlightState called with payload; idx: findIndex
   if (idx === -1) return;
 
   const item = circlesByState.value[idx];
@@ -152,20 +139,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
     // Also record in highlightedStates so highlight survives a refetch
   const key = item.estado_id != null ? String(item.estado_id) : String((item.estado || '').toUpperCase());
   highlightedStates.value[key] = ts;
-  console.debug('[store] highlighted key set:', key, 'ts:', ts, 'item.estado:', item.estado);
-
-    // Clear the mark after duration (both on the row and on the map)
-    setTimeout(() => {
-      if (item && item.__highlightedAt && item.__highlightedAt === ts) {
-        delete item.__highlightedAt;
-      }
-      if (item && item.__pendingUpdate) {
-        delete item.__pendingUpdate;
-      }
-      if (highlightedStates.value[key] && highlightedStates.value[key] === ts) {
-        delete highlightedStates.value[key];
-      }
-    }, HIGHLIGHT_DURATION);
     lastUpdateAt.value = Date.now();
   };
 

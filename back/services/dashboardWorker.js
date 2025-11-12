@@ -12,11 +12,10 @@ let previousStateData = null; // Guardar estado anterior para detectar cambios
  */
 async function refreshDashboardCache() {
   if (isRefreshing) {
-    console.log('[Worker] Ya hay un refresco en progreso. Omitiendo.');
+    // Refresh already in progress; skipping
     return;
   }
-
-  console.log('[Worker] Iniciando refresco del caché del dashboard...');
+  // Starting dashboard cache refresh
   isRefreshing = true;
 
   try {
@@ -61,7 +60,6 @@ async function refreshDashboardCache() {
             circulos_certificados: change.newValue
           }
         });
-        console.log(`[Worker] Estado ${change.estado}: ${change.oldValue} → ${change.newValue}`);
       });
     }
 
@@ -71,10 +69,10 @@ async function refreshDashboardCache() {
     cache.set('dashboard:total', totalCirculos);
     previousStateData = { ...circulosPorEstado }; // Guardar para próxima comparación
 
-    console.log('[Worker] Caché actualizado exitosamente.');
+  // Cache updated successfully
 
     // 5. Notificar al frontend que los datos están listos
-    websocketService.broadcast({ event: 'data_updated' });
+  websocketService.broadcast({ event: 'data_updated' });
 
   } catch (error) {
     console.error('[Worker] Error durante el refresco del caché:', error);

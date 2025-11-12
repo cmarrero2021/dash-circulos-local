@@ -22,7 +22,7 @@ export default boot(({ app }) => {
     (error) => {
       if (error.response && error.response.status === 401) {
         if (routerInstance.currentRoute.value.path !== '/login') {
-          console.log('[Axios Interceptor] Token inválido o expirado. Forzando logout.');
+          // Token inválido o expirado. Forzando logout.
           authStore.logout();
         }
       }

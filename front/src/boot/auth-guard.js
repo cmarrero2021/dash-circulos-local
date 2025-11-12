@@ -10,20 +10,13 @@ export default boot(({ router }) => {
   const authStore = useAuthStore(storeInstance);
 
   router.beforeEach((to, from, next) => {
-    // ---- Añade estos logs para la depuración final ----
-    console.log(`[Auth Guard] Navegando a: ${to.path}`);
-    console.log(`[Auth Guard] isAuthenticated: ${authStore.isAuthenticated}`);
-    console.log(`[Auth Guard] Meta:`, to.meta);
-    // --------------------------------------------------
+  // Debug logs removed: navigation/auth info
 
     if (to.meta.requiresAuth && !authStore.isAuthenticated) {
-      console.log(`[Auth Guard] DECISIÓN: Redirigir a /login`);
       next({ path: '/login' });
     } else if (to.meta.requiresGuest && authStore.isAuthenticated) {
-      console.log(`[Auth Guard] DECISIÓN: Redirigir a /`);
       next({ path: '/' });
     } else {
-      console.log(`[Auth Guard] DECISIÓN: Permitir`);
       next();
     }
   });

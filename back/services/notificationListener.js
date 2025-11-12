@@ -14,13 +14,7 @@ const dbConfig = {
   password: process.env.REGISTRO_DB_PASSWORD,
   port: process.env.REGISTRO_DB_PORT,
 };
-console.log('🔍 Configuración del Listener de la BD:', {
-    user: dbConfig.user,
-    host: dbConfig.host,
-    database: dbConfig.database,
-    port: dbConfig.port,
-    password: dbConfig.password ? '****** (definida)' : 'undefined' // No mostramos la clave en el log
-});
+// Listener DB configuration loaded (sensitive data omitted)
 
 let client; // Mantenemos el cliente en una variable para poder reconectar
 
@@ -33,12 +27,12 @@ const startListening = () => {
       setTimeout(startListening, 5000);
       return;
     }
-    console.log('✅ Listener conectado a la base de datos "registro"');
+    // Listener connected to the source DB
     client.query('LISTEN actualizacion_dashboard');
   });
 
   client.on('notification', (msg) => {
-    console.log('🔔 Notificación recibida. Disparando refresco en segundo plano.');
+    // Notification received from DB: trigger background refresh
     websocketService.broadcast({ event: 'data_is_updating' });
     refreshDashboardCache();    
     // try {
@@ -54,7 +48,7 @@ const startListening = () => {
   });
   
   client.on('end', () => {
-    console.warn('🔚 Conexión del listener de la BD finalizada. Reintentando conexión...');
+  console.warn('🔚 Conexión del listener de la BD finalizada. Reintentando conexión...');
     setTimeout(startListening, 5000); // Intenta reconectar si la conexión se pierde
   });
 

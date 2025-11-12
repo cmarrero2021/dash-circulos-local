@@ -17,7 +17,6 @@ export default boot(() => {
 
     // Convenience helpers
     window.__simulateStateUpdate = (payload) => {
-      console.debug('[BOOT] simulate state update', payload);
       try {
         dashboardStore.highlightState(payload);
       } catch (e) {
@@ -26,7 +25,6 @@ export default boot(() => {
     };
 
     window.__simulateIndicators = async () => {
-      console.debug('[BOOT] simulate indicators refresh');
       try {
         await dashboardStore.fetchIndicators();
       } catch (e) {
