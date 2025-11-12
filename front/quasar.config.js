@@ -15,7 +15,8 @@ export default defineConfig((ctx) => {
     boot: [
       'axios',
       'auth-guard',
-      'notify-defaults'
+      'notify-defaults',
+      'ws'
 
     ],
 

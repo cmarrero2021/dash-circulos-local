@@ -7,16 +7,14 @@ import { Notify } from 'quasar'; // Importamos Notify para mostrar errores
 
 export const useDashboardStore = defineStore('dashboard', () => {
   // --- STATE ---
-  // Un ref para cada indicador que necesitemos
   const circlesByState = ref([]);
   const indicators = ref({});
-  // ... aquí añadiremos más refs para otros datos (byMunicipality, total, etc.)
-
-  // Un único estado de carga para todo el store o podrías tener uno por acción
   const isLoading = ref(false);
+  // Marca de actualización para WS
+  const isUpdatingFromBackend = ref(false);
+  const lastUpdateAt = ref(0);
 
   // --- ACTIONS ---
-
   const fetchIndicators = async () => {
     isLoading.value = true;
     try {
@@ -24,7 +22,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
       indicators.value = response.data;
     } catch (error) {
       console.error('Error al obtener los indicadores:', error);
-      indicators.value = {}; // Limpiar en caso de error
+      indicators.value = {};
       Notify.create({
         type: 'negative',
         message: 'No se pudieron cargar los indicadores principales.',
@@ -34,50 +32,14 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   };
 
-  /**
-   * Obtiene los datos de círculos agrupados por estado desde la API.
-   * @param {object} filters - Un objeto con filtros opcionales (ej: { estado_id: 4 })
-   */
-  /*
-  const fetchCirclesByState = async (filters = {}) => {
-    isLoading.value = true;
-    try {
-      // Hacemos la llamada a la API, pasando los filtros como query params
-      const response = await api.get('/dashboard/by-state', { params: filters });
-
-      // La data del backend para este endpoint es un objeto, no un array.
-      // Lo transformamos a un array de objetos, que es más fácil de usar en QTable y ApexCharts.
-      // Ejemplo de entrada: { "AMAZONAS": 15, "ANZOÁTEGUI": 10 }
-      // Ejemplo de salida: [ { estado: "AMAZONAS", total_circulos: 15 }, { estado: "ANZOÁTEGUI", total_circulos: 10 } ]
-      const dataAsArray = Object.entries(response.data).map(([estado, total]) => ({
-        estado: estado,
-        total_circulos: total
-      }));
-
-      circlesByState.value = dataAsArray;
-
-    } catch (error) {
-      console.error('Error al obtener los círculos por estado:', error);
-      circlesByState.value = []; // Limpiar datos en caso de error
-      Notify.create({
-        type: 'negative',
-        message: 'No se pudieron cargar los datos de círculos por estado.',
-      });
-    } finally {
-      isLoading.value = false;
-    }
-  };
-*/
   const fetchCirclesByState = async (filters = {}) => {
     isLoading.value = true;
     try {
       const response = await api.get('/dashboard/by-state', { params: filters });
-      // La API ya devuelve un array de objetos, así que lo asignamos directamente.
-      // Ejemplo: [ { estado_id: 1, estado: "AMAZONAS", total_circulos: 15 }, ... ]
       circlesByState.value = response.data;
     } catch (error) {
       console.error('Error al obtener los círculos por estado:', error);
-      circlesByState.value = []; // Limpiar datos en caso de error
+      circlesByState.value = [];
       Notify.create({
         type: 'negative',
         message: 'No se pudieron cargar los datos de círculos por estado.',
@@ -86,17 +48,38 @@ export const useDashboardStore = defineStore('dashboard', () => {
       isLoading.value = false;
     }
   };
-  // --- (Aquí añadiremos más acciones como fetchCirclesByMunicipality, etc.) ---
 
+  // Encadenar recarga para todos los datasets usados en IndexPage
+  const refetchAll = async () => {
+    await Promise.allSettled([
+      fetchIndicators(),
+      fetchCirclesByState(),
+    ]);
+    lastUpdateAt.value = Date.now();
+  };
+
+  // Notificaciones desde WS
+  const notifyDataIsUpdating = () => {
+    isUpdatingFromBackend.value = true;
+  };
+  const notifyDataUpdated = async () => {
+    isUpdatingFromBackend.value = false;
+    await refetchAll();
+  };
 
   return {
     // State
     circlesByState,
     indicators,
     isLoading,
+    isUpdatingFromBackend,
+    lastUpdateAt,
 
     // Actions
     fetchCirclesByState,
     fetchIndicators,
+    refetchAll,
+    notifyDataIsUpdating,
+    notifyDataUpdated,
   };
 });
