@@ -1,6 +1,23 @@
 <template>
   <q-page class="q-pa-md bg-grey-2">
     <div class="row q-col-gutter-md">
+      <!-- Indicadores Principales -->
+      <div v-for="indicator in indicators" :key="indicator.label" class="col-12 col-md-3">
+        <q-card flat bordered>
+          <q-card-section>
+            <div class="row items-center no-wrap">
+              <div class="col">
+                <div class="text-subtitle2 text-grey-8">{{ indicator.label }}</div>
+                <div class="text-h5 text-weight-bold">
+                  {{ indicator.value }}
+                  <q-icon :name="indicator.icon" :color="indicator.color" size="sm" />
+                </div>
+              </div>
+            </div>
+          </q-card-section>
+        </q-card>
+      </div>
+
       <!-- Filtros de la Página -->
       <div class="col-12">
         <q-card flat bordered>
@@ -62,13 +79,31 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue';
+import { onMounted, computed } from 'vue';
 import { useDashboardStore } from 'stores/dashboard-store';
+import { storeToRefs } from 'pinia';
 import DataVisualizer from 'components/DataVisualizer.vue';
 
 const dashboardStore = useDashboardStore();
+const { indicators: rawIndicators } = storeToRefs(dashboardStore);
+
+const indicators = computed(() => {
+  const data = rawIndicators.value || {};
+  const formattedDate = data.fecha_maxima 
+    ? new Date(data.fecha_maxima).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : 'N/A';
+
+  return [
+    { label: 'Certificados', value: data.certificados || 0, icon: 'emoji_events', color: 'green-5' },
+    { label: 'Faltantes', value: data.faltantes || 0, icon: 'flag', color: 'orange-5' },
+    { label: 'Promedio Diario', value: Math.round(data.promedio_diario || 0), icon: 'speed', color: 'blue-5' },
+    { label: 'Fecha Máxima', value: formattedDate, icon: 'event', color: 'purple-5' }
+  ];
+});
+
 
 onMounted(() => {
   dashboardStore.fetchCirclesByState();
+  dashboardStore.fetchIndicators();
 });
 </script>

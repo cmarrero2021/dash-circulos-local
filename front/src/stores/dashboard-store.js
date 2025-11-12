@@ -9,12 +9,30 @@ export const useDashboardStore = defineStore('dashboard', () => {
   // --- STATE ---
   // Un ref para cada indicador que necesitemos
   const circlesByState = ref([]);
+  const indicators = ref({});
   // ... aquí añadiremos más refs para otros datos (byMunicipality, total, etc.)
 
   // Un único estado de carga para todo el store o podrías tener uno por acción
   const isLoading = ref(false);
 
   // --- ACTIONS ---
+
+  const fetchIndicators = async () => {
+    isLoading.value = true;
+    try {
+      const response = await api.get('/dashboard/indicators');
+      indicators.value = response.data;
+    } catch (error) {
+      console.error('Error al obtener los indicadores:', error);
+      indicators.value = {}; // Limpiar en caso de error
+      Notify.create({
+        type: 'negative',
+        message: 'No se pudieron cargar los indicadores principales.',
+      });
+    } finally {
+      isLoading.value = false;
+    }
+  };
 
   /**
    * Obtiene los datos de círculos agrupados por estado desde la API.
@@ -74,9 +92,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
   return {
     // State
     circlesByState,
+    indicators,
     isLoading,
 
     // Actions
     fetchCirclesByState,
+    fetchIndicators,
   };
 });

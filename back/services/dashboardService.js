@@ -92,6 +92,13 @@ const buildFilterClause = async (userId, voluntaryFilters = {}) => {
 };
 
 
+// --- Funciones de Indicadores ---
+exports.getIndicators = async () => {
+    const query = `SELECT certificados, faltantes, promedio_diario, fecha_maxima FROM vindicadores;`;
+    const result = await pool.query(query);
+    return result.rows[0] || {};
+}
+
 // --- Funciones de Agregación ---
 
 exports.getCirclesByState = async (userId, filters) => {

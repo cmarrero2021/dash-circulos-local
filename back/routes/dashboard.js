@@ -9,6 +9,9 @@ router.use(authMiddleware);
 // Protegemos todas las rutas con el permiso para ver el dashboard nacional.
 router.use(authorize('ver_dashboard_nacional'));
 
+// --- Endpoint de Indicadores ---
+router.get('/indicators', dashboardController.getIndicators);
+
 // --- Endpoints de Agregación ---
 router.get('/by-state', dashboardController.getCirclesByState);
 router.get('/by-municipality', dashboardController.getCirclesByMunicipality);

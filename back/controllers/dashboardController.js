@@ -19,6 +19,16 @@ const handleRequest = async (serviceFunction, req, res) => {
     }
 }
 
+exports.getIndicators = async (req, res) => {
+    try {
+        const data = await dashboardService.getIndicators();
+        res.json(data);
+    } catch (error) {
+        console.error('Error en el controlador de indicadores:', error.message);
+        res.status(500).send('Error del servidor');
+    }
+};
+
 // Exportamos TODAS las funciones que el router necesita
 exports.getCirclesByState = (req, res) => handleRequest(dashboardService.getCirclesByState, req, res);
 exports.getCirclesByMunicipality = (req, res) => handleRequest(dashboardService.getCirclesByMunicipality, req, res);

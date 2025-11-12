@@ -46,7 +46,7 @@
         v-model:pagination="pagination"
         :rows="data"
         :columns="tableColumns"
-        row-key="name"
+        row-key="label"
         flat
         dense
       />
@@ -92,20 +92,56 @@ const pagination = ref({
 
 // --- Lógica de la TABLA ---
 const tableColumns = computed(() => {
+  const formatNumber = (value) => {
+    // Parsea el valor a número. COUNT de postgres devuelve string para bigints.
+    const num = Number(value);
+    if (isNaN(num)) {
+      return value; // Si no es un número válido, devuelve el original.
+    }
+    // Formato 'de-DE' usa punto como separador de miles.
+    return new Intl.NumberFormat('de-DE').format(Math.round(num));
+  };
+
   const columns = [
     { name: 'label', label: props.columnMap.labelHeader || 'Categoría', field: props.columnMap.label, align: 'left', sortable: true }
   ];
 
   if (Array.isArray(props.columnMap.value)) {
-    props.columnMap.value.forEach(series => {
+    const metaColumnInfo = props.columnMap.value.find(c => c.key === 'meta_circulos');
+    const certColumnInfo = props.columnMap.value.find(c => c.key === 'circulos_certificados');
+
+    if (metaColumnInfo) {
       columns.push({
-        name: series.key,
-        label: series.name,
-        field: series.key,
+        name: metaColumnInfo.key,
+        label: metaColumnInfo.name,
+        field: metaColumnInfo.key,
         align: 'right',
         sortable: true,
+        format: formatNumber,
       });
+    }
+
+    if (certColumnInfo) {
+      columns.push({
+        name: certColumnInfo.key,
+        label: certColumnInfo.name,
+        field: certColumnInfo.key,
+        align: 'right',
+        sortable: true,
+        format: formatNumber,
+      });
+    }
+
+    // Columna de porcentaje de cumplimiento
+    columns.push({
+      name: 'cumplimiento',
+      label: '% Cumplimiento',
+      align: 'right',
+      sortable: true,
+      field: row => (row.meta_circulos > 0 ? row.circulos_certificados / row.meta_circulos : 0),
+      format: val => `${(val * 100).toFixed(2).replace('.', ',')}%`
     });
+
   } else {
     columns.push({
       name: 'value',
@@ -113,6 +149,7 @@ const tableColumns = computed(() => {
       field: props.columnMap.value,
       align: 'right',
       sortable: true,
+      format: formatNumber,
     });
   }
   return columns;
