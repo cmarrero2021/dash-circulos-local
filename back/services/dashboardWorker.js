@@ -3,10 +3,12 @@ const cache = require('./cacheService');
 const websocketService = require('./websocketService');
 
 let isRefreshing = false; // Un semáforo para evitar refrescos concurrentes
+let previousStateData = null; // Guardar estado anterior para detectar cambios
 
 /**
  * La función principal que realiza el trabajo pesado.
  * Obtiene todos los datos, los agrega y actualiza el caché.
+ * Detecta cambios puntuales y emite eventos granulares.
  */
 async function refreshDashboardCache() {
   if (isRefreshing) {
@@ -38,14 +40,40 @@ async function refreshDashboardCache() {
     
     const totalCirculos = rawData.length;
 
-    // 3. Sobrescribir los datos en el caché
+    // 3. Detectar cambios puntuales comparando con estado anterior
+    if (previousStateData) {
+      const changedStates = [];
+      for (const estado in circulosPorEstado) {
+        if (circulosPorEstado[estado] !== previousStateData[estado]) {
+          changedStates.push({
+            estado,
+            newValue: circulosPorEstado[estado],
+            oldValue: previousStateData[estado] || 0
+          });
+        }
+      }
+      // Emitir eventos granulares para cada estado que cambió
+      changedStates.forEach(change => {
+        websocketService.broadcast({
+          event: 'state_updated',
+          payload: {
+            estado: change.estado,
+            circulos_certificados: change.newValue
+          }
+        });
+        console.log(`[Worker] Estado ${change.estado}: ${change.oldValue} → ${change.newValue}`);
+      });
+    }
+
+    // 4. Sobrescribir los datos en el caché
     cache.set('dashboard:by-state', circulosPorEstado);
     cache.set('dashboard:by-municipality', circulosPorMunicipio);
     cache.set('dashboard:total', totalCirculos);
+    previousStateData = { ...circulosPorEstado }; // Guardar para próxima comparación
 
     console.log('[Worker] Caché actualizado exitosamente.');
 
-    // 4. Notificar al frontend que los datos están listos
+    // 5. Notificar al frontend que los datos están listos
     websocketService.broadcast({ event: 'data_updated' });
 
   } catch (error) {

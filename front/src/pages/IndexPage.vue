@@ -30,14 +30,17 @@
       <!-- Indicador: Círculos por Estado (Gráfico) -->
       <div class="col-12 col-md-6">
         <q-card flat bordered style="min-height: 425px;">
-          <q-inner-loading :showing="dashboardStore.isLoading || dashboardStore.isUpdatingFromBackend">
+          <!-- El spinner ahora se muestra SOBRE el contenido -->
+          <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
+          <!-- v-show mantiene el componente en el DOM pero oculto -->
           <DataVisualizer
-            v-show="!dashboardStore.isLoading && !dashboardStore.isUpdatingFromBackend"
+            v-show="!dashboardStore.isLoading"
             title="Cumplimiento de Metas por Estado"
             :data="dashboardStore.circlesByState"
             type="bar"
+            row-key="estado"
             :column-map="{
               label: 'estado',
               value: [
@@ -53,14 +56,15 @@
       <!-- Indicador: Círculos por Estado (Tabla) -->
       <div class="col-12 col-md-6">
         <q-card flat bordered style="min-height: 425px;">
-           <q-inner-loading :showing="dashboardStore.isLoading || dashboardStore.isUpdatingFromBackend">
+           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
           <DataVisualizer
-            v-show="!dashboardStore.isLoading && !dashboardStore.isUpdatingFromBackend"
+            v-show="!dashboardStore.isLoading"
             title="Tabla: Cumplimiento de Metas por Estado"
             :data="dashboardStore.circlesByState"
             type="table"
+            row-key="estado"
             :column-map="{
               label: 'estado',
               labelHeader: 'Estado',

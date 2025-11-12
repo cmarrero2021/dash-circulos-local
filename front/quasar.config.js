@@ -16,7 +16,9 @@ export default defineConfig((ctx) => {
       'axios',
       'auth-guard',
       'notify-defaults',
-      'ws'
+      'ws',
+      // Temporary boot to expose store/helpers on window for debugging
+      'expose-store'
 
     ],
 

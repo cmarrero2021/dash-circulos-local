@@ -43,10 +43,12 @@
       <!-- Renderizado de la TABLA -->
       <q-table
         v-if="type === 'table'"
+        ref="tableRef"
         v-model:pagination="pagination"
         :rows="data"
         :columns="tableColumns"
-        row-key="label"
+        :row-key="rowKey"
+        :row-class="rowClass"
         flat
         dense
       />
@@ -67,7 +69,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import VueApexCharts from 'vue3-apexcharts';
 import { utils, writeFile } from 'xlsx';
 import { exportFile } from 'quasar';
@@ -82,26 +84,29 @@ const props = defineProps({
   type: { type: String, default: 'bar' }, // 'table', 'bar', 'pie', 'donut'
   columnMap: { type: Object, required: true }, // { label: 'campo_label', value: 'campo_valor' o [{ name, key }, ...] }
   stacked: { type: Boolean, default: false }, // Para gráficos de barras apiladas
+  rowKey: { type: String, default: 'estado_id' }, // clave estable para QTable
 });
 
 const chartRef = ref(null);
+const tableRef = ref(null);
 
 const pagination = ref({
   rowsPerPage: 10
 });
 
 // --- Lógica de la TABLA ---
-const tableColumns = computed(() => {
-  const formatNumber = (value) => {
-    // Parsea el valor a número. COUNT de postgres devuelve string para bigints.
-    const num = Number(value);
-    if (isNaN(num)) {
-      return value; // Si no es un número válido, devuelve el original.
-    }
-    // Formato 'de-DE' usa punto como separador de miles.
-    return new Intl.NumberFormat('de-DE').format(Math.round(num));
-  };
+const formatNumber = (value) => {
+  // Parsea el valor a número. COUNT de postgres devuelve string para bigints.
+  const num = Number(value);
+  if (isNaN(num)) {
+    return value; // Si no es un número válido, devuelve el original.
+  }
+  // Formato 'de-DE' usa punto como separador de miles.
+  return new Intl.NumberFormat('de-DE').format(Math.round(num));
+};
 
+// Calcular columnas una sola vez (no es computed para evitar re-renders)
+const buildTableColumns = () => {
   const columns = [
     { name: 'label', label: props.columnMap.labelHeader || 'Categoría', field: props.columnMap.label, align: 'left', sortable: true }
   ];
@@ -153,7 +158,9 @@ const tableColumns = computed(() => {
     });
   }
   return columns;
-});
+};
+
+const tableColumns = ref(buildTableColumns());
 
 
 // --- Lógica del GRÁFICO ---
@@ -204,6 +211,178 @@ const chartSeries = computed(() => {
   return [{ name: props.title, data: seriesData }];
 });
 
+// --- Watcher para actualizar gráfico de forma granular ---
+// Mantener referencia de los datos anteriores para detectar cambios puntuales
+const previousData = ref(null);
+
+// Row highlight: show a temporary background for rows that were marked as changed
+const HIGHLIGHT_DURATION = 5000; // ms
+const rowClass = (row) => {
+  if (!row) return '';
+  const ts = row.__highlightedAt;
+  if (!ts) return '';
+  const age = Date.now() - ts;
+  const isHighlighted = age >= 0 && age < HIGHLIGHT_DURATION;
+  if (isHighlighted) {
+    // debug
+    console.debug('[DataVisualizer] rowClass: highlighting', row.estado || row.estado_id, 'age(ms):', age);
+  }
+  return isHighlighted ? 'row-highlight' : '';
+};
+
+// Debug: watch data prop to detect highlighted flags on incoming rows
+watch(
+  () => props.data,
+  (newData) => {
+    if (!newData) return;
+    const highlighted = newData.filter(r => r && r.__highlightedAt);
+    if (highlighted.length > 0) {
+      console.debug('[DataVisualizer] detected highlighted rows in props.data:', highlighted.map(r => r.estado || r.estado_id));
+      // Apply DOM-level highlight to matching table rows so the user sees the change
+      highlighted.forEach(r => {
+        const key = r.estado || r.estado_id;
+        applyDomHighlight(String(key));
+          // If there's an incoming payload with new values, update the DOM cells
+          if (r.__pendingUpdate) {
+            try {
+              updateRowDomValues(String(key), r.__pendingUpdate, r);
+              // remove pending after applying
+              delete r.__pendingUpdate;
+            } catch (e) {
+              console.error('[DataVisualizer] error applying DOM value update', e);
+            }
+          }
+      });
+    }
+  },
+  { deep: true, immediate: true }
+);
+
+// Apply and remove highlight on the actual table row element matching the state text
+const applyDomHighlight = (stateKey) => {
+  if (!tableRef.value || !tableRef.value.$el) return;
+  const el = tableRef.value.$el; // component root
+  // Clear any previous inline highlights we added
+  el.querySelectorAll('tr').forEach(tr => {
+    if (tr.__wasHighlightedByScript) {
+      tr.classList.remove('row-highlight');
+      tr.__wasHighlightedByScript = false;
+    }
+  });
+
+  // Find a tr whose cell text matches the stateKey (case-insensitive)
+  const rows = Array.from(el.querySelectorAll('tr'));
+  const target = rows.find(tr => {
+    return Array.from(tr.querySelectorAll('td, th')).some(cell => {
+      const text = (cell.textContent || '').trim();
+      return text.toUpperCase() === stateKey.toUpperCase();
+    });
+  });
+
+  if (!target) {
+    console.debug('[DataVisualizer] applyDomHighlight: no DOM row found for', stateKey);
+    return;
+  }
+
+  target.classList.add('row-highlight');
+  target.__wasHighlightedByScript = true;
+
+  // Remove after same duration
+  setTimeout(() => {
+    if (target && target.__wasHighlightedByScript) {
+      target.classList.remove('row-highlight');
+      target.__wasHighlightedByScript = false;
+    }
+  }, HIGHLIGHT_DURATION);
+};
+
+// Update specific cells in the row for given stateKey using payload values (no table re-render)
+const updateRowDomValues = (stateKey, payload = {}, rowData = {}) => {
+  if (!tableRef.value || !tableRef.value.$el) return;
+  const el = tableRef.value.$el;
+
+  // Build header label -> index map from rendered headers
+  const headers = Array.from(el.querySelectorAll('thead th'));
+  const headerText = headers.map(h => (h.textContent || '').trim());
+
+  // Determine target column labels used by our tableColumns (fall back to expected names)
+  const certLabel = tableColumns.value.find(c => c.name === 'circulos_certificados')?.label || 'Círculos Certificados';
+  const cumplimientoLabel = tableColumns.value.find(c => c.name === 'cumplimiento')?.label || '% Cumplimiento';
+
+  const certIdx = headerText.findIndex(t => t === certLabel);
+  const cumpIdx = headerText.findIndex(t => t === cumplimientoLabel);
+
+  // Find the target tr
+  const rows = Array.from(el.querySelectorAll('tbody tr'));
+  const target = rows.find(tr => {
+    return Array.from(tr.querySelectorAll('td, th')).some(cell => {
+      const text = (cell.textContent || '').trim();
+      return text.toUpperCase() === stateKey.toUpperCase();
+    });
+  });
+
+  if (!target) {
+    console.debug('[DataVisualizer] updateRowDomValues: no DOM row found for', stateKey);
+    return;
+  }
+
+  const tds = Array.from(target.querySelectorAll('td'));
+
+  // Update circulos_certificados cell
+  if (certIdx !== -1 && tds[certIdx]) {
+    const newCert = payload.circulos_certificados != null ? payload.circulos_certificados : rowData.circulos_certificados;
+    tds[certIdx].textContent = formatNumber(newCert);
+  }
+
+  // Update cumplimiento cell (compute from meta_circulos if available)
+  if (cumpIdx !== -1 && tds[cumpIdx]) {
+    const newCert = payload.circulos_certificados != null ? Number(payload.circulos_certificados) : Number(rowData.circulos_certificados || 0);
+    const meta = Number(rowData.meta_circulos || 0);
+    const percent = meta > 0 ? (newCert / meta) * 100 : 0;
+    tds[cumpIdx].textContent = `${percent.toFixed(2).replace('.', ',')}%`;
+  }
+};
+
+watch(
+  () => props.data,
+  (newData) => {
+    // Solo actualizar si el gráfico está renderizado y no es tabla
+    if (!chartRef.value || props.type === 'table' || !newData || newData.length === 0) return;
+
+    // Si es la primera vez, guardar los datos y no hacer nada
+    if (!previousData.value) {
+      previousData.value = JSON.parse(JSON.stringify(newData));
+      return;
+    }
+
+    // Detectar qué índices cambiaron
+    const changedIndices = [];
+    for (let i = 0; i < newData.length; i++) {
+      const oldItem = previousData.value[i];
+      const newItem = newData[i];
+
+      if (!oldItem || JSON.stringify(oldItem) !== JSON.stringify(newItem)) {
+        changedIndices.push(i);
+      }
+    }
+
+    // Si hay cambios, actualizar la serie usando updateSeries
+    if (changedIndices.length > 0) {
+      try {
+        const newSeries = chartSeries.value;
+        // updateSeries sin re-render completo
+        if (chartRef.value && chartRef.value.updateSeries) {
+          chartRef.value.updateSeries(newSeries, false);
+        }
+      } catch (e) {
+        console.error('[DataVisualizer] Error actualizando serie:', e);
+      }
+      previousData.value = JSON.parse(JSON.stringify(newData));
+    }
+  },
+  { deep: true }
+);
+
 // --- Lógica de EXPORTACIÓN ---
 const getTimestamp = () => new Date().toISOString().replace(/[:.]/g, '-');
 
@@ -221,7 +400,7 @@ const getFormattedDateTime = () => {
 const exportData = (format) => {
   const timestamp = getTimestamp();
   const filename = `${props.title.replace(/\s+/g, '_')}_${timestamp}`;
-  
+
   // Usar las columnas de la tabla para asegurar consistencia
   const columns = tableColumns.value;
   const dataToExport = props.data.map(row => {
@@ -320,4 +499,15 @@ const exportChart = async (format) => {
 .data-card {
   height: 100%;
 }
+  /* Highlighted row style for temporary change indication */
+  .row-highlight {
+    background-color: rgba(255, 0, 0, 0.12) !important;
+  }
+</style>
+
+<!-- Global style so QTable internal rows (rendered by child component) pick up the class -->
+<style>
+  .row-highlight {
+    background-color: rgba(255, 0, 0, 0.12) !important;
+  }
 </style>
