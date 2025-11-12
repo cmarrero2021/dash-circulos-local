@@ -355,18 +355,40 @@ watch(
     }
 
     // Si hay cambios, actualizar la serie usando updateSeries
-    if (changedIndices.length > 0) {
-      try {
-        const newSeries = chartSeries.value;
-        // updateSeries sin re-render completo
-        if (chartRef.value && chartRef.value.updateSeries) {
-          chartRef.value.updateSeries(newSeries, false);
+      if (changedIndices.length > 0) {
+        try {
+          if (!chartRef.value || !chartRef.value.updateSeries) {
+            previousData.value = JSON.parse(JSON.stringify(newData));
+            return;
+          }
+
+          // Build a shallow copy of current series and update only the changed indices
+          // This avoids re-creating all data points and keeps the chart instance intact.
+          if (Array.isArray(props.columnMap.value)) {
+            // multiple series case
+            const existingSeries = chartSeries.value.map(s => ({ name: s.name, data: Array.isArray(s.data) ? s.data.slice() : [] }));
+            changedIndices.forEach(i => {
+              props.columnMap.value.forEach((seriesCfg, si) => {
+                const val = (newData[i] && newData[i][seriesCfg.key]) != null ? newData[i][seriesCfg.key] : 0;
+                if (!existingSeries[si]) existingSeries[si] = { name: seriesCfg.name, data: [] };
+                existingSeries[si].data[i] = val;
+              });
+            });
+            chartRef.value.updateSeries(existingSeries, false);
+          } else {
+            // single series case
+            const existing = chartSeries.value[0] ? { name: chartSeries.value[0].name, data: Array.isArray(chartSeries.value[0].data) ? chartSeries.value[0].data.slice() : [] } : { name: props.title, data: [] };
+            changedIndices.forEach(i => {
+              const val = (newData[i] && newData[i][props.columnMap.value]) != null ? newData[i][props.columnMap.value] : 0;
+              existing.data[i] = val;
+            });
+            chartRef.value.updateSeries([existing], false);
+          }
+        } catch (e) {
+          console.error('[DataVisualizer] Error actualizando serie:', e);
         }
-      } catch (e) {
-        console.error('[DataVisualizer] Error actualizando serie:', e);
+        previousData.value = JSON.parse(JSON.stringify(newData));
       }
-      previousData.value = JSON.parse(JSON.stringify(newData));
-    }
   },
   { deep: true }
 );
