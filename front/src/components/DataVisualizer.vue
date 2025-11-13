@@ -120,7 +120,8 @@ onBeforeUnmount(() => {
 });
 
 const pagination = ref({
-  rowsPerPage: 10
+  rowsPerPage: 24
+  // rowsPerPage: 10
 });
 
 // --- Lógica de la TABLA ---

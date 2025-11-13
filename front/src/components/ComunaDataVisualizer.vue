@@ -1,14 +1,10 @@
 <template>
   <q-card class="data-card" flat bordered>
     <q-card-section>
-      <div class="text-h6">{{ title }}</div>
-    </q-card-section>
+      <div class="row q-col-gutter-md items-center">
+        <div class="col-auto text-h6">{{ title }}</div>
 
-    <q-separator />
-
-    <q-card-section>
-      <div class="row q-col-gutter-md">
-        <div class="col-12 col-md-4">
+        <div class="col">
           <q-select
             v-model="selectedEstado"
             :options="estadoOptions"
@@ -17,13 +13,14 @@
             use-input
             emit-value
             map-options
+            outlined
             clearable
             dense
             @filter="filterEstados"
             @update:model-value="onEstadoChange"
           />
         </div>
-        <div class="col-12 col-md-4">
+        <div class="col">
           <q-select
             v-model="selectedMunicipio"
             :options="municipioOptions"
@@ -31,6 +28,7 @@
             multiple
             use-input
             emit-value
+            outlined
             map-options
             clearable
             dense
@@ -39,7 +37,7 @@
             @update:model-value="onMunicipioChange"
           />
         </div>
-        <div class="col-12 col-md-4">
+        <div class="col">
           <q-select
             v-model="selectedComuna"
             :options="comunaOptions"
@@ -47,12 +45,33 @@
             multiple
             use-input
             emit-value
+            outlined
             map-options
             clearable
             dense
             :disable="!selectedMunicipio || selectedMunicipio.length === 0"
             @filter="filterComunas"
           />
+        </div>
+        <div class="col-auto">
+          <q-btn color="grey-7" round flat icon="more_vert">
+            <q-menu cover auto-close>
+              <q-list style="min-width: 150px">
+                <q-item clickable @click="exportData('xlsx')">
+                  <q-item-section avatar><q-icon name="description" /></q-item-section>
+                  <q-item-section>Exportar a XLSX</q-item-section>
+                </q-item>
+                <q-item clickable @click="exportData('csv')">
+                  <q-item-section avatar><q-icon name="toc" /></q-item-section>
+                  <q-item-section>Exportar a CSV</q-item-section>
+                </q-item>
+                <q-item clickable @click="exportData('json')">
+                  <q-item-section avatar><q-icon name="code" /></q-item-section>
+                  <q-item-section>Exportar a JSON</q-item-section>
+                </q-item>
+              </q-list>
+            </q-menu>
+          </q-btn>
         </div>
       </div>
     </q-card-section>
@@ -72,10 +91,11 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue';
-
+import { utils, writeFile } from 'xlsx';
+import { exportFile } from 'quasar';
 import { api } from 'boot/axios';
 
-defineProps({
+const props = defineProps({
   title: { type: String, required: true },
 });
 
@@ -250,10 +270,52 @@ onMounted(() => {
   fetchEstados();
   fetchComunaData();
 });
+
+const getTimestamp = () => new Date().toISOString().replace(/[:.]/g, '-');
+
+const exportData = (format) => {
+  const timestamp = getTimestamp();
+  const filename = `${props.title.replace(/\s+/g, '_')}_${timestamp}`;
+
+  const dataForExport = filteredData.value;
+
+  if (format === 'xlsx') {
+    const worksheet = utils.json_to_sheet(dataForExport.map(row => {
+      const newRow = {};
+      columns.forEach(col => {
+        newRow[col.label] = row[col.field];
+      });
+      return newRow;
+    }));
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, 'Datos');
+    writeFile(workbook, `${filename}.xlsx`);
+  } else if (format === 'csv') {
+    const content = [columns.map(col => col.label).join(',')]
+      .concat(
+        dataForExport.map(row =>
+          columns.map(col => row[col.field]).join(',')
+        )
+      )
+      .join('\r\n');
+
+    const status = exportFile(`${filename}.csv`, content, 'text/csv');
+    if (status !== true) {
+      console.error('Error al descargar el archivo CSV');
+    }
+  } else if (format === 'json') {
+    const content = JSON.stringify(dataForExport, null, 2);
+    const status = exportFile(`${filename}.json`, content, 'application/json');
+    if (status !== true) {
+      console.error('Error al descargar el archivo JSON');
+    }
+  }
+};
 </script>
 
 <style scoped>
 .data-card {
   height: 100%;
 }
+
 </style>
