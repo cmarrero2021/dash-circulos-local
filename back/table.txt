@@ -1,5 +1,7 @@
 tablero:tR@2O50.
 dashboard_user:tR@2O50.
+SIMULAR ACTUALIZACION DE DATA EN DASHBOARD: // reemplaza 'SUCRE' y 713 por los valores que quieras probar
+window.__simulateStateUpdate({ estado: 'ARAGUA', circulos_certificados: 5000 });
   "email": "admin@correo.com",
   "password": "password123"
   CREACION DE TABLAS FORÁNEAS

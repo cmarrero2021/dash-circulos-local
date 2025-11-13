@@ -1,5 +1,5 @@
 <template>
-  <q-card class="data-card" flat bordered>
+  <q-card ref="cardRef" class="data-card" flat  bordered>
     <q-card-section>
       <div class="row items-center no-wrap">
         <div class="col">
@@ -59,7 +59,7 @@
           v-if="type !== 'table'"
           ref="chartRef"
           :type="type"
-          height="350"
+          :height="height"
           :options="chartOptions"
           :series="chartSeries"
         ></vue-apex-charts>
@@ -69,13 +69,16 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
 import VueApexCharts from 'vue3-apexcharts';
 import { utils, writeFile } from 'xlsx';
 import { exportFile } from 'quasar';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
+
+// --- Emits ---
+const emit = defineEmits(['update:height']);
 
 // --- Props del Componente ---
 const props = defineProps({
@@ -85,10 +88,36 @@ const props = defineProps({
   columnMap: { type: Object, required: true }, // { label: 'campo_label', value: 'campo_valor' o [{ name, key }, ...] }
   stacked: { type: Boolean, default: false }, // Para gráficos de barras apiladas
   rowKey: { type: String, default: 'estado_id' }, // clave estable para QTable
+  height: { type: [String, Number], default: 350 },
 });
 
 const chartRef = ref(null);
 const tableRef = ref(null);
+const cardRef = ref(null);
+
+// --- Resize Observer ---
+let resizeObserver = null;
+
+onMounted(() => {
+  // Only create observer for tables, which can change height based on pagination
+  if (props.type === 'table' && tableRef.value?.$el) {
+    resizeObserver = new ResizeObserver(entries => {
+      if (!entries || entries.length === 0) return;
+      const height = entries[0].contentRect.height;
+      // Emit only if height is sensible
+      if (height > 50) {
+        emit('update:height', Math.round(height));
+      }
+    });
+    resizeObserver.observe(tableRef.value.$el);
+  }
+});
+
+onBeforeUnmount(() => {
+  if (resizeObserver) {
+    resizeObserver.disconnect();
+  }
+});
 
 const pagination = ref({
   rowsPerPage: 10
@@ -269,6 +298,29 @@ const chartSeries = computed(() => {
     : (props.data || []);
 
   if (Array.isArray(props.columnMap.value)) {
+    if (props.stacked && props.columnMap.value.length === 2) {
+      const progressConfig = props.columnMap.value[0];
+      const totalConfig = props.columnMap.value[1];
+
+      const seriesData = dataForChart.map(item => {
+        const progress = item[progressConfig.key] != null ? Number(item[progressConfig.key]) : 0;
+        const total = item[totalConfig.key] != null ? Number(item[totalConfig.key]) : 0;
+        const remaining = Math.max(0, total - progress);
+        return { progress, remaining };
+      });
+
+      return [
+        {
+          name: progressConfig.name,
+          data: seriesData.map(d => d.progress),
+        },
+        {
+          name: 'Faltante',
+          data: seriesData.map(d => d.remaining),
+        },
+      ];
+    }
+
     return props.columnMap.value.map(series => ({
       name: series.name,
       data: dataForChart.map(item => item[series.key] != null ? Number(item[series.key]) : 0)

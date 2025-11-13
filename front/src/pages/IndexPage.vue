@@ -41,6 +41,7 @@
             type="line"
             row-key="fecha"
             :column-map="{ label: 'fecha', value: 'certificaciones' }"
+            :height="dailyCertificationsHeight"
           />
         </q-card>
       </div>
@@ -58,6 +59,7 @@
             type="table"
             row-key="fecha"
             :column-map="{ label: 'fecha', labelHeader: 'Fecha', value: 'certificaciones' }"
+            @update:height="newHeight => dailyCertificationsHeight = newHeight"
           />
         </q-card>
       </div>
@@ -83,6 +85,7 @@
               ]
             }"
             stacked
+            :height="circlesByStateHeight"
           />
         </q-card>
       </div>
@@ -107,6 +110,7 @@
                 { name: 'Meta de Círculos', key: 'meta_circulos' }
               ]
             }"
+            @update:height="newHeight => circlesByStateHeight = newHeight"
           />
         </q-card>
       </div>
@@ -131,6 +135,7 @@
               ]
             }"
             stacked
+            :height="participantsByStateHeight"
           />
         </q-card>
       </div>
@@ -155,6 +160,7 @@
                 { name: 'Meta de Participantes', key: 'meta_participantes' }
               ]
             }"
+            @update:height="newHeight => participantsByStateHeight = newHeight"
           />
         </q-card>
       </div>
@@ -247,6 +253,10 @@ import { exportFile } from 'quasar';
 
 const dashboardStore = useDashboardStore();
 const { indicators: rawIndicators, circlesByState, circlesByMunicipio } = storeToRefs(dashboardStore);
+
+const dailyCertificationsHeight = ref(425);
+const circlesByStateHeight = ref(425);
+const participantsByStateHeight = ref(425);
 
 // Filters for municipios table
 const estadoFilter = ref(null);
