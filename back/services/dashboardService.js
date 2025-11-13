@@ -112,6 +112,25 @@ exports.getCirclesByState = async (userId, filters) => {
     return result.rows;
 };
 
+    exports.getCirclesByStateMunicipios = async (userId, filters = {}) => {
+        // filters: { estado }
+        const client = await pool.connect();
+        try {
+            const estado = filters.estado || null;
+            const params = [];
+            let where = '';
+            if (estado) {
+                params.push(estado);
+                where = 'WHERE estado = $1';
+            }
+            const sql = `SELECT estado, municipio, count(municipio) AS avance FROM rm_circulos_remoto ${where} GROUP BY estado, municipio ORDER BY estado, municipio`;
+            const res = await client.query(sql, params);
+            return res.rows;
+        } finally {
+            client.release();
+        }
+    };
+
 exports.getCirclesByMunicipality = async (userId, filters) => {
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `

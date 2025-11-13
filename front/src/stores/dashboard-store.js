@@ -57,6 +57,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
       fetchIndicators(),
       fetchCirclesByState(),
       fetchDailyCertifications(),
+      fetchCirclesByMunicipios(),
     ]);
     lastUpdateAt.value = Date.now();
   };
@@ -77,6 +78,21 @@ export const useDashboardStore = defineStore('dashboard', () => {
     } catch (error) {
       console.error('Error al obtener las certificaciones diarias:', error);
       dailyCertifications.value = [];
+    }
+  };
+
+  const circlesByMunicipio = ref([]);
+
+  const fetchCirclesByMunicipios = async (filters = {}) => {
+    isLoading.value = true;
+    try {
+      const response = await api.get('/dashboard/circles-states-municipios', { params: filters });
+      circlesByMunicipio.value = response.data;
+    } catch (error) {
+      console.error('Error al obtener los círculos por municipio:', error);
+      circlesByMunicipio.value = [];
+    } finally {
+      isLoading.value = false;
     }
   };
 
@@ -157,6 +173,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   return {
     // State
     circlesByState,
+    circlesByMunicipio,
     indicators,
     isLoading,
     isUpdatingFromBackend,
@@ -166,6 +183,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     fetchCirclesByState,
     fetchIndicators,
   fetchDailyCertifications,
+    fetchCirclesByMunicipios,
     refetchAll,
     notifyDataIsUpdating,
     notifyDataUpdated,

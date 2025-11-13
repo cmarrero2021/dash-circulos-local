@@ -31,6 +31,7 @@ export default boot(() => {
               await Promise.all([
                 dashboardStore.fetchIndicators(),
                 dashboardStore.fetchDailyCertifications(),
+                dashboardStore.fetchCirclesByMunicipios(),
               ]);
             } catch (e) {
               console.error('[WS] Error fetching indicators after data_updated', e);

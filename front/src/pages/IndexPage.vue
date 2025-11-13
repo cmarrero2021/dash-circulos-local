@@ -158,18 +158,204 @@
           />
         </q-card>
       </div>
+
+      <!-- Tabla: Círculos por Estado / Municipio -->
+      <div class="col-12">
+        <q-card flat bordered style="min-height: 250px;">
+          <q-card-section class="row items-center q-col-gutter-md">
+            <div class="col">
+              <div class="text-h6">CÍRCULOS POR ESTADO Y MUNICIPIO</div>
+            </div>
+            <div class="col-12 col-md-3">
+              <q-select
+                v-model="estadoFilter"
+                clearable
+                outlined
+                dense
+                label="Estado"
+                :options="estadoOptions"
+              />
+            </div>
+            <div class="col-12 col-md-4">
+              <q-select
+                v-model="municipioFilter"
+                v-model:input-value="municipioInput"
+                multiple
+                clearable
+                outlined
+                dense
+                use-input
+                input-debounce="300"
+                label="Municipio (autocompletar)"
+                :options="municipioOptions"
+                :disable="!estadoFilter"
+                map-options
+                emit-value
+              />
+            </div>
+            <div class="col-auto">
+              <q-btn color="grey-7" round flat icon="more_vert">
+                <q-menu cover auto-close>
+                  <q-list style="min-width: 150px">
+                    <q-item clickable @click="exportMunicipios('xlsx')">
+                      <q-item-section avatar><q-icon name="description" /></q-item-section>
+                      <q-item-section>Exportar a XLSX</q-item-section>
+                    </q-item>
+                    <q-item clickable @click="exportMunicipios('csv')">
+                      <q-item-section avatar><q-icon name="toc" /></q-item-section>
+                      <q-item-section>Exportar a CSV</q-item-section>
+                    </q-item>
+                    <q-item clickable @click="exportMunicipios('json')">
+                      <q-item-section avatar><q-icon name="code" /></q-item-section>
+                      <q-item-section>Exportar a JSON</q-item-section>
+                    </q-item>
+                  </q-list>
+                </q-menu>
+              </q-btn>
+            </div>
+          </q-card-section>
+
+          <q-separator />
+
+          <q-card-section>
+            <q-inner-loading :showing="dashboardStore.isLoading">
+              <q-spinner-dots size="30px" color="primary" />
+            </q-inner-loading>
+
+            <q-table
+              v-model:pagination="municipioPagination"
+              :rows="municipioTableRows"
+              :columns="municipioTableColumns"
+              :row-key="row => `${row.estado}__${row.municipio}`"
+              flat
+              dense
+            />
+          </q-card-section>
+        </q-card>
+      </div>
     </div>
   </q-page>
 </template>
 
+                <template #selected="scope">
+                  <div class="row items-center no-wrap q-gutter-xs" style="max-width: 100%;">
+                    <template v-if="Array.isArray(scope.value) && scope.value.length > 0">
+                      <template v-for="(val, i) in scope.value.slice(0,2)" :key="val">
+                        <q-chip dense removable size="sm" @remove="() => { municipioFilter = municipioFilter.filter(m => m !== val) }">{{ val }}</q-chip>
+                      </template>
+                      <q-chip dense size="sm" v-if="scope.value.length > 2">+{{ scope.value.length - 2 }}</q-chip>
+                    </template>
+                    <template v-else>
+                      <span class="text-grey">Ningún municipio seleccionado</span>
+                    </template>
+                  </div>
+                </template>
 <script setup>
-import { onMounted, computed } from 'vue';
+import { onMounted, computed, ref, watch } from 'vue';
 import { useDashboardStore } from 'stores/dashboard-store';
 import { storeToRefs } from 'pinia';
 import DataVisualizer from 'components/DataVisualizer.vue';
+import { utils, writeFile } from 'xlsx';
+import { exportFile } from 'quasar';
 
 const dashboardStore = useDashboardStore();
-const { indicators: rawIndicators } = storeToRefs(dashboardStore);
+const { indicators: rawIndicators, circlesByState, circlesByMunicipio } = storeToRefs(dashboardStore);
+
+// Filters for municipios table
+const estadoFilter = ref(null);
+const municipioInput = ref(''); // for autocomplete typing
+const municipioFilter = ref([]); // selected municipio(s)
+
+// Compute unique estado options from circlesByState
+const estadoOptions = computed(() => {
+  const set = new Set();
+  ((circlesByState && circlesByState.value) || []).forEach(r => { if (r && r.estado) set.add(r.estado); });
+  return Array.from(set).sort();
+});
+
+// When estadoFilter changes, fetch municipios for that estado
+watch(estadoFilter, (val) => {
+  if (val) {
+    dashboardStore.fetchCirclesByMunicipios({ estado: val });
+  } else {
+    // fetch all
+    dashboardStore.fetchCirclesByMunicipios();
+  }
+});
+// Ensure municipio filters are cleared when estado is cleared
+watch(estadoFilter, (val) => {
+  if (!val) {
+    municipioInput.value = '';
+    municipioFilter.value = [];
+  }
+});
+
+// Municipio options for the select (from fetched municipios); allow autocomplete via use-input in template
+const municipioOptions = computed(() => {
+  // Only provide municipio options when an estado is selected
+  if (!estadoFilter.value) return [];
+  const stateKey = String(estadoFilter.value).toUpperCase();
+  const set = new Set();
+  ((circlesByMunicipio && circlesByMunicipio.value) || [])
+    .filter(r => r && r.estado && String(r.estado).toUpperCase() === stateKey)
+    .forEach(r => { if (r && r.municipio) set.add(r.municipio); });
+  return Array.from(set).sort();
+});
+
+// Table rows filtered by estado and municipio selection/input
+const municipioTableRows = computed(() => {
+  let rows = ((circlesByMunicipio && circlesByMunicipio.value) || []).slice();
+  // If estado selected, only keep rows for that estado
+  if (estadoFilter.value) {
+    const stateKey = String(estadoFilter.value).toUpperCase();
+    rows = rows.filter(r => r && r.estado && String(r.estado).toUpperCase() === stateKey);
+  }
+  if (Array.isArray(municipioFilter.value) && municipioFilter.value.length > 0) {
+    const sel = municipioFilter.value.map(v => String(v).toUpperCase());
+    rows = rows.filter(r => sel.includes((r.municipio || '').toUpperCase()));
+  } else if (municipioInput.value && municipioInput.value.length > 0) {
+    const q = String(municipioInput.value).toUpperCase();
+    rows = rows.filter(r => (r.municipio || '').toUpperCase().includes(q));
+  }
+  return rows;
+});
+
+const municipioTableColumns = computed(() => ([
+  { name: 'estado', label: 'Estado', field: 'estado', align: 'left' },
+  { name: 'municipio', label: 'Municipio', field: 'municipio', align: 'left' },
+  { name: 'avance', label: 'Avance', field: 'avance', align: 'right', format: v => formatNumber(v) },
+]));
+
+// Pagination for municipio table (default 15 rows)
+const municipioPagination = ref({ rowsPerPage: 15 });
+
+// Export helpers (xlsx/csv/json) — similar to DataVisualizer
+const getTimestamp = () => new Date().toISOString().replace(/[:.]/g, '-');
+const formatNumber = (value) => {
+  const num = Number(value);
+  if (Number.isNaN(num)) return value;
+  return new Intl.NumberFormat('de-DE').format(Math.round(num));
+};
+
+const exportMunicipios = (format) => {
+  const filename = `circulos_municipios_${getTimestamp()}`;
+  const data = municipioTableRows.value.map(r => ({ Estado: r.estado, Municipio: r.municipio, Avance: r.avance }));
+  if (format === 'xlsx') {
+    const worksheet = utils.json_to_sheet(data);
+    const workbook = utils.book_new();
+    utils.book_append_sheet(workbook, worksheet, 'Datos');
+    writeFile(workbook, `${filename}.xlsx`);
+  } else if (format === 'csv') {
+    const csv = [Object.keys(data[0] || {}).join(',')]
+      .concat((data || []).map(row => Object.values(row).join(','))).join('\r\n');
+    const status = exportFile(`${filename}.csv`, csv, 'text/csv');
+    if (status !== true) console.error('Error al exportar CSV');
+  } else if (format === 'json') {
+    const content = JSON.stringify(data, null, 2);
+    const status = exportFile(`${filename}.json`, content, 'application/json');
+    if (status !== true) console.error('Error al exportar JSON');
+  }
+};
 
 const indicators = computed(() => {
   const data = rawIndicators.value || {};
@@ -260,6 +446,7 @@ onMounted(() => {
   dashboardStore.fetchCirclesByState();
   dashboardStore.fetchIndicators();
   dashboardStore.fetchDailyCertifications();
+  dashboardStore.fetchCirclesByMunicipios();
 });
 
 // (debug logs removed)
