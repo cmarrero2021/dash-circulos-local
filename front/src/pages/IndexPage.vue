@@ -237,19 +237,6 @@
   </q-page>
 </template>
 
-                <template #selected="scope">
-                  <div class="row items-center no-wrap q-gutter-xs" style="max-width: 100%;">
-                    <template v-if="Array.isArray(scope.value) && scope.value.length > 0">
-                      <template v-for="(val, i) in scope.value.slice(0,2)" :key="val">
-                        <q-chip dense removable size="sm" @remove="() => { municipioFilter = municipioFilter.filter(m => m !== val) }">{{ val }}</q-chip>
-                      </template>
-                      <q-chip dense size="sm" v-if="scope.value.length > 2">+{{ scope.value.length - 2 }}</q-chip>
-                    </template>
-                    <template v-else>
-                      <span class="text-grey">Ningún municipio seleccionado</span>
-                    </template>
-                  </div>
-                </template>
 <script setup>
 import { onMounted, computed, ref, watch } from 'vue';
 import { useDashboardStore } from 'stores/dashboard-store';

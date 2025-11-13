@@ -68,7 +68,15 @@ export const useDashboardStore = defineStore('dashboard', () => {
   };
   const notifyDataUpdated = async () => {
     isUpdatingFromBackend.value = false;
-    await refetchAll();
+    // Se elimina refetchAll() para evitar recarga completa de la tabla.
+    // La actualización granular se maneja con el evento 'state_updated'.
+    // Aquí solo recargamos datos secundarios que no afectan la tabla principal.
+    await Promise.allSettled([
+      fetchIndicators(),
+      fetchDailyCertifications(),
+      fetchCirclesByMunicipios(),
+    ]);
+    lastUpdateAt.value = Date.now();
   };
 
   const fetchDailyCertifications = async (filters = {}) => {
