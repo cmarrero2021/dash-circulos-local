@@ -13,4 +13,7 @@ router.get('/states', locationController.getAllStates);
 // Endpoint para obtener municipios de un estado por su ID
 router.get('/states/:stateId/municipalities', locationController.getMunicipalitiesByState);
 
+// Endpoint para obtener comunas de un municipio por su ID
+router.get('/municipalities/:municipalityId/comunas', locationController.getComunasByMunicipality);
+
 module.exports = router;

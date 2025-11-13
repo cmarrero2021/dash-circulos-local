@@ -239,6 +239,11 @@
           </q-card-section>
         </q-card>
       </div>
+
+      <!-- Tabla: Círculos por Estado / Municipio / Comuna -->
+      <div class="col-12">
+        <ComunaDataVisualizer title="CÍRCULOS POR ESTADO, MUNICIPIO Y COMUNA" />
+      </div>
     </div>
   </q-page>
 </template>
@@ -248,6 +253,7 @@ import { onMounted, computed, ref, watch } from 'vue';
 import { useDashboardStore } from 'stores/dashboard-store';
 import { storeToRefs } from 'pinia';
 import DataVisualizer from 'components/DataVisualizer.vue';
+import ComunaDataVisualizer from 'components/ComunaDataVisualizer.vue';
 import { utils, writeFile } from 'xlsx';
 import { exportFile } from 'quasar';
 

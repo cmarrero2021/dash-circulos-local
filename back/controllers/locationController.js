@@ -18,6 +18,24 @@ exports.getAllStates = async (req, res) => {
   }
 };
 
+// @desc    Obtener una lista única de comunas para un municipio específico
+exports.getComunasByMunicipality = async (req, res) => {
+  const { municipalityId } = req.params;
+  try {
+    const query = `
+      SELECT DISTINCT ON (comuna_id) comuna_id, comuna
+      FROM rm_comunas
+      WHERE municipio_id = $1
+      ORDER BY comuna_id, comuna;
+    `;
+    const result = await pool.query(query, [municipalityId]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Error del servidor');
+  }
+};
+
 // @desc    Obtener una lista única de municipios para un estado específico
 exports.getMunicipalitiesByState = async (req, res) => {
   const { stateId } = req.params;
