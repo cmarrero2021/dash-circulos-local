@@ -21,7 +21,7 @@ const handleRequest = async (serviceFunction, req, res) => {
 
 exports.getIndicators = async (req, res) => {
     try {
-        const data = await dashboardService.getIndicators();
+        const data = await dashboardService.getIndicators(req.user.id);
         res.json(data);
     } catch (error) {
         console.error('Error en el controlador de indicadores:', error.message);

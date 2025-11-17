@@ -2,7 +2,6 @@
   <q-page class="q-pa-md bg-grey-2">
     <div class="row q-col-gutter-md">
       <!-- Indicadores Principales -->
-      <template v-if="showNationalSections">
         <div v-for="indicator in indicators" :key="indicator.label" class="col-12 col-md-3">
           <q-card flat bordered>
             <q-card-section>
@@ -18,10 +17,9 @@
             </q-card-section>
           </q-card>
         </div>
-      </template>
 
       <!-- Filtros de la Página -->
-      <div v-if="showNationalSections" class="col-12">
+      <div class="col-12">
         <q-card flat bordered>
           <q-card-section class="row q-gutter-md items-center">
             <div class="text-h6">Filtros</div>
@@ -31,7 +29,7 @@
 
       <!-- Indicador: Círculos por Estado (Gráfico) -->
       <!-- Par inicial: Certificaciones Diarias (Gráfico) -->
-      <div v-if="showNationalSections" class="col-12 col-md-6">
+      <div class="col-12 col-md-6">
         <q-card flat bordered style="min-height: 425px;">
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
@@ -49,7 +47,7 @@
       </div>
 
       <!-- Par inicial: Certificaciones Diarias (Tabla) -->
-      <div v-if="showNationalSections" class="col-12 col-md-6">
+      <div class="col-12 col-md-6">
         <q-card flat bordered style="min-height: 425px;">
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
@@ -275,12 +273,6 @@ const municipioFilter = ref([]); // selected municipio(s)
 
 const allowedStateIds = computed(() => authStore.allowedStates);
 const isAdmin = computed(() => authStore.user?.role === 'Administrador');
-const hasNationalDashboardAccess = computed(() => {
-  if (isAdmin.value) return true;
-  const allowed = allowedStateIds.value;
-  return !Array.isArray(allowed) || allowed.length === 0;
-});
-const showNationalSections = hasNationalDashboardAccess;
 
 // Compute unique estado options from circlesByState
 const estadoOptions = computed(() => {
@@ -490,10 +482,8 @@ const indicators = computed(() => {
 
 onMounted(() => {
   dashboardStore.fetchCirclesByState();
-  if (hasNationalDashboardAccess.value) {
-    dashboardStore.fetchIndicators();
-    dashboardStore.fetchDailyCertifications();
-  }
+  dashboardStore.fetchIndicators();
+  dashboardStore.fetchDailyCertifications();
   dashboardStore.fetchCirclesByMunicipios();
 });
 

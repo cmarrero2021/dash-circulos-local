@@ -6,6 +6,27 @@ const {
     getAllowedMunicipalitiesForUser,
 } = require('./geoPermissionsService');
 
+const DASHBOARD_DEADLINE = process.env.DASHBOARD_DEADLINE || '2025-11-30';
+
+const getDaysRemaining = async () => {
+    const { rows } = await pool.query(
+        'SELECT GREATEST(($1::date - CURRENT_DATE), 0) AS dias_faltantes',
+        [DASHBOARD_DEADLINE]
+    );
+    return Number(rows[0]?.dias_faltantes ?? 0);
+};
+
+const buildEmptyIndicators = (dias_faltantes) => ({
+    meta: 0,
+    acumulado: 0,
+    diferencia: 0,
+    dias_faltantes,
+    promedio_necesario: 0,
+    promedio_diario: 0,
+    maximo_por_fecha: 0,
+    fecha_maxima: null,
+});
+
 /**
  * Construye la cláusula WHERE y los parámetros para las consultas del dashboard
  * basándose en los permisos geográficos del usuario.
@@ -80,16 +101,81 @@ const buildFilterClause = async (userId, voluntaryFilters = {}) => {
     return { whereClause, params };
 };
 
-
 // --- Funciones de Indicadores ---
-exports.getIndicators = async () => {
-    const query = `SELECT meta, acumulado, diferencia, dias_faltantes, promedio_necesario, promedio_diario, maximo_por_fecha, fecha_maxima FROM vindicadores;`;
-    const result = await pool.query(query);
-    return result.rows[0] || {};
+exports.getIndicators = async (userId) => {
+    const diasFaltantes = await getDaysRemaining();
+    const hasNationalAccess = await hasNationalDashboardAccess(userId);
+
+    if (hasNationalAccess) {
+        const query = `SELECT meta, acumulado, diferencia, dias_faltantes, promedio_necesario, promedio_diario, maximo_por_fecha, fecha_maxima FROM vindicadores;`;
+        const result = await pool.query(query);
+        const row = result.rows[0] || {};
+        return {
+            meta: Number(row.meta ?? 0),
+            acumulado: Number(row.acumulado ?? 0),
+            diferencia: Number(row.diferencia ?? 0),
+            dias_faltantes: Number(row.dias_faltantes ?? diasFaltantes),
+            promedio_necesario: Number(row.promedio_necesario ?? 0),
+            promedio_diario: Number(row.promedio_diario ?? 0),
+            maximo_por_fecha: Number(row.maximo_por_fecha ?? 0),
+            fecha_maxima: row.fecha_maxima || null,
+        };
+    }
+
+    const allowedStates = await getAllowedStatesForUser(userId);
+    if (!allowedStates.length) {
+        return buildEmptyIndicators(diasFaltantes);
+    }
+
+    const [metaResult, totalsResult, peakResult] = await Promise.all([
+        pool.query(
+            'SELECT COALESCE(SUM(circulos), 0) AS meta FROM metas_estado WHERE estado_id = ANY($1)',
+            [allowedStates]
+        ),
+        pool.query(
+            `SELECT
+                COUNT(*)::integer AS acumulado,
+                COUNT(DISTINCT certificacion::date) AS dias_con_registro
+            FROM rm_circulos_remoto
+            WHERE estado_id = ANY($1);`,
+            [allowedStates]
+        ),
+        pool.query(
+            `SELECT certificacion::date AS fecha, COUNT(*)::integer AS total
+            FROM rm_circulos_remoto
+            WHERE estado_id = ANY($1)
+            GROUP BY certificacion::date
+            ORDER BY total DESC, fecha DESC
+            LIMIT 1;`,
+            [allowedStates]
+        ),
+    ]);
+
+    const meta = Number(metaResult.rows[0]?.meta || 0);
+    const acumulado = Number(totalsResult.rows[0]?.acumulado || 0);
+    const diasConRegistro = Number(totalsResult.rows[0]?.dias_con_registro || 0);
+    const maximo_por_fecha = Number(peakResult.rows[0]?.total || 0);
+    const fecha_maxima = peakResult.rows[0]?.fecha || null;
+
+    const diferencia = meta - acumulado;
+    const restante = Math.max(diferencia, 0);
+    const diasReferencia = diasFaltantes > 0 ? diasFaltantes : 0;
+    const promedio_necesario = diasReferencia > 0 ? Math.trunc(restante / diasReferencia) : restante;
+    const promedio_diario = diasConRegistro > 0 ? Math.trunc(acumulado / diasConRegistro) : 0;
+
+    return {
+        meta,
+        acumulado,
+        diferencia,
+        dias_faltantes: diasFaltantes,
+        promedio_necesario,
+        promedio_diario,
+        maximo_por_fecha,
+        fecha_maxima,
+    };
 }
 
 // --- Funciones de Agregación ---
-
 exports.getCirclesByState = async (userId, filters) => {
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
@@ -114,18 +200,18 @@ exports.getCirclesByStateMunicipiosComunas = async (userId, filters = {}) => {
     return result.rows;
 };
 
-    exports.getCirclesByStateMunicipios = async (userId, filters = {}) => {
-        const { whereClause, params } = await buildFilterClause(userId, filters);
-        const query = `
+exports.getCirclesByStateMunicipios = async (userId, filters = {}) => {
+    const { whereClause, params } = await buildFilterClause(userId, filters);
+    const query = `
         SELECT estado, municipio, COUNT(*) as avance
         FROM rm_circulos_remoto
         ${whereClause}
         GROUP BY estado, municipio
         ORDER BY estado, municipio;
     `;
-        const result = await pool.query(query, params);
-        return result.rows;
-    };
+    const result = await pool.query(query, params);
+    return result.rows;
+};
 
 exports.getCirclesByMunicipality = async (userId, filters) => {
     const { whereClause, params } = await buildFilterClause(userId, filters);
@@ -172,13 +258,14 @@ exports.getRawData = async (userId, filters) => {
     return result.rows;
 };
 
-// --- Función para certificaciones diarias (vista vcertificaciones_diarias)
+// --- Función para certificaciones diarias filtradas por permisos
 exports.getDailyCertifications = async (userId, filters) => {
     const { whereClause, params } = await buildFilterClause(userId, filters);
-    // The view contains fecha (date) and certificaciones (bigint)
     const query = `
-        SELECT fecha, certificaciones
-        FROM vcertificaciones_diarias ${whereClause}
+        SELECT certificacion::date AS fecha, COUNT(*)::integer AS certificaciones
+        FROM rm_circulos_remoto
+        ${whereClause}
+        GROUP BY certificacion::date
         ORDER BY fecha DESC;
     `;
     const result = await pool.query(query, params);
