@@ -69,7 +69,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue';
 import VueApexCharts from 'vue3-apexcharts';
 import { utils, writeFile } from 'xlsx';
 import { exportFile } from 'quasar';
@@ -99,18 +99,28 @@ const cardRef = ref(null);
 let resizeObserver = null;
 
 onMounted(() => {
-  // Only create observer for tables, which can change height based on pagination
-  if (props.type === 'table' && tableRef.value?.$el) {
+  if (props.type !== 'table') {
+    return;
+  }
+
+  nextTick(() => {
+    const targetEl = cardRef.value?.$el || tableRef.value?.$el;
+    if (!targetEl) {
+      return;
+    }
+
     resizeObserver = new ResizeObserver(entries => {
       if (!entries || entries.length === 0) return;
-      const height = entries[0].contentRect.height;
-      // Emit only if height is sensible
+      const height = Math.max(
+        Math.round(entries[0].contentRect.height),
+        Number(props.height) || 0
+      );
       if (height > 50) {
-        emit('update:height', Math.round(height));
+        emit('update:height', height);
       }
     });
-    resizeObserver.observe(tableRef.value.$el);
-  }
+    resizeObserver.observe(targetEl);
+  });
 });
 
 onBeforeUnmount(() => {
@@ -294,7 +304,7 @@ const chartOptions = computed(() => {
             const faltantes = Number(originalDataRow[totalKey] || 0) - certificados;
             const total = certificados + faltantes;
             const porcentajeCertificados = total > 0 ? (certificados / total) * 100 : 0;
-            
+
             const isProgress = seriesIndex === 0; // Primera serie es el progreso
 
             // Formatear la salida del tooltip
@@ -320,7 +330,7 @@ const chartOptions = computed(() => {
   // Configuración para gráficos de barras apiladas
   if (props.type === 'bar' && Array.isArray(props.columnMap.value) && props.columnMap.value.length === 2) {
     baseOptions.colors = ['#008FFB', '#FFA500']; // Azul para certificados, Naranja para faltante
-    
+
     // Configurar el eje Y para mostrar solo números enteros
     baseOptions.yaxis = {
       min: 0,
@@ -333,7 +343,7 @@ const chartOptions = computed(() => {
         }
       }
     };
-    
+
     // Asegurar que las etiquetas de datos muestren solo números enteros
     baseOptions.dataLabels = {
       enabled: true,
@@ -369,12 +379,12 @@ const chartOptions = computed(() => {
 
   // Configuración para gráficos de línea
   if (props.type === 'line') {
-    baseOptions.stroke = { 
+    baseOptions.stroke = {
       curve: 'straight',
       width: 3
     };
     baseOptions.colors = ['#008FFB'];
-    
+
     // Configurar el eje X para mostrar todas las fechas
     if (dataForChart && dataForChart.length > 0) {
       const labelKey = props.columnMap?.label;
@@ -383,7 +393,7 @@ const chartOptions = computed(() => {
         const dates = dataForChart
           .map(item => item[labelKey])
           .filter(date => date != null);
-        
+
         if (dates.length > 0) {
           baseOptions.xaxis = {
             type: 'datetime',
@@ -412,7 +422,7 @@ const chartOptions = computed(() => {
         }
       }
     }
-    
+
     // Configurar eje Y para números enteros con separador de miles
     baseOptions.yaxis = {
       labels: {
@@ -423,7 +433,7 @@ const chartOptions = computed(() => {
       forceNiceScale: true,
       min: 0 // Asegurar que el eje Y empiece en 0
     };
-    
+
     // Configurar tooltips
     baseOptions.tooltip = {
       x: {
@@ -444,7 +454,7 @@ const chartOptions = computed(() => {
         }
       }
     };
-    
+
     // Configurar etiquetas de datos
     baseOptions.dataLabels = {
       enabled: true,
@@ -483,8 +493,8 @@ const chartSeries = computed(() => {
         const total = certificados + faltantes;
         const porcentajeCertificados = total > 0 ? (certificados / total) * 100 : 0;
         const porcentajeFaltantes = 100 - porcentajeCertificados;
-        
-        return { 
+
+        return {
           certificados,
           faltantes,
           total,
@@ -492,7 +502,7 @@ const chartSeries = computed(() => {
           porcentajeFaltantes
         };
       });
-      
+
       // Para mostrar todas las columnas con la misma altura (100%)
       return [
         {
@@ -523,7 +533,7 @@ const chartSeries = computed(() => {
           name: props.title,
           data: dataForChart.map(item => Number(item[props.columnMap.value] || 0))
         }];
-    
+
     return values;
   }
 
