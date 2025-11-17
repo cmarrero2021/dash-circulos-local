@@ -251,6 +251,7 @@
 <script setup>
 import { onMounted, computed, ref, watch } from 'vue';
 import { useDashboardStore } from 'stores/dashboard-store';
+import { useAuthStore } from 'stores/auth-store';
 import { storeToRefs } from 'pinia';
 import DataVisualizer from 'components/DataVisualizer.vue';
 import ComunaDataVisualizer from 'components/ComunaDataVisualizer.vue';
@@ -258,6 +259,7 @@ import { utils, writeFile } from 'xlsx';
 import { exportFile } from 'quasar';
 
 const dashboardStore = useDashboardStore();
+const authStore = useAuthStore();
 const { indicators: rawIndicators, circlesByState, circlesByMunicipio } = storeToRefs(dashboardStore);
 
 const dailyCertificationsHeight = ref(425);
@@ -269,11 +271,44 @@ const estadoFilter = ref(null);
 const municipioInput = ref(''); // for autocomplete typing
 const municipioFilter = ref([]); // selected municipio(s)
 
+const allowedStateIds = computed(() => authStore.allowedStates);
+const isAdmin = computed(() => authStore.user?.role === 'Administrador');
+
 // Compute unique estado options from circlesByState
 const estadoOptions = computed(() => {
-  const set = new Set();
-  ((circlesByState && circlesByState.value) || []).forEach(r => { if (r && r.estado) set.add(r.estado); });
-  return Array.from(set).sort();
+  const optionsSet = new Set();
+  const canSeeAll = isAdmin.value;
+  const allowedIds = allowedStateIds.value || [];
+
+  ((circlesByState && circlesByState.value) || []).forEach(r => {
+    if (!r || !r.estado) return;
+    if (canSeeAll) {
+      optionsSet.add(r.estado);
+      return;
+    }
+
+    if (!Array.isArray(allowedIds) || allowedIds.length === 0) {
+      // Sin permisos explícitos no mostramos estados
+      return;
+    }
+
+    const stateId = r.estado_id ?? r.estadoId ?? null;
+    if (stateId && allowedIds.includes(stateId)) {
+      optionsSet.add(r.estado);
+    }
+  });
+
+  return Array.from(optionsSet).sort();
+});
+
+watch([estadoOptions, isAdmin, allowedStateIds], ([options]) => {
+  if (!estadoFilter.value) return;
+  if (isAdmin.value) return;
+  if (!options.includes(estadoFilter.value)) {
+    estadoFilter.value = null;
+    municipioInput.value = '';
+    municipioFilter.value = [];
+  }
 });
 
 // When estadoFilter changes, fetch municipios for that estado

@@ -1,5 +1,10 @@
 // services/dashboardService.js
 const pool = require('../config/db');
+const {
+    hasNationalDashboardAccess,
+    getAllowedStatesForUser,
+    getAllowedMunicipalitiesForUser,
+} = require('./geoPermissionsService');
 
 /**
  * Construye la cláusula WHERE y los parámetros para las consultas del dashboard
@@ -10,17 +15,7 @@ const pool = require('../config/db');
  */
 const buildFilterClause = async (userId, voluntaryFilters = {}) => {
     // 1. Verificar si el usuario tiene permiso de dashboard nacional
-    const nationalAccessQuery = `
-        SELECT EXISTS (
-            SELECT 1
-            FROM usuarios u
-            LEFT JOIN roles_permisos rp ON u.rol_id = rp.rol_id AND rp.permiso_id = (SELECT id FROM permisos WHERE nombre = 'ver_dashboard_nacional')
-            LEFT JOIN usuarios_permisos up ON u.id = up.usuario_id AND up.permiso_id = (SELECT id FROM permisos WHERE nombre = 'ver_dashboard_nacional')
-            WHERE u.id = $1 AND (rp.permiso_id IS NOT NULL OR up.permiso_id IS NOT NULL)
-        );
-    `;
-    const { rows: nationalAccessRows } = await pool.query(nationalAccessQuery, [userId]);
-    const hasNationalAccess = nationalAccessRows[0].exists;
+    const hasNationalAccess = await hasNationalDashboardAccess(userId);
 
     // Si tiene acceso nacional, no se aplica ningún filtro geográfico.
     if (hasNationalAccess) {
@@ -40,16 +35,10 @@ const buildFilterClause = async (userId, voluntaryFilters = {}) => {
     }
 
     // 2. Si no tiene acceso nacional, obtener sus permisos geográficos específicos
-    const statesQuery = 'SELECT estado_id FROM usuarios_estados_permitidos WHERE usuario_id = $1';
-    const municipalitiesQuery = 'SELECT estado_id, municipio_id FROM usuarios_municipios_permitidos WHERE usuario_id = $1';
-    
-    const [statesResult, municipalitiesResult] = await Promise.all([
-        pool.query(statesQuery, [userId]),
-        pool.query(municipalitiesQuery, [userId])
+    const [allowedStates, allowedMunicipalities] = await Promise.all([
+        getAllowedStatesForUser(userId),
+        getAllowedMunicipalitiesForUser(userId),
     ]);
-
-    const allowedStates = statesResult.rows.map(r => r.estado_id);
-    const allowedMunicipalities = municipalitiesResult.rows;
 
     const conditions = [];
     const params = [];

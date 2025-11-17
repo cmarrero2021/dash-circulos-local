@@ -73,12 +73,19 @@ exports.login = async (req, res) => {
       roleName = roleResult.rows[0]?.nombre || roleName;
     }
 
+    const allowedStatesResult = await pool.query(
+      'SELECT estado_id FROM usuarios_estados_permitidos WHERE usuario_id = $1 ORDER BY estado_id',
+      [user.id]
+    );
+    const allowedStates = allowedStatesResult.rows.map(row => row.estado_id);
+
     const sessionUser = {
       id: user.id,
       email: user.email,
       nombre: user.nombre,
       roleId,
       role: roleName,
+      allowedStates,
     };
 
     // 5. Crear el JWT con los datos necesarios para reconstruir la sesión

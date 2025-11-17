@@ -3,11 +3,8 @@ const express = require('express');
 const router = express.Router();
 const dashboardController = require('../controllers/dashboardController');
 const authMiddleware = require('../middleware/authMiddleware');
-const authorize = require('../middleware/authorizationMiddleware');
 
 router.use(authMiddleware);
-// Protegemos todas las rutas con el permiso para ver el dashboard nacional.
-router.use(authorize('ver_dashboard_nacional'));
 
 // --- Endpoint de Indicadores ---
 router.get('/indicators', dashboardController.getIndicators);

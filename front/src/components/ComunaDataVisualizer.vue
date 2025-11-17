@@ -95,17 +95,20 @@ import { useDashboardStore } from 'src/stores/dashboard-store';
 import { utils, writeFile } from 'xlsx';
 import { exportFile } from 'quasar';
 import { api } from 'boot/axios';
+import { useAuthStore } from 'stores/auth-store';
 
 const props = defineProps({
   title: { type: String, required: true },
 });
 
 const dashboardStore = useDashboardStore();
+const authStore = useAuthStore();
 
 const selectedEstado = ref([]);
 const selectedMunicipio = ref([]);
 const selectedComuna = ref([]);
 
+const rawEstados = ref([]);
 const allEstados = ref([]);
 const allMunicipios = ref([]);
 const allComunas = ref([]);
@@ -135,11 +138,40 @@ watch(() => dashboardStore.lastUpdateAt, () => {
 });
 
 
+const allowedStateIds = computed(() => authStore.allowedStates);
+const isAdmin = computed(() => authStore.user?.role === 'Administrador');
+
+const sanitizeEstadoSelection = (ids = []) => {
+  if (isAdmin.value) return ids;
+  if (allowedStateIds.value.length === 0) return [];
+  const allowedSet = new Set(allowedStateIds.value);
+  return ids.filter(id => allowedSet.has(id));
+};
+
+const applyStateFilters = () => {
+  const baseStates = rawEstados.value;
+  let filteredStates;
+  if (isAdmin.value) {
+    filteredStates = baseStates;
+  } else if (allowedStateIds.value.length === 0) {
+    filteredStates = [];
+  } else {
+    const allowedSet = new Set(allowedStateIds.value);
+    filteredStates = baseStates.filter(state => allowedSet.has(state.value));
+  }
+  allEstados.value = filteredStates;
+  estadoOptions.value = filteredStates;
+  const sanitized = sanitizeEstadoSelection(selectedEstado.value);
+  if (sanitized.length !== selectedEstado.value.length) {
+    selectedEstado.value = sanitized;
+  }
+};
+
 const fetchEstados = async () => {
   try {
     const response = await api.get('/locations/states');
-    allEstados.value = response.data.map(e => ({ label: e.estado, value: e.estado_id }));
-    estadoOptions.value = allEstados.value;
+    rawEstados.value = response.data.map(e => ({ label: e.estado, value: e.estado_id }));
+    applyStateFilters();
   } catch (error) {
     console.error('Error fetching states:', error);
   }
@@ -180,14 +212,18 @@ const fetchComunas = async (municipioIds) => {
 };
 
 const onEstadoChange = (estadoIds) => {
+  const validStateIds = sanitizeEstadoSelection(estadoIds || []);
+  if (validStateIds.length !== (estadoIds || []).length) {
+    selectedEstado.value = validStateIds;
+  }
   selectedMunicipio.value = [];
   selectedComuna.value = [];
   allMunicipios.value = [];
   municipioOptions.value = [];
   allComunas.value = [];
   comunaOptions.value = [];
-  if (estadoIds && estadoIds.length > 0) {
-    fetchMunicipios(estadoIds);
+  if (validStateIds.length > 0) {
+    fetchMunicipios(validStateIds);
   }
 };
 
@@ -270,6 +306,12 @@ onMounted(() => {
   fetchEstados();
   // Fetch initial data from the store
   dashboardStore.fetchCirclesByComunas();
+});
+
+watch([allowedStateIds, () => authStore.user?.role], () => {
+  if (rawEstados.value.length > 0) {
+    applyStateFilters();
+  }
 });
 
 const getTimestamp = () => new Date().toISOString().replace(/[:.]/g, '-');

@@ -9,9 +9,18 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('token') || null);
   const user = ref(null); // El usuario se inicializa como nulo y se carga con init()
 
+  const normalizeUser = payload => {
+    if (!payload) return null;
+    return {
+      ...payload,
+      allowedStates: Array.isArray(payload.allowedStates) ? payload.allowedStates : [],
+    };
+  };
+
   // --- GETTERS ---
   // Un usuario está autenticado solo si hay un token Y un objeto de usuario.
   const isAuthenticated = computed(() => !!token.value && !!user.value);
+  const allowedStates = computed(() => user.value?.allowedStates || []);
 
   // --- ACTIONS ---
 
@@ -23,7 +32,7 @@ export const useAuthStore = defineStore('auth', () => {
         // Decodificar el token para obtener el payload completo del usuario
         const decodedPayload = jwtDecode(storedToken);
         token.value = storedToken;
-        user.value = decodedPayload.user || decodedPayload;
+        user.value = normalizeUser(decodedPayload.user || decodedPayload);
         // Configurar el header de Axios para las peticiones de la sesión actual
       } catch (error) {
         console.error('Token inválido o expirado, limpiando sesión.', error);
@@ -38,7 +47,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     // Guardar en el estado de Pinia
     token.value = newToken;
-    user.value = newUser; // El backend ya nos devuelve el objeto de usuario completo
+    user.value = normalizeUser(newUser); // El backend ya nos devuelve el objeto de usuario completo
 
     // Guardar token en localStorage para persistencia
     localStorage.setItem('token', newToken);
@@ -62,6 +71,7 @@ export const useAuthStore = defineStore('auth', () => {
     token,
     user,
     isAuthenticated,
+    allowedStates,
     // Actions
     init,
     login,
