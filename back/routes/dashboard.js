@@ -8,6 +8,7 @@ router.use(authMiddleware);
 
 // --- Endpoint de Indicadores ---
 router.get('/indicators', dashboardController.getIndicators);
+router.get('/state-indicators', dashboardController.getStateIndicatorsView);
 
 // --- Endpoints de Agregación ---
 router.get('/by-state', dashboardController.getCirclesByState);

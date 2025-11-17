@@ -5,6 +5,24 @@ import { api } from 'boot/axios';
 import { useAuthStore } from 'stores/auth-store'; // Importar el store de autenticación
 import { ref } from 'vue';
 
+const sortStateIndicators = (rows = []) =>
+  [...rows].sort((a, b) => (a?.estado_nombre || '').localeCompare(b?.estado_nombre || '', 'es', { sensitivity: 'base' }));
+
+const applyStateIndicatorHighlight = (rows = [], estadoId = null) => {
+  const timestamp = Date.now();
+  const normalizedId = Number(estadoId);
+  return rows.map(row => {
+    if (!row) return row;
+    const copy = { ...row };
+    if (!Number.isNaN(normalizedId) && Number(row.estado_id) === normalizedId) {
+      copy.__highlightedAt = timestamp;
+    } else {
+      delete copy.__highlightedAt;
+    }
+    return copy;
+  });
+};
+
 export const useDashboardStore = defineStore('dashboard', () => {
   // --- STATE ---
   const circlesByState = ref([]);
@@ -12,8 +30,18 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const circlesByComuna = ref([]);
   const indicators = ref({});
   const dailyCertifications = ref([]);
+  const stateIndicators = ref([]);
   const isLoading = ref(false);
+  const isStateIndicatorsLoading = ref(false);
   const lastUpdateAt = ref(0);
+  const highlightedStateId = ref(null);
+
+  const userHasNationalAccess = () => {
+    const authStore = useAuthStore();
+    const isAdmin = authStore.user?.role === 'Administrador';
+    const allowed = authStore.allowedStates;
+    return isAdmin || !Array.isArray(allowed) || allowed.length === 0;
+  };
 
   // --- ACTIONS ---
 
@@ -103,6 +131,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
       fetchCirclesByMunicipios(),
       fetchCirclesByComunas(),
     ]);
+    if (userHasNationalAccess()) {
+      await fetchStateIndicators();
+    }
     lastUpdateAt.value = Date.now();
     isLoading.value = false;
   };
@@ -149,6 +180,59 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
     // 5. Notify components of the update
     lastUpdateAt.value = Date.now();
+
+    if (userHasNationalAccess() && state_id) {
+      refreshStateIndicatorRow(state_id);
+    }
+  };
+
+  const fetchStateIndicators = async () => {
+    const authStore = useAuthStore();
+    if (!authStore.isAuthenticated) return;
+
+    if (!userHasNationalAccess()) {
+      stateIndicators.value = [];
+      highlightedStateId.value = null;
+      return;
+    }
+
+    isStateIndicatorsLoading.value = true;
+    try {
+      const response = await api.get('/dashboard/state-indicators');
+      stateIndicators.value = sortStateIndicators(response.data || []);
+      highlightedStateId.value = null;
+    } catch (error) {
+      console.error('Error al obtener los indicadores por estado:', error);
+      stateIndicators.value = [];
+    } finally {
+      isStateIndicatorsLoading.value = false;
+    }
+  };
+
+  const refreshStateIndicatorRow = async (estadoId) => {
+    const normalizedId = Number(estadoId);
+    if (Number.isNaN(normalizedId)) return;
+    if (!stateIndicators.value.length) {
+      await fetchStateIndicators();
+      return;
+    }
+    try {
+      const response = await api.get('/dashboard/state-indicators', { params: { estado_id: normalizedId } });
+      const row = response.data?.[0];
+      if (!row) return;
+      const current = [...stateIndicators.value];
+      const index = current.findIndex(r => Number(r.estado_id) === normalizedId);
+      if (index === -1) {
+        current.push(row);
+      } else {
+        current[index] = row;
+      }
+      const sorted = sortStateIndicators(current);
+      stateIndicators.value = applyStateIndicatorHighlight(sorted, normalizedId);
+      highlightedStateId.value = normalizedId;
+    } catch (error) {
+      console.error('Error al refrescar indicador por estado:', error);
+    }
   };
 
   return {
@@ -158,8 +242,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
     circlesByComuna,
     indicators,
     dailyCertifications,
+    stateIndicators,
     isLoading,
+    isStateIndicatorsLoading,
     lastUpdateAt,
+    highlightedStateId,
 
     // Actions
     fetchCirclesByState,
@@ -169,5 +256,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
     fetchCirclesByComunas,
     refetchAll,
     handleDBChange,
+    fetchStateIndicators,
   };
 });

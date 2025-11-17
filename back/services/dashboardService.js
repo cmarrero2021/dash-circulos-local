@@ -271,3 +271,33 @@ exports.getDailyCertifications = async (userId, filters) => {
     const result = await pool.query(query, params);
     return result.rows;
 };
+
+exports.getStateIndicatorsView = async (userId, filters = {}) => {
+    const hasNationalAccess = await hasNationalDashboardAccess(userId);
+    const params = [];
+    let whereClauses = [];
+
+    if (!hasNationalAccess) {
+        const allowedStates = await getAllowedStatesForUser(userId);
+        if (!allowedStates.length) {
+            return [];
+        }
+        params.push(allowedStates);
+        whereClauses.push(`estado_id = ANY($${params.length})`);
+    }
+
+    if (filters.estado_id) {
+        params.push(Number(filters.estado_id));
+        whereClauses.push(`estado_id = $${params.length}`);
+    }
+
+    const whereClause = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
+    const query = `
+        SELECT *
+        FROM vindicadores_estados
+        ${whereClause}
+        ORDER BY estado_nombre;
+    `;
+    const { rows } = await pool.query(query, params);
+    return rows;
+};

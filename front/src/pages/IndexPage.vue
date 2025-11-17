@@ -1,6 +1,7 @@
 <template>
   <q-page class="q-pa-md bg-grey-2">
     <div class="row q-col-gutter-md">
+
       <!-- Indicadores Principales -->
         <div v-for="indicator in indicators" :key="indicator.label" class="col-12 col-md-3">
           <q-card flat bordered>
@@ -23,6 +24,34 @@
         <q-card flat bordered>
           <q-card-section class="row q-gutter-md items-center">
             <div class="text-h6">Filtros</div>
+          </q-card-section>
+        </q-card>
+      </div>
+
+      <div v-if="showStateIndicators" class="col-12">
+        <q-card flat bordered class="state-indicators-card">
+          <q-card-section class="row items-center justify-between q-col-gutter-sm">
+            <div class="text-h6">Indicadores por Estado</div>
+          </q-card-section>
+          <q-separator />
+          <q-card-section>
+            <q-inner-loading :showing="isStateIndicatorsLoading">
+              <q-spinner-dots size="40px" color="primary" />
+            </q-inner-loading>
+            <q-table
+            v-show="!isStateIndicatorsLoading"
+              ref="stateIndicatorsTableRef"
+              class="state-indicators-table"
+              flat
+              dense
+              :rows="stateIndicators"
+              :columns="stateIndicatorColumns"
+              row-key="estado_id"
+              hide-bottom
+              :pagination="stateIndicatorsPagination"
+              :rows-per-page-options="[0]"
+              :row-class="stateIndicatorRowClass"
+            />
           </q-card-section>
         </q-card>
       </div>
@@ -249,7 +278,7 @@
 </template>
 
 <script setup>
-import { onMounted, computed, ref, watch } from 'vue';
+import { onMounted, computed, ref, watch, nextTick } from 'vue';
 import { useDashboardStore } from 'stores/dashboard-store';
 import { useAuthStore } from 'stores/auth-store';
 import { storeToRefs } from 'pinia';
@@ -260,11 +289,13 @@ import { exportFile } from 'quasar';
 
 const dashboardStore = useDashboardStore();
 const authStore = useAuthStore();
-const { indicators: rawIndicators, circlesByState, circlesByMunicipio } = storeToRefs(dashboardStore);
+const { indicators: rawIndicators, circlesByState, circlesByMunicipio, stateIndicators, highlightedStateId } = storeToRefs(dashboardStore);
+const { isStateIndicatorsLoading } = storeToRefs(dashboardStore);
 
 const dailyCertificationsHeight = ref(425);
 const circlesByStateHeight = ref(425);
 const participantsByStateHeight = ref(425);
+const stateIndicatorsTableRef = ref(null);
 
 // Filters for municipios table
 const estadoFilter = ref(null);
@@ -273,6 +304,7 @@ const municipioFilter = ref([]); // selected municipio(s)
 
 const allowedStateIds = computed(() => authStore.allowedStates);
 const isAdmin = computed(() => authStore.user?.role === 'Administrador');
+const showStateIndicators = computed(() => isAdmin.value || (Array.isArray(allowedStateIds.value) && allowedStateIds.value.length === 0));
 
 // Compute unique estado options from circlesByState
 const estadoOptions = computed(() => {
@@ -364,6 +396,51 @@ const municipioTableColumns = computed(() => ([
   { name: 'avance', label: 'Avance', field: 'avance', align: 'right', format: v => formatNumber(v) },
 ]));
 
+const stateIndicatorColumns = computed(() => ([
+  { name: 'estado', label: 'Estado', field: 'estado_nombre', align: 'left' },
+  { name: 'meta', label: 'Meta', field: 'meta', align: 'right', format: v => formatNumber(v) },
+  { name: 'acumulado', label: 'Acumulado', field: 'acumulado', align: 'right', format: v => formatNumber(v) },
+  { name: 'diferencia', label: 'Diferencia', field: 'diferencia', align: 'right', format: v => formatNumber(v) },
+  { name: 'promedio_necesario', label: 'Promedio Necesario', field: 'promedio_necesario', align: 'right', format: v => formatNumber(v) },
+  { name: 'promedio_diario', label: 'Promedio Diario', field: 'promedio_diario', align: 'right', format: v => formatNumber(v) },
+  { name: 'maximo_por_fecha', label: 'Máximo por Fecha', field: 'maximo_por_fecha', align: 'right', format: v => formatNumber(v) },
+  { name: 'fecha_maxima', label: 'Fecha Máxima', field: 'fecha_maxima', align: 'left', format: v => formatDate(v) },
+]));
+
+const stateIndicatorsPagination = ref({ rowsPerPage: 0 });
+const stateIndicatorRowClass = (row) => {
+  if (!row) return '';
+  const rowId = Number(row.estado_id);
+  const highlightedId = Number(highlightedStateId.value);
+  if (!Number.isNaN(rowId) && !Number.isNaN(highlightedId) && rowId === highlightedId) {
+    return 'highlighted-state-row';
+  }
+  return '';
+};
+
+const applyStateIndicatorsDomHighlight = (estadoId) => {
+  if (!estadoId || !stateIndicatorsTableRef.value?.$el) return;
+  const tableEl = stateIndicatorsTableRef.value.$el;
+  const rows = Array.from(tableEl.querySelectorAll('tbody tr'));
+  rows.forEach((tr) => tr.classList.remove('highlighted-state-row'));
+
+  const estadoIdStr = String(estadoId);
+  let target = rows.find((tr) => tr.getAttribute('data-row-key') === estadoIdStr);
+
+  if (!target) {
+    target = rows.find((tr) => {
+      return Array.from(tr.querySelectorAll('td, th')).some((cell) => {
+        const text = (cell.textContent || '').trim();
+        return text && stateIndicators.value.some(row => String(row.estado_nombre).toUpperCase() === text.toUpperCase() && String(row.estado_id) === estadoIdStr);
+      });
+    });
+  }
+
+  if (target) {
+    target.classList.add('highlighted-state-row');
+  }
+};
+
 // Pagination for municipio table (default 15 rows)
 const municipioPagination = ref({ rowsPerPage: 15 });
 
@@ -373,6 +450,13 @@ const formatNumber = (value) => {
   const num = Number(value);
   if (Number.isNaN(num)) return value;
   return new Intl.NumberFormat('de-DE').format(Math.round(num));
+};
+
+const formatDate = (value) => {
+  if (!value) return 'N/A';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'N/A';
+  return date.toLocaleDateString('es-VE', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
 const exportMunicipios = (format) => {
@@ -485,7 +569,37 @@ onMounted(() => {
   dashboardStore.fetchIndicators();
   dashboardStore.fetchDailyCertifications();
   dashboardStore.fetchCirclesByMunicipios();
+  if (showStateIndicators.value) {
+    dashboardStore.fetchStateIndicators();
+  }
+});
+
+watch(showStateIndicators, (val) => {
+  if (val) {
+    dashboardStore.fetchStateIndicators();
+  }
+});
+
+watch(highlightedStateId, (estadoId) => {
+  if (estadoId == null) return;
+  nextTick(() => applyStateIndicatorsDomHighlight(estadoId));
 });
 
 // (debug logs removed)
+// (debug logs removed)
 </script>
+
+<style scoped>
+.state-indicators-card {
+  background: #ffffff;
+}
+
+.state-indicators-table :deep(tbody tr) {
+  transition: background-color 0.4s ease, box-shadow 0.4s ease;
+}
+
+.state-indicators-table :deep(tbody tr.highlighted-state-row) {
+  background-color: rgba(76, 175, 80, 0.18);
+  box-shadow: inset 0 0 0 2px rgba(76, 175, 80, 0.4);
+}
+</style>
