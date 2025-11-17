@@ -236,12 +236,16 @@ const chartOptions = computed(() => {
     chart: {
       id: `chart-${props.title.replace(/\s+/g, '-')}`,
       toolbar: { show: false },
-      stacked: props.stacked,
+      stacked: true, // Siempre apilado para mantener la misma altura
     },
     plotOptions: {
       bar: {
         horizontal: false,
-        columnWidth: props.stacked ? '70%' : '55%',
+        columnWidth: '70%',
+        borderRadius: 4,
+        dataLabels: {
+          position: 'top', // Posición de las etiquetas si se muestran
+        },
       },
     },
     labels,
@@ -250,27 +254,46 @@ const chartOptions = computed(() => {
       type: (props.type === 'line' && String(props.columnMap.label).toLowerCase().includes('fecha')) ? 'datetime' : undefined,
     },
     legend: { position: 'bottom' },
-    // Data labels: show only for the primary series (main data) when a trend series exists
-    dataLabels: (() => {
-      let cfg = { enabled: true, style: { colors: ['#000'] }, formatter: function (val) { return formatNumber(val); } };
-      try {
-        const hasTrend = Array.isArray(chartSeries.value) && chartSeries.value.length > 1 && chartSeries.value[1] && String(chartSeries.value[1].name).toLowerCase().includes('tendencia');
-        if (hasTrend) {
-          cfg.enabledOnSeries = [0];
-        }
-      } catch {
-        // ignore
-      }
-      return cfg;
-    })(),
+    // Se ajustan los colores dinámicamente más abajo
+    dataLabels: {
+      enabled: false, // Deshabilitar todas las etiquetas de datos
+    },
     tooltip: {
       y: {
-        formatter: function (val) {
-          return formatNumber(val);
+        formatter: (val, { seriesIndex, dataPointIndex }) => {
+          const originalDataRow = props.data[dataPointIndex];
+          if (originalDataRow && Array.isArray(props.columnMap.value) && props.columnMap.value.length === 2) {
+            const progressKey = props.columnMap.value[0].key;
+            const totalKey = props.columnMap.value[1].key;
+
+            const certificados = Number(originalDataRow[progressKey] || 0);
+            const faltantes = Number(originalDataRow[totalKey] || 0) - certificados;
+            const total = certificados + faltantes;
+            const porcentajeCertificados = total > 0 ? (certificados / total) * 100 : 0;
+            const isProgress = seriesIndex === 0; // Primera serie es el progreso
+
+            // Formatear la salida del tooltip
+            return `
+              <div>
+                <div style="font-weight: bold; margin-bottom: 5px;">${originalDataRow[props.columnMap.label] || ''}</div>
+                ${isProgress ? `
+                  <div><strong>Certificados:</strong> ${formatNumber(certificados)} (${porcentajeCertificados.toFixed(1).replace('.', ',')}%)</div>
+                  <div><strong>Faltante:</strong> ${formatNumber(faltantes)} (${(100 - porcentajeCertificados).toFixed(1).replace('.', ',')}%)</div>
+                  <div style="margin-top: 5px; border-top: 1px solid #eee; padding-top: 5px;">
+                    <strong>Total:</strong> ${formatNumber(total)}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }
+          return formatNumber(val); // Fallback
         }
       }
     }
   };
+
+  // Colores para las barras apiladas
+  baseOptions.colors = ['#008FFB', '#FFA500']; // Azul para certificados, Naranja para faltante
 
   // Add stroke options for line charts (smooth)
   if (props.type === 'line') {
@@ -304,21 +327,31 @@ const chartSeries = computed(() => {
       const totalConfig = props.columnMap.value[1];
 
       const seriesData = dataForChart.map(item => {
-        const progress = item[progressConfig.key] != null ? Number(item[progressConfig.key]) : 0;
-        const total = item[totalConfig.key] != null ? Number(item[totalConfig.key]) : 0;
-        const remaining = Math.max(0, total - progress);
-        return { progress, remaining };
+        const certificados = item[progressConfig.key] != null ? Number(item[progressConfig.key]) : 0;
+        const faltantes = item[totalConfig.key] != null ? (Number(item[totalConfig.key]) - certificados) : 0;
+        const total = certificados + faltantes;
+        const porcentajeCertificados = total > 0 ? (certificados / total) * 100 : 0;
+        const porcentajeFaltantes = 100 - porcentajeCertificados;
+        
+        return { 
+          certificados,
+          faltantes,
+          total,
+          porcentajeCertificados,
+          porcentajeFaltantes
+        };
       });
-
+      
+      // Para mostrar todas las columnas con la misma altura (100%)
       return [
         {
-          name: progressConfig.name,
-          data: seriesData.map(d => d.progress),
+          name: 'Certificados',
+          data: seriesData.map(d => d.porcentajeCertificados)
         },
         {
           name: 'Faltante',
-          data: seriesData.map(d => d.remaining),
-        },
+          data: seriesData.map(d => d.porcentajeFaltantes)
+        }
       ];
     }
 
