@@ -2,24 +2,26 @@
   <q-page class="q-pa-md bg-grey-2">
     <div class="row q-col-gutter-md">
       <!-- Indicadores Principales -->
-      <div v-for="indicator in indicators" :key="indicator.label" class="col-12 col-md-3">
-        <q-card flat bordered>
-          <q-card-section>
-            <div class="row items-center no-wrap">
-              <div class="col">
-                <div class="text-subtitle2 text-grey-8">{{ indicator.label }}</div>
-                <div class="text-h5 text-weight-bold">
-                  {{ indicator.value }}
-                  <q-icon :name="indicator.icon" :color="indicator.color" size="sm" />
+      <template v-if="showNationalSections">
+        <div v-for="indicator in indicators" :key="indicator.label" class="col-12 col-md-3">
+          <q-card flat bordered>
+            <q-card-section>
+              <div class="row items-center no-wrap">
+                <div class="col">
+                  <div class="text-subtitle2 text-grey-8">{{ indicator.label }}</div>
+                  <div class="text-h5 text-weight-bold">
+                    {{ indicator.value }}
+                    <q-icon :name="indicator.icon" :color="indicator.color" size="sm" />
+                  </div>
                 </div>
               </div>
-            </div>
-          </q-card-section>
-        </q-card>
-      </div>
+            </q-card-section>
+          </q-card>
+        </div>
+      </template>
 
       <!-- Filtros de la Página -->
-      <div class="col-12">
+      <div v-if="showNationalSections" class="col-12">
         <q-card flat bordered>
           <q-card-section class="row q-gutter-md items-center">
             <div class="text-h6">Filtros</div>
@@ -29,7 +31,7 @@
 
       <!-- Indicador: Círculos por Estado (Gráfico) -->
       <!-- Par inicial: Certificaciones Diarias (Gráfico) -->
-      <div class="col-12 col-md-6">
+      <div v-if="showNationalSections" class="col-12 col-md-6">
         <q-card flat bordered style="min-height: 425px;">
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
@@ -47,7 +49,7 @@
       </div>
 
       <!-- Par inicial: Certificaciones Diarias (Tabla) -->
-      <div class="col-12 col-md-6">
+      <div v-if="showNationalSections" class="col-12 col-md-6">
         <q-card flat bordered style="min-height: 425px;">
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
@@ -273,6 +275,12 @@ const municipioFilter = ref([]); // selected municipio(s)
 
 const allowedStateIds = computed(() => authStore.allowedStates);
 const isAdmin = computed(() => authStore.user?.role === 'Administrador');
+const hasNationalDashboardAccess = computed(() => {
+  if (isAdmin.value) return true;
+  const allowed = allowedStateIds.value;
+  return !Array.isArray(allowed) || allowed.length === 0;
+});
+const showNationalSections = hasNationalDashboardAccess;
 
 // Compute unique estado options from circlesByState
 const estadoOptions = computed(() => {
@@ -482,8 +490,10 @@ const indicators = computed(() => {
 
 onMounted(() => {
   dashboardStore.fetchCirclesByState();
-  dashboardStore.fetchIndicators();
-  dashboardStore.fetchDailyCertifications();
+  if (hasNationalDashboardAccess.value) {
+    dashboardStore.fetchIndicators();
+    dashboardStore.fetchDailyCertifications();
+  }
   dashboardStore.fetchCirclesByMunicipios();
 });
 
