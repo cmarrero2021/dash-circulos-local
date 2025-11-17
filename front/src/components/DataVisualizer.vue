@@ -367,29 +367,79 @@ const chartOptions = computed(() => {
     baseOptions.colors = ['#008FFB'];
   }
 
-  // Add stroke options for line charts
+  // Configuración para gráficos de línea
   if (props.type === 'line') {
     baseOptions.stroke = { 
       curve: 'straight',
       width: 3
     };
-    baseOptions.colors = ['#008FFB']; // Main line color
+    baseOptions.colors = ['#008FFB'];
     
-    // Configurar formato de números para gráficos de línea
+    // Configurar el eje X para mostrar todas las fechas
+    if (dataForChart && dataForChart.length > 0) {
+      const labelKey = props.columnMap?.label;
+      if (labelKey) {
+        // Obtener todas las fechas de los datos
+        const dates = dataForChart
+          .map(item => item[labelKey])
+          .filter(date => date != null);
+        
+        if (dates.length > 0) {
+          baseOptions.xaxis = {
+            type: 'datetime',
+            labels: {
+              format: 'dd/MM/yy', // Formato de fecha corto (ej: 17/11/25)
+              datetimeUTC: false,
+              style: {
+                fontSize: '11px',
+                fontFamily: 'Arial, sans-serif'
+              },
+              formatter: function(value) {
+                const date = new Date(value);
+                return date.toLocaleDateString('es-VE', {
+                  day: '2-digit',
+                  month: '2-digit',
+                  year: '2-digit'
+                });
+              }
+            },
+            categories: dates,
+            tickAmount: 'dataPoints', // Muestra una marca por cada punto de datos
+            tooltip: {
+              enabled: false
+            }
+          };
+        }
+      }
+    }
+    
+    // Configurar eje Y para números enteros con separador de miles
     baseOptions.yaxis = {
       labels: {
         formatter: function(value) {
-          // Formatear números con separador de miles y sin decimales
           return value.toLocaleString('es-VE', { maximumFractionDigits: 0 });
         }
-      }
+      },
+      forceNiceScale: true,
+      min: 0 // Asegurar que el eje Y empiece en 0
     };
     
-    // Configurar tooltips para gráficos de línea
+    // Configurar tooltips
     baseOptions.tooltip = {
+      x: {
+        show: true,
+        format: 'dd/MM/yyyy',
+        formatter: function(_, { dataPointIndex, w }) {
+          const date = new Date(w.globals.categoryLabels[dataPointIndex]);
+          return date.toLocaleDateString('es-VE', {
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric'
+          });
+        }
+      },
       y: {
         formatter: function(value) {
-          // Formatear números con separador de miles y sin decimales en tooltips
           return value.toLocaleString('es-VE', { maximumFractionDigits: 0 });
         }
       }
@@ -399,11 +449,10 @@ const chartOptions = computed(() => {
     baseOptions.dataLabels = {
       enabled: true,
       formatter: function(val) {
-        // Formatear números con separador de miles y sin decimales en etiquetas
         return Number(val).toLocaleString('es-VE', { maximumFractionDigits: 0 });
       },
       style: {
-        fontSize: '12px',
+        fontSize: '11px',
         fontWeight: 'bold',
         colors: ['#000']
       }
