@@ -256,7 +256,31 @@ const chartOptions = computed(() => {
     legend: { position: 'bottom' },
     // Se ajustan los colores dinámicamente más abajo
     dataLabels: {
-      enabled: false, // Deshabilitar todas las etiquetas de datos
+      enabled: true,
+      style: {
+        colors: ['#000000'],
+        fontSize: '12px',
+        fontWeight: 'bold'
+      },
+      dropShadow: {
+        enabled: true,
+        top: 1,
+        left: 1,
+        blur: 1,
+        color: '#fff',
+        opacity: 0.9
+      },
+      formatter: function(val, { seriesIndex }) {
+        if (seriesIndex === 0) { // Solo mostrar etiqueta en la parte superior de la barra azul (certificados)
+          const numVal = Number(val);
+          return isNaN(numVal) ? '' : `${Math.round(numVal)}%`;
+        }
+        return ''; // No mostrar etiqueta para la parte naranja (faltante)
+      },
+      offsetY: -5,
+      background: {
+        enabled: false
+      }
     },
     tooltip: {
       y: {
@@ -270,6 +294,7 @@ const chartOptions = computed(() => {
             const faltantes = Number(originalDataRow[totalKey] || 0) - certificados;
             const total = certificados + faltantes;
             const porcentajeCertificados = total > 0 ? (certificados / total) * 100 : 0;
+            
             const isProgress = seriesIndex === 0; // Primera serie es el progreso
 
             // Formatear la salida del tooltip
@@ -292,20 +317,97 @@ const chartOptions = computed(() => {
     }
   };
 
-  // Colores para las barras apiladas
-  baseOptions.colors = ['#008FFB', '#FFA500']; // Azul para certificados, Naranja para faltante
+  // Configuración para gráficos de barras apiladas
+  if (props.type === 'bar' && Array.isArray(props.columnMap.value) && props.columnMap.value.length === 2) {
+    baseOptions.colors = ['#008FFB', '#FFA500']; // Azul para certificados, Naranja para faltante
+    
+    // Configurar el eje Y para mostrar solo números enteros
+    baseOptions.yaxis = {
+      min: 0,
+      max: 100,
+      tickAmount: 5, // Muestra 5 marcas en el eje Y (0%, 25%, 50%, 75%, 100%)
+      labels: {
+        formatter: function(val) {
+          // Mostrar solo la parte entera del porcentaje
+          return Math.round(val) + '%';
+        }
+      }
+    };
+    
+    // Asegurar que las etiquetas de datos muestren solo números enteros
+    baseOptions.dataLabels = {
+      enabled: true,
+      style: {
+        colors: ['#000000'],
+        fontSize: '12px',
+        fontWeight: 'bold'
+      },
+      dropShadow: {
+        enabled: true,
+        top: 1,
+        left: 1,
+        blur: 1,
+        color: '#fff',
+        opacity: 0.9
+      },
+      formatter: function(val, { seriesIndex }) {
+        if (seriesIndex === 0) { // Solo mostrar etiqueta en la parte superior de la barra azul (certificados)
+          const numVal = Number(val);
+          return isNaN(numVal) ? '' : `${Math.round(numVal)}%`; // Redondear al entero más cercano
+        }
+        return ''; // No mostrar etiqueta para la parte naranja (faltante)
+      },
+      offsetY: -5,
+      background: {
+        enabled: false
+      }
+    };
+  } else {
+    // Configuración por defecto para otros tipos de gráficos
+    baseOptions.colors = ['#008FFB'];
+  }
 
-  // Add stroke options for line charts (smooth)
+  // Add stroke options for line charts
   if (props.type === 'line') {
-    // If there's a trend series, render it dashed and slightly thinner
-    const hasTrend = Array.isArray(chartSeries.value) && chartSeries.value.length > 1 && chartSeries.value[1] && String(chartSeries.value[1].name).toLowerCase().includes('tendencia');
-    if (hasTrend) {
-      baseOptions.stroke = { curve: 'smooth', width: [3, 2], dashArray: [0, 6] };
-      // Set a clear color for the trend (gray) and a blue for main series
-      baseOptions.colors = ['#008FFB', '#9E9E9E'];
-    } else {
-      baseOptions.stroke = { curve: 'smooth', width: 3 };
-    }
+    baseOptions.stroke = { 
+      curve: 'straight',
+      width: 3
+    };
+    baseOptions.colors = ['#008FFB']; // Main line color
+    
+    // Configurar formato de números para gráficos de línea
+    baseOptions.yaxis = {
+      labels: {
+        formatter: function(value) {
+          // Formatear números con separador de miles y sin decimales
+          return value.toLocaleString('es-VE', { maximumFractionDigits: 0 });
+        }
+      }
+    };
+    
+    // Configurar tooltips para gráficos de línea
+    baseOptions.tooltip = {
+      y: {
+        formatter: function(value) {
+          // Formatear números con separador de miles y sin decimales en tooltips
+          return value.toLocaleString('es-VE', { maximumFractionDigits: 0 });
+        }
+      }
+    };
+    
+    // Configurar etiquetas de datos
+    baseOptions.dataLabels = {
+      enabled: true,
+      formatter: function(val) {
+        // Formatear números con separador de miles y sin decimales en etiquetas
+        return Number(val).toLocaleString('es-VE', { maximumFractionDigits: 0 });
+      },
+      style: {
+        fontSize: '12px',
+        fontWeight: 'bold',
+        colors: ['#000']
+      }
+    };
   }
 
   return baseOptions;
@@ -361,38 +463,29 @@ const chartSeries = computed(() => {
     }));
   }
 
-  const seriesData = dataForChart.map(item => item[props.columnMap.value] != null ? Number(item[props.columnMap.value]) : 0);
+  // Para gráficos de líneas, usar valores absolutos
+  if (props.type === 'line') {
+    const values = Array.isArray(props.columnMap.value)
+      ? props.columnMap.value.map(series => ({
+          name: series.name,
+          data: dataForChart.map(item => Number(item[series.key] || 0))
+        }))
+      : [{
+          name: props.title,
+          data: dataForChart.map(item => Number(item[props.columnMap.value] || 0))
+        }];
+    
+    return values;
+  }
+
+  // Para gráficos de pastel o dona
   if (props.type === 'pie' || props.type === 'donut') {
-    return seriesData;
+    return dataForChart.map(item => Number(item[props.columnMap.value] || 0));
   }
 
-  const mainSeries = { name: props.title, data: seriesData };
-
-  // If it's a time-series line chart, compute a simple linear trend and append it as a second series
-  if (props.type === 'line' && isDateLabel && dataForChart && dataForChart.length > 1) {
-    try {
-      const xy = dataForChart.map(d => ({ x: new Date(d[labelKey]).getTime(), y: Number(d[props.columnMap.value] || 0) }))
-        .filter(p => !isNaN(p.x));
-      if (xy.length >= 2) {
-        const n = xy.length;
-        let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-        xy.forEach(p => { sumX += p.x; sumY += p.y; sumXY += p.x * p.y; sumXX += p.x * p.x; });
-        const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX || 1);
-        const intercept = (sumY - slope * sumX) / n;
-        const trend = dataForChart.map(d => {
-          const x = new Date(d[labelKey]).getTime();
-          if (isNaN(x)) return null;
-          return Math.round((slope * x + intercept) * 100) / 100;
-        }).map(v => v == null ? 0 : v);
-
-        return [mainSeries, { name: 'Tendencia', data: trend }];
-      }
-    } catch (e) {
-      console.error('[DataVisualizer] trend calc error', e);
-    }
-  }
-
-  return [mainSeries];
+  // Para otros tipos de gráficos (no debería llegar aquí para gráficos de barras apiladas)
+  const seriesData = dataForChart.map(item => Number(item[props.columnMap.value] || 0));
+  return [{ name: props.title, data: seriesData }];
 });
 
 // --- Watcher para actualizar gráfico de forma granular ---
