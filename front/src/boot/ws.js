@@ -13,46 +13,24 @@ export default boot(() => {
     socket = new WebSocket(WS_URL);
 
     socket.onopen = () => {
-      // connection opened
+      console.log('[WS] Conectado.');
     };
 
     socket.onmessage = async (event) => {
       try {
         const msg = JSON.parse(event.data);
-        // Obtain store instance when needed
         const dashboardStore = useDashboardStore(storeInstance);
-        switch (msg.event) {
-          case 'data_is_updating':
-            // Backend is updating data; no UI notification shown.
-            break;
-          case 'data_updated':
-            // Update only the indicator cards (no table refresh and no user notification)
-            try {
-              await Promise.all([
-                dashboardStore.fetchIndicators(),
-                dashboardStore.fetchDailyCertifications(),
-                dashboardStore.fetchCirclesByMunicipios(),
-              ]);
-            } catch (e) {
-              console.error('[WS] Error fetching indicators after data_updated', e);
-            }
-            break;
-          case 'state_updated':
-          case 'delta_state': {
-            try {
-              const payload = msg.payload || {};
-              // Highlight only the row that matches payload.estado or payload.estado_id
-              dashboardStore.highlightState(payload);
-            } catch (e) {
-              console.error('[WS] Error highlighting state', e);
-            }
-            break;
-          }
-          default:
-            break;
+
+        // Centralized event handler for all database changes
+        if (msg.event === 'db_change' && msg.payload) {
+          dashboardStore.handleDBChange(msg.payload);
         }
-      } catch {
-        // Mensajes no JSON -> no hacer nada especial
+        // Optional: Keep other event types if they serve different purposes
+        // For example, a full-reload command could be added here if needed.
+
+      } catch (e) {
+        // Non-JSON messages or errors are ignored
+        console.error('[WS] Error processing message', e);
       }
     };
 
@@ -62,7 +40,7 @@ export default boot(() => {
     };
 
     socket.onerror = (err) => {
-      console.error('[WS] Error', err);
+      console.error('[WS] Error', err.message);
       socket.close();
     };
   };

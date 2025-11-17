@@ -32,19 +32,22 @@ const startListening = () => {
   });
 
   client.on('notification', (msg) => {
-    // Notification received from DB: trigger background refresh
-    websocketService.broadcast({ event: 'data_is_updating' });
-    refreshDashboardCache();    
-    // try {
-    //   const payload = JSON.parse(msg.payload);
-    //   console.log('   Payload:', payload);
+    try {
+      const payload = JSON.parse(msg.payload);
+      console.log('Payload recibido de la BD:', payload);
       
-    //   // Enviamos el payload a todos los clientes conectados a través de nuestro servicio WebSocket
-    //   websocketService.broadcast(payload);
+      // Envolvemos el payload en el formato que el frontend espera
+      const message = {
+        event: 'db_change',
+        payload: payload
+      };
+      
+      // Enviamos el objeto estructurado a todos los clientes
+      websocketService.broadcast(message);
 
-    // } catch (error) {
-    //   console.error('Error al parsear el payload de la notificación:', error);
-    // }
+    } catch (error) {
+      console.error('Error al parsear el payload de la notificación:', error);
+    }
   });
   
   client.on('end', () => {

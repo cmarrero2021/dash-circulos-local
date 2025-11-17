@@ -112,23 +112,30 @@ exports.getCirclesByState = async (userId, filters) => {
     return result.rows;
 };
 
+exports.getCirclesByStateMunicipiosComunas = async (userId, filters = {}) => {
+    const { whereClause, params } = await buildFilterClause(userId, filters);
+    const query = `
+        SELECT estado, municipio, comuna, COUNT(*) as avance
+        FROM rm_circulos_remoto
+        ${whereClause}
+        GROUP BY estado, municipio, comuna
+        ORDER BY estado, municipio, comuna;
+    `;
+    const result = await pool.query(query, params);
+    return result.rows;
+};
+
     exports.getCirclesByStateMunicipios = async (userId, filters = {}) => {
-        // filters: { estado }
-        const client = await pool.connect();
-        try {
-            const estado = filters.estado || null;
-            const params = [];
-            let where = '';
-            if (estado) {
-                params.push(estado);
-                where = 'WHERE estado = $1';
-            }
-            const sql = `SELECT estado, municipio, count(municipio) AS avance FROM rm_circulos_remoto ${where} GROUP BY estado, municipio ORDER BY estado, municipio`;
-            const res = await client.query(sql, params);
-            return res.rows;
-        } finally {
-            client.release();
-        }
+        const { whereClause, params } = await buildFilterClause(userId, filters);
+        const query = `
+        SELECT estado, municipio, COUNT(*) as avance
+        FROM rm_circulos_remoto
+        ${whereClause}
+        GROUP BY estado, municipio
+        ORDER BY estado, municipio;
+    `;
+        const result = await pool.query(query, params);
+        return result.rows;
     };
 
 exports.getCirclesByMunicipality = async (userId, filters) => {

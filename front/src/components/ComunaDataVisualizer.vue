@@ -90,7 +90,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
+import { useDashboardStore } from 'src/stores/dashboard-store';
 import { utils, writeFile } from 'xlsx';
 import { exportFile } from 'quasar';
 import { api } from 'boot/axios';
@@ -99,7 +100,7 @@ const props = defineProps({
   title: { type: String, required: true },
 });
 
-
+const dashboardStore = useDashboardStore();
 
 const selectedEstado = ref([]);
 const selectedMunicipio = ref([]);
@@ -113,8 +114,6 @@ const estadoOptions = ref([]);
 const municipioOptions = ref([]);
 const comunaOptions = ref([]);
 
-const comunaData = ref([]);
-
 const pagination = ref({
   rowsPerPage: 15
 });
@@ -125,6 +124,16 @@ const columns = [
   { name: 'comuna', label: 'Comuna', field: 'comuna', align: 'left', sortable: true },
   { name: 'avance', label: 'Avance', field: 'avance', align: 'right', sortable: true },
 ];
+
+// Watch for updates from the store
+watch(() => dashboardStore.lastUpdateAt, () => {
+  // The handleDBChange now performs granular updates, so a full refetch might not be needed.
+  // However, if indicators or other parts need a refresh, you can call specific fetch actions.
+  // For now, we assume the granular update is enough.
+  // If a full refresh is desired, uncomment the line below.
+  // dashboardStore.fetchCirclesByComunas();
+});
+
 
 const fetchEstados = async () => {
   try {
@@ -167,15 +176,6 @@ const fetchComunas = async (municipioIds) => {
     comunaOptions.value = allComunas.value;
   } catch (error) {
     console.error('Error fetching comunas:', error);
-  }
-};
-
-const fetchComunaData = async () => {
-  try {
-    const response = await api.get('/comunas');
-    comunaData.value = response.data;
-  } catch (error) {
-    console.error('Error fetching comuna data:', error);
   }
 };
 
@@ -240,23 +240,23 @@ const filterComunas = (val, update) => {
 };
 
 const filteredData = computed(() => {
-  let data = comunaData.value;
+  let data = dashboardStore.circlesByComuna;
 
-  if (selectedEstado.value.length > 0) {
+  if (selectedEstado.value?.length > 0) {
     const estadoNames = allEstados.value
       .filter(e => selectedEstado.value.includes(e.value))
       .map(e => e.label);
     data = data.filter(row => estadoNames.includes(row.estado));
   }
 
-  if (selectedMunicipio.value.length > 0) {
+  if (selectedMunicipio.value?.length > 0) {
     const municipioNames = allMunicipios.value
       .filter(m => selectedMunicipio.value.includes(m.value))
       .map(m => m.label);
     data = data.filter(row => municipioNames.includes(row.municipio));
   }
 
-  if (selectedComuna.value.length > 0) {
+  if (selectedComuna.value?.length > 0) {
     const comunaNames = allComunas.value
       .filter(c => selectedComuna.value.includes(c.value))
       .map(c => c.label);
@@ -268,7 +268,8 @@ const filteredData = computed(() => {
 
 onMounted(() => {
   fetchEstados();
-  fetchComunaData();
+  // Fetch initial data from the store
+  dashboardStore.fetchCirclesByComunas();
 });
 
 const getTimestamp = () => new Date().toISOString().replace(/[:.]/g, '-');

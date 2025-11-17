@@ -33,6 +33,7 @@ exports.getIndicators = async (req, res) => {
 exports.getCirclesByState = (req, res) => handleRequest(dashboardService.getCirclesByState, req, res);
 exports.getCirclesByMunicipality = (req, res) => handleRequest(dashboardService.getCirclesByMunicipality, req, res);
 exports.getCirclesByStateMunicipios = (req, res) => handleRequest(dashboardService.getCirclesByStateMunicipios, req, res);
+exports.getCirclesByStateMunicipiosComunas = (req, res) => handleRequest(dashboardService.getCirclesByStateMunicipiosComunas, req, res);
 exports.getTotalCircles = (req, res) => handleRequest(dashboardService.getTotalCircles, req, res);
 exports.getDailyAverage = (req, res) => handleRequest(dashboardService.getDailyAverage, req, res);
 exports.getRawData = (req, res) => handleRequest(dashboardService.getRawData, req, res);

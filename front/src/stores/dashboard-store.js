@@ -7,19 +7,17 @@ import { ref } from 'vue';
 export const useDashboardStore = defineStore('dashboard', () => {
   // --- STATE ---
   const circlesByState = ref([]);
+  const circlesByMunicipio = ref([]);
+  const circlesByComuna = ref([]);
   const indicators = ref({});
   const dailyCertifications = ref([]);
   const isLoading = ref(false);
-  // Marca de actualización para WS
-  const isUpdatingFromBackend = ref(false);
   const lastUpdateAt = ref(0);
-  // Highlighted states map to persist highlights across refreshes
-  const highlightedStates = ref({}); // { key: timestamp }
 
   // --- ACTIONS ---
+
+  // Fetches data without showing global loading, for silent updates
   const fetchIndicators = async () => {
-    // Fetch indicators without toggling the global isLoading flag so
-    // charts/tables are not impacted by indicator-only refreshes (e.g. from WS)
     try {
       const response = await api.get('/dashboard/indicators');
       indicators.value = response.data;
@@ -27,56 +25,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
       console.error('Error al obtener los indicadores:', error);
       indicators.value = {};
     }
-  };
-
-  const fetchCirclesByState = async (filters = {}) => {
-    isLoading.value = true;
-    try {
-      const response = await api.get('/dashboard/by-state', { params: filters });
-      circlesByState.value = response.data;
-      // Re-apply highlights to freshly loaded rows if any highlighted keys are active
-      circlesByState.value.forEach(row => {
-        const key = row.estado_id != null ? String(row.estado_id) : String((row.estado || '').toUpperCase());
-        const ts = highlightedStates.value[key];
-        if (ts) {
-          // Reapply any active highlight for this key (persist until another WS signal)
-          row.__highlightedAt = ts;
-        }
-      });
-    } catch (error) {
-      console.error('Error al obtener los círculos por estado:', error);
-      circlesByState.value = [];
-    } finally {
-      isLoading.value = false;
-    }
-  };
-
-  // Encadenar recarga para todos los datasets usados en IndexPage
-  const refetchAll = async () => {
-    await Promise.allSettled([
-      fetchIndicators(),
-      fetchCirclesByState(),
-      fetchDailyCertifications(),
-      fetchCirclesByMunicipios(),
-    ]);
-    lastUpdateAt.value = Date.now();
-  };
-
-  // Notificaciones desde WS
-  const notifyDataIsUpdating = () => {
-    isUpdatingFromBackend.value = true;
-  };
-  const notifyDataUpdated = async () => {
-    isUpdatingFromBackend.value = false;
-    // Se elimina refetchAll() para evitar recarga completa de la tabla.
-    // La actualización granular se maneja con el evento 'state_updated'.
-    // Aquí solo recargamos datos secundarios que no afectan la tabla principal.
-    await Promise.allSettled([
-      fetchIndicators(),
-      fetchDailyCertifications(),
-      fetchCirclesByMunicipios(),
-    ]);
-    lastUpdateAt.value = Date.now();
   };
 
   const fetchDailyCertifications = async (filters = {}) => {
@@ -89,7 +37,19 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   };
 
-  const circlesByMunicipio = ref([]);
+  // Fetches data with global loading indicator
+  const fetchCirclesByState = async (filters = {}) => {
+    isLoading.value = true;
+    try {
+      const response = await api.get('/dashboard/by-state', { params: filters });
+      circlesByState.value = response.data;
+    } catch (error) {
+      console.error('Error al obtener los círculos por estado:', error);
+      circlesByState.value = [];
+    } finally {
+      isLoading.value = false;
+    }
+  };
 
   const fetchCirclesByMunicipios = async (filters = {}) => {
     isLoading.value = true;
@@ -104,77 +64,74 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   };
 
-  // Aplicar delta puntual de un estado
-  const applyStateUpdate = (payload) => {
-    // payload esperado: { estado_id?, estado?, circulos_certificados?, meta_circulos? }
-    const findIndex = () => {
-      if (payload.estado_id != null) {
-        return circlesByState.value.findIndex(r => r.estado_id === payload.estado_id);
-      }
-      if (payload.estado) {
-        return circlesByState.value.findIndex(r => (r.estado || '').toUpperCase() === String(payload.estado).toUpperCase());
-      }
-      return -1;
-    };
-    const idx = findIndex();
-    if (idx === -1) return; // si no existe en memoria, no hacemos nada (o podríamos insertar)
-
-    // Mutar propiedades del objeto directamente (no reemplazar el objeto)
-    // Esto permite que Vue detecte cambios en propiedades específicas
-    const item = circlesByState.value[idx];
-    Object.assign(item, payload);
-    // Si el payload trae indicadores agregados, aplicarlos también (opcional)
-    if (payload.indicators && typeof payload.indicators === 'object') {
-      indicators.value = { ...(indicators.value || {}), ...payload.indicators };
+  const fetchCirclesByComunas = async (filters = {}) => {
+    isLoading.value = true;
+    try {
+      const response = await api.get('/dashboard/circles-states-municipios-comunas', { params: filters });
+      circlesByComuna.value = response.data;
+    } catch (error) {
+      console.error('Error al obtener los círculos por comuna:', error);
+      circlesByComuna.value = [];
+    } finally {
+      isLoading.value = false;
     }
-    lastUpdateAt.value = Date.now();
   };
 
-  const highlightState = (payload) => {
-    // First, clear any existing highlights on all rows
-    circlesByState.value.forEach(r => {
-      if (r && r.__highlightedAt) {
-        // previously highlighted; clearing mark
-        delete r.__highlightedAt;
-      }
-    });
+  // Encadenar recarga para todos los datasets usados en IndexPage
+  const refetchAll = async () => {
+    isLoading.value = true;
+    await Promise.allSettled([
+      fetchIndicators(),
+      fetchCirclesByState(),
+      fetchDailyCertifications(),
+      fetchCirclesByMunicipios(),
+      fetchCirclesByComunas(),
+    ]);
+    lastUpdateAt.value = Date.now();
+    isLoading.value = false;
+  };
 
-    // Find the target row by estado_id or estado (case-insensitive)
-    const findIndex = () => {
-      if (payload.estado_id != null) {
-        return circlesByState.value.findIndex(r => r.estado_id === payload.estado_id);
-      }
-      if (payload.estado) {
-        return circlesByState.value.findIndex(r => (r.estado || '').toUpperCase() === String(payload.estado).toUpperCase());
-      }
-      return -1;
-    };
+  /**
+   * Handles real-time updates from WebSocket.
+   * This action performs granular updates on the local state without refetching all data.
+   * @param {object} payload - The data from the WebSocket message.
+   * e.g., { operacion: 'INSERT', state_id: 1, municipality_id: 2, comuna_id: 3 }
+   */
+  const handleDBChange = (payload) => {
+    const { state_id, municipality_id, parish_id, operacion } = payload;
+    const change = operacion === 'INSERT' ? 1 : operacion === 'DELETE' ? -1 : 0;
 
-  const idx = findIndex();
-  // highlightState called with payload; idx: findIndex
-  if (idx === -1) return;
+    if (change === 0) return;
 
-  const item = circlesByState.value[idx];
-    // Mark with timestamp so components can show highlight
-    const ts = Date.now();
-    item.__highlightedAt = ts;
-    // Store the incoming payload temporarily on the item so UI can read new values
-    // attach payload
-    item.__pendingUpdate = payload;
-    // Also apply the incoming numeric values to the item so the table shows them
-    if (payload.circulos_certificados != null) {
-      // ensure numeric
-      const num = Number(payload.circulos_certificados);
-      if (!Number.isNaN(num)) item.circulos_certificados = num;
-    }
-    if (payload.meta_circulos != null) {
-      const num2 = Number(payload.meta_circulos);
-      if (!Number.isNaN(num2)) item.meta_circulos = num2;
+    // 1. Update Circles by State
+    const stateRow = circlesByState.value.find(s => s.estado_id === state_id);
+    if (stateRow) {
+      stateRow.avance = (stateRow.avance || 0) + change;
+      circlesByState.value.forEach(r => delete r.__highlightedAt);
+      stateRow.__highlightedAt = Date.now();
     }
 
-    // Also record in highlightedStates so highlight survives a refetch
-  const key = item.estado_id != null ? String(item.estado_id) : String((item.estado || '').toUpperCase());
-  highlightedStates.value[key] = ts;
+    // 2. Update Circles by Municipio
+    const municipioRow = circlesByMunicipio.value.find(m => m.municipio_id === municipality_id);
+    if (municipioRow) {
+      municipioRow.avance = (municipioRow.avance || 0) + change;
+      circlesByMunicipio.value.forEach(r => delete r.__highlightedAt);
+      municipioRow.__highlightedAt = Date.now();
+    }
+
+    // 3. Update Circles by Comuna (using parish_id from payload)
+    const comunaRow = circlesByComuna.value.find(c => c.comuna_id === parish_id);
+    if (comunaRow) {
+      comunaRow.avance = (comunaRow.avance || 0) + change;
+      circlesByComuna.value.forEach(r => delete r.__highlightedAt);
+      comunaRow.__highlightedAt = Date.now();
+    }
+
+    // 4. Refresh global indicators as they might have changed
+    fetchIndicators();
+    fetchDailyCertifications();
+
+    // 5. Notify components of the update
     lastUpdateAt.value = Date.now();
   };
 
@@ -182,22 +139,19 @@ export const useDashboardStore = defineStore('dashboard', () => {
     // State
     circlesByState,
     circlesByMunicipio,
+    circlesByComuna,
     indicators,
+    dailyCertifications,
     isLoading,
-    isUpdatingFromBackend,
     lastUpdateAt,
 
     // Actions
     fetchCirclesByState,
     fetchIndicators,
-  fetchDailyCertifications,
+    fetchDailyCertifications,
     fetchCirclesByMunicipios,
+    fetchCirclesByComunas,
     refetchAll,
-    notifyDataIsUpdating,
-    notifyDataUpdated,
-    applyStateUpdate,
-    highlightState,
-  // State
-  dailyCertifications,
+    handleDBChange,
   };
 });

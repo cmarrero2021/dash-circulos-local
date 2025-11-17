@@ -24,6 +24,8 @@ const broadcast = (data) => {
     return;
   }
 
+  console.log('Broadcasting message to clients:', data); // Log para depuración
+
   const message = JSON.stringify(data);
 
   wss.clients.forEach((client) => {
