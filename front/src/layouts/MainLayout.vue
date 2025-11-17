@@ -11,6 +11,7 @@
           <q-list>
             <q-item-label header>
               {{ authStore.user?.email || 'Usuario' }}
+              <q-chip dense class="q-ml-sm" color="primary" text-color="white">{{ authStore.user?.role || 'Rol no definido' }}</q-chip>
             </q-item-label>
             <q-item v-close-popup clickable @click="handleLogout">
               <q-item-section avatar>
@@ -30,6 +31,17 @@
         <q-item-label header> Vistas Principales </q-item-label>
 
         <EssentialLink v-for="link in linksList" :key="link.title" v-bind="link" />
+
+        <!-- Sección de Administración -->
+        <div v-if="authStore.user?.role === 'Administrador'">
+          <q-separator class="q-my-md" />
+          <q-item-label header>Administración</q-item-label>
+          <EssentialLink
+            v-for="link in adminLinksList"
+            :key="link.title"
+            v-bind="link"
+          />
+        </div>
       </q-list>
     </q-drawer>
 
@@ -55,6 +67,17 @@ const linksList = [
     link: '/', // Asumiendo que la ruta principal es el dashboard
   },
   // Puedes añadir más links aquí si es necesario
+];
+
+const adminLinksList = [
+  {
+    title: 'Gestión de Usuarios',
+    caption: 'Administrar usuarios y permisos',
+    icon: 'manage_accounts',
+    link: '/admin/users',
+  },
+  // Aquí puedes agregar links para Roles, Permisos, etc.
+  // { title: 'Roles', icon: 'shield', link: '/admin/roles' },
 ];
 
 function toggleLeftDrawer() {

@@ -83,8 +83,10 @@ const handleLogin = async () => {
   isLoading.value = true;
 
   try {
-    await authStore.login(form.value.email, form.value.password);
-    router.push('/');
+    const loginSuccess = await authStore.login(form.value.email, form.value.password);
+    if (loginSuccess) {
+      router.push('/');
+    }
   } catch (error) {
     const errorMessage = error.response?.data?.message || 'Error al iniciar sesión.';
 

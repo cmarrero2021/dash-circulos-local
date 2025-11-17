@@ -4,7 +4,12 @@ const routes = [
     path: '/',
     component: () => import('layouts/MainLayout.vue'),
     children: [
-      { path: '', component: () => import('pages/IndexPage.vue') }
+      { path: '', component: () => import('pages/IndexPage.vue') },
+      {
+        path: 'admin/users',
+        component: () => import('layouts/UsersPage.vue'), // Corregido para que apunte al archivo correcto
+        meta: { requiresAuth: true, requiresAdmin: true }
+      }
     ],
     meta: { requiresAuth: true }
   },
@@ -16,7 +21,7 @@ const routes = [
       {
         path: 'login',
         component: () => import('pages/LoginPage.vue'),
-        meta: { requiresGuest: true }
+        meta: { requiresGuest: true } // Esta meta es clave
       },
       // Aquí podrías añadir en el futuro la página de 'recuperar-password', etc.
     ]

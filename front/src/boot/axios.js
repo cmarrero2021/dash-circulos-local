@@ -11,8 +11,8 @@ export default boot(({ app }) => {
   const authStore = useAuthStore(storeInstance);
 
   api.interceptors.request.use((config) => {
-    if (authStore.isAuthenticated) {
-      config.headers.Authorization = `Bearer ${authStore.authToken}`;
+    if (authStore.token) {
+      config.headers.Authorization = `Bearer ${authStore.token}`;
     }
     return config;
   });

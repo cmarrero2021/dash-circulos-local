@@ -65,20 +65,33 @@ exports.login = async (req, res) => {
     // 3. Login exitoso: Auditar el éxito
     const auditId = await auditarLogin(email, true, ip, user.id);
 
-    // 4. Crear el JWT
+    // 4. Obtener información del rol para incluirla en la sesión
+    const roleId = user.rol_id ?? user.id_rol_fk ?? user.role_id ?? null;
+    let roleName = 'Rol no definido';
+    if (roleId) {
+      const roleResult = await pool.query('SELECT nombre FROM roles WHERE id = $1', [roleId]);
+      roleName = roleResult.rows[0]?.nombre || roleName;
+    }
+
+    const sessionUser = {
+      id: user.id,
+      email: user.email,
+      nombre: user.nombre,
+      roleId,
+      role: roleName,
+    };
+
+    // 5. Crear el JWT con los datos necesarios para reconstruir la sesión
     const payload = {
-      user: {
-        id: user.id,
-        rol: user.id_rol_fk // <-- Añadir el rol al payload
-      },
-      auditId: auditId // Incluimos el ID de la auditoría en el token para el logout
+      user: sessionUser,
+      auditId, // Incluimos el ID de la auditoría en el token para el logout
     };
 
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: process.env.JWT_EXPIRES_IN,
     });
 
-    res.json({ token });
+    res.json({ token, user: sessionUser });
 
   } catch (error) {
     console.error(error.message);

@@ -2,6 +2,7 @@
 
 import { defineStore } from 'pinia';
 import { api } from 'boot/axios';
+import { useAuthStore } from 'stores/auth-store'; // Importar el store de autenticación
 import { ref } from 'vue';
 
 export const useDashboardStore = defineStore('dashboard', () => {
@@ -18,6 +19,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
   // Fetches data without showing global loading, for silent updates
   const fetchIndicators = async () => {
+    const authStore = useAuthStore();
+    if (!authStore.isAuthenticated) return; // No hacer nada si no está autenticado
+
     try {
       const response = await api.get('/dashboard/indicators');
       indicators.value = response.data;
@@ -28,6 +32,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
   };
 
   const fetchDailyCertifications = async (filters = {}) => {
+    const authStore = useAuthStore();
+    if (!authStore.isAuthenticated) return; // No hacer nada si no está autenticado
+
     try {
       const response = await api.get('/dashboard/daily-certifications', { params: filters });
       dailyCertifications.value = response.data;
@@ -39,6 +46,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
   // Fetches data with global loading indicator
   const fetchCirclesByState = async (filters = {}) => {
+    const authStore = useAuthStore();
+    if (!authStore.isAuthenticated) return; // No hacer nada si no está autenticado
+
     isLoading.value = true;
     try {
       const response = await api.get('/dashboard/by-state', { params: filters });
@@ -52,6 +62,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
   };
 
   const fetchCirclesByMunicipios = async (filters = {}) => {
+    const authStore = useAuthStore();
+    if (!authStore.isAuthenticated) return; // No hacer nada si no está autenticado
+
     isLoading.value = true;
     try {
       const response = await api.get('/dashboard/circles-states-municipios', { params: filters });
@@ -65,6 +78,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
   };
 
   const fetchCirclesByComunas = async (filters = {}) => {
+    const authStore = useAuthStore();
+    if (!authStore.isAuthenticated) return; // No hacer nada si no está autenticado
+
     isLoading.value = true;
     try {
       const response = await api.get('/dashboard/circles-states-municipios-comunas', { params: filters });

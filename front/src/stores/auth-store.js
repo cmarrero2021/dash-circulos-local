@@ -1,59 +1,60 @@
 // src/stores/auth-store.js
 import { defineStore } from 'pinia';
 import { api } from 'boot/axios'; // Importamos la instancia de Axios
-import { ref, computed } from 'vue';
+import { ref, computed } from 'vue'; // Importamos ref y computed de Vue
+import { jwtDecode } from 'jwt-decode'; // Importamos la librería para decodificar JWT
 
 export const useAuthStore = defineStore('auth', () => {
   // --- STATE ---
   const token = ref(localStorage.getItem('token') || null);
-  const user = ref(JSON.parse(localStorage.getItem('user')) || null);
+  const user = ref(null); // El usuario se inicializa como nulo y se carga con init()
 
   // --- GETTERS ---
-  const isAuthenticated = computed(() => !!token.value);
-  const authToken = computed(() => token.value);
+  // Un usuario está autenticado solo si hay un token Y un objeto de usuario.
+  const isAuthenticated = computed(() => !!token.value && !!user.value);
 
   // --- ACTIONS ---
 
-  // Guardar estado en localStorage
-  const setAuthData = (newToken, newUser) => {
-    token.value = newToken;
-    user.value = newUser;
-    localStorage.setItem('token', newToken);
-    localStorage.setItem('user', JSON.stringify(newUser));
-  };
-
-  // Limpiar estado
-  const clearAuthData = () => {
-    token.value = null;
-    user.value = null;
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    // Forzamos un reload para limpiar cualquier otro estado en la app
-    location.reload();
+  // Acción para inicializar el estado desde el token en localStorage
+  const init = async () => {
+    const storedToken = localStorage.getItem('token');
+    if (storedToken) {
+      try {
+        // Decodificar el token para obtener el payload completo del usuario
+        const decodedPayload = jwtDecode(storedToken);
+        token.value = storedToken;
+        user.value = decodedPayload.user || decodedPayload;
+        // Configurar el header de Axios para las peticiones de la sesión actual
+      } catch (error) {
+        console.error('Token inválido o expirado, limpiando sesión.', error);
+        logout(); // Si el token no es válido, limpiamos todo
+      }
+    }
   };
 
   const login = async (email, password) => {
     const response = await api.post('/auth/login', { email, password });
-    const newToken = response.data.token;
+    const { token: newToken, user: newUser } = response.data;
 
-    // Decodificar el payload del token para obtener el ID de usuario
-    const payload = JSON.parse(atob(newToken.split('.')[1]));
-    const loggedInUser = { id: payload.user.id, email };
+    // Guardar en el estado de Pinia
+    token.value = newToken;
+    user.value = newUser; // El backend ya nos devuelve el objeto de usuario completo
 
-    setAuthData(newToken, loggedInUser);
-    // The calling component is responsible for handling errors.
+    // Guardar token en localStorage para persistencia
+    localStorage.setItem('token', newToken);
+
+    // Devolver true para indicar que el login fue exitoso
+    return true;
   };
 
   const logout = async () => {
-    try {
-      // La API de logout necesita el token, que será enviado automáticamente por Axios
-      await api.post('/auth/logout');
-    } catch (error) {
-      console.error('Error en el logout de la API, cerrando sesión localmente de todas formas.', error);
-    } finally {
-      // Siempre limpiamos los datos locales, incluso si la llamada a la API falla
-      clearAuthData();
-    }
+    // Limpiar el estado de Pinia
+    token.value = null;
+    user.value = null;
+    // Limpiar localStorage y el header de Axios
+    localStorage.removeItem('token');
+    // Forzar recarga para una limpieza completa y segura
+    location.reload();
   };
 
   return {
@@ -61,8 +62,8 @@ export const useAuthStore = defineStore('auth', () => {
     token,
     user,
     isAuthenticated,
-    authToken,
     // Actions
+    init,
     login,
     logout,
   };
