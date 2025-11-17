@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const bcrypt = require('bcryptjs');
 
 const formatDbUser = (row = {}) => ({
   id: row.id,
@@ -22,6 +23,38 @@ exports.getUsers = async (_req, res) => {
   } catch (error) {
     console.error('Error al listar usuarios:', error);
     res.status(500).json({ message: 'Error del servidor' });
+  }
+};
+
+exports.createUser = async (req, res) => {
+  const { nombre, email, password, cedula, rol_id, activo = true } = req.body;
+
+  if (!nombre || !email || !password || !cedula || rol_id == null) {
+    return res.status(400).json({ message: 'Nombre, email, contraseña, cédula y rol son requeridos.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const passwordHash = await bcrypt.hash(password, 10);
+    const insertQuery = `
+      INSERT INTO usuarios (nombre, email, password_hash, cedula, rol_id, activo)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING id, nombre, email, rol_id, activo;
+    `;
+    const { rows } = await client.query(insertQuery, [nombre, email, passwordHash, cedula, rol_id, activo]);
+
+    const selectQuery = 'SELECT nombre AS rol_nombre FROM roles WHERE id = $1;';
+    const roleResult = await client.query(selectQuery, [rol_id]);
+
+    await client.query('COMMIT');
+    res.status(201).json(formatDbUser({ ...rows[0], rol_nombre: roleResult.rows[0]?.rol_nombre || 'Sin rol' }));
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error al crear usuario:', error);
+    res.status(500).json({ message: 'Error del servidor' });
+  } finally {
+    client.release();
   }
 };
 
