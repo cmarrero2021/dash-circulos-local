@@ -7,7 +7,7 @@ const routes = [
       { path: '', component: () => import('pages/IndexPage.vue') },
       {
         path: 'admin/users',
-        component: () => import('layouts/UsersPage.vue'), // Corregido para que apunte al archivo correcto
+        component: () => import('src/pages/UsersPage.vue'), // Corregido para que apunte al archivo correcto
         meta: { requiresAuth: true, requiresAdmin: true }
       }
     ],

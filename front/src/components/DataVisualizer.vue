@@ -439,8 +439,13 @@ const chartOptions = computed(() => {
       x: {
         show: true,
         format: 'dd/MM/yyyy',
-        formatter: function(_, { dataPointIndex, w }) {
-          const date = new Date(w.globals.categoryLabels[dataPointIndex]);
+        formatter: function(_, ctx = {}) {
+          const { dataPointIndex, w } = ctx;
+          const rawLabel = w?.globals?.categoryLabels?.[dataPointIndex] ?? _;
+          const date = new Date(rawLabel);
+          if (Number.isNaN(date.getTime())) {
+            return rawLabel ?? '';
+          }
           return date.toLocaleDateString('es-VE', {
             day: '2-digit',
             month: 'long',
