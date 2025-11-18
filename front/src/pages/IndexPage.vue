@@ -552,7 +552,7 @@ watch(showStateIndicators, (val) => {
   transition: background-color 0.4s ease, box-shadow 0.4s ease;
 }
 
-.state-indicators-table :deep(tbody tr.highlighted-state-row) {
+.state-indicators-table :deep(tbody tr.row-highlight) {
   background-color: rgba(76, 175, 80, 0.18);
   box-shadow: inset 0 0 0 2px rgba(76, 175, 80, 0.4);
 }

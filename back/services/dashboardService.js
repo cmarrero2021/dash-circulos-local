@@ -293,11 +293,13 @@ exports.getStateIndicatorsView = async (userId, filters = {}) => {
 
     const whereClause = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
     const query = `
-        SELECT *
+        SELECT estado_id, estado_nombre, meta, acumulado, diferencia, dias_faltantes, promedio_necesario, promedio_diario, maximo_por_fecha, fecha_maxima
         FROM vindicadores_estados
         ${whereClause}
         ORDER BY estado_nombre;
     `;
+    console.log('Query:', query);
+    console.log('Params:', params);
     const { rows } = await pool.query(query, params);
     return rows;
 };

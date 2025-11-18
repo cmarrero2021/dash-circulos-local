@@ -46,4 +46,14 @@ export default boot(() => {
   };
 
   connect();
+
+  // Temporary global function to simulate WebSocket messages for testing
+  window.simulateWSMessage = (payload) => {
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      const fakeEvent = { data: JSON.stringify({ event: 'db_change', payload }) };
+      socket.onmessage(fakeEvent);
+    } else {
+      console.warn('[WS] Socket not connected. Cannot simulate message.');
+    }
+  };
 });
