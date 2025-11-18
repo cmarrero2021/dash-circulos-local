@@ -8,13 +8,31 @@ import { ref } from 'vue';
 const sortStateIndicators = (rows = []) =>
   [...rows].sort((a, b) => (a?.estado_nombre || '').localeCompare(b?.estado_nombre || '', 'es', { sensitivity: 'base' }));
 
-const applyStateIndicatorHighlight = (rows = [], estadoId = null) => {
+// const applyStateIndicatorHighlight = (rows = [], estadoId = null) => {
+//   const timestamp = Date.now();
+//   const normalizedId = Number(estadoId);
+//   return rows.map(row => {
+//     if (!row) return row;
+//     const copy = { ...row };
+//     if (!Number.isNaN(normalizedId) && Number(row.estado_id) === normalizedId) {
+//       copy.__highlightedAt = timestamp;
+//     } else {
+//       delete copy.__highlightedAt;
+//     }
+//     return copy;
+//   });
+// };
+
+const setRowHighlightFlag = (rows = [], estadoId) => {
   const timestamp = Date.now();
   const normalizedId = Number(estadoId);
+  if (Number.isNaN(normalizedId)) {
+    return rows.map(row => ({ ...row }));
+  }
   return rows.map(row => {
     if (!row) return row;
     const copy = { ...row };
-    if (!Number.isNaN(normalizedId) && Number(row.estado_id) === normalizedId) {
+    if (Number(copy.estado_id) === normalizedId) {
       copy.__highlightedAt = timestamp;
     } else {
       delete copy.__highlightedAt;
@@ -214,6 +232,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     if (Number.isNaN(normalizedId)) return;
     if (!stateIndicators.value.length) {
       await fetchStateIndicators();
+      highlightedStateId.value = normalizedId;
       return;
     }
     try {
@@ -228,7 +247,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
         current[index] = row;
       }
       const sorted = sortStateIndicators(current);
-      stateIndicators.value = applyStateIndicatorHighlight(sorted, normalizedId);
+      stateIndicators.value = setRowHighlightFlag(sorted, normalizedId);
       highlightedStateId.value = normalizedId;
     } catch (error) {
       console.error('Error al refrescar indicador por estado:', error);
