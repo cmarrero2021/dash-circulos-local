@@ -4,7 +4,7 @@ import axios from 'axios';
 import { useAuthStore } from 'stores/auth-store';
 import { storeInstance, routerInstance } from 'src/router/index'; // <-- Importación clave
 
-const api = axios.create({ baseURL: 'http://localhost:3000/api' });
+const api = axios.create({ baseURL: `${import.meta.env.VITE_API_URL}/api` });
 
 // Ya no necesitamos pasar { store, router } a la función boot
 export default boot(({ app }) => {

@@ -6,8 +6,9 @@ import { storeInstance } from 'src/router/index';
 let socket;
 
 export default boot(() => {
-  // Determinar URL del WS (asume backend en el mismo host:puerto de API base http://localhost:3000)
-  const WS_URL = (location.protocol === 'https:' ? 'wss://' : 'ws://') + 'localhost:3000';
+  // Determinar URL del WS basado en VITE_API_URL
+  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3100';
+  const WS_URL = apiUrl.replace(/^http/, 'ws');
 
   const connect = () => {
     socket = new WebSocket(WS_URL);

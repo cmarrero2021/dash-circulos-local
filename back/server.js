@@ -3,7 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const { WebSocketServer } = require('ws');
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 
 const { startListening } = require('./services/notificationListener');
 const websocketService = require('./services/websocketService');
@@ -24,7 +24,7 @@ const adminRoutes = require('./routes/admin');
 const app = express();
 
 //////////EOLO EN DESARROLLO, ELIMINAR ANTES DEL DEPLOY///////////
-app.disable('etag'); 
+app.disable('etag');
 //////////EOLO EN DESARROLLO, ELIMINAR ANTES DEL DEPLOY///////////
 
 app.use(cors()); // Habilita CORS para todas las rutas
@@ -62,7 +62,7 @@ websocketService.initialize(wss);
 
 wss.on('connection', (ws) => {
   // Client connected to WebSocket
-  
+
   ws.on('close', () => {
     // Client disconnected
   });
