@@ -1,6 +1,40 @@
 <template>
   <q-page class="q-pa-md bg-grey-2">
-    <div class="row q-col-gutter-md">
+    <!-- Header banner image -->
+    <q-img src="/images/cintillo.png" alt="Cintillo" class="full-width" style="width: 100%; max-height: 300px;" />
+    <div class="row q-col-gutter-md" style="margin-top: 16px;">
+    <div v-if="showStateIndicators" class="col-12">
+      <q-card flat bordered class="state-indicators-card">
+        <q-card-section class="row items-center justify-between q-col-gutter-sm">
+          <!-- Logo and Title Container -->
+          <div class="col-12 col-md-8 row items-center q-gutter-x-md">
+            <!-- <q-img 
+              src="/images/logo_nobg.png" 
+              alt="Logo" 
+              style="max-width: 150px; height: auto;" 
+              fit="contain"
+            /> -->
+            <div class="text-h5 text-weight-bold text-primary">DASHBOARD CERTIFICACIONES MINAAMP - {{ currentDate }}</div>
+          </div>
+
+          <!-- Export Options -->
+          <div class="col-12 col-md-auto">
+            <q-btn-dropdown color="primary" label="Exportar Página" icon="file_download" flat dense class="q-mr-sm">
+              <q-list>
+                <q-item v-close-popup clickable @click="exportPage('png')">
+                  <q-item-section avatar><q-icon name="image" /></q-item-section>
+                  <q-item-section>PNG</q-item-section>
+                </q-item>
+                <q-item v-close-popup clickable @click="exportPage('pdf')">
+                  <q-item-section avatar><q-icon name="picture_as_pdf" /></q-item-section>
+                  <q-item-section>PDF</q-item-section>
+                </q-item>
+              </q-list>
+            </q-btn-dropdown>
+          </div>
+        </q-card-section>
+      </q-card>
+    </div>
 
       <!-- Indicadores Principales -->
         <div v-for="indicator in indicators" :key="indicator.label" class="col-12 col-md-3">
@@ -16,24 +50,16 @@
                 </div>
               </div>
             </q-card-section>
-          </q-card>
-        </div>
 
-      <!-- Filtros de la Página -->
-      <div class="col-12">
-        <q-card flat bordered>
-          <q-card-section class="row q-gutter-md items-center">
-            <div class="text-h6">Filtros</div>
-          </q-card-section>
         </q-card>
       </div>
 
       <div v-if="showStateIndicators" class="col-12">
         <q-card flat bordered class="state-indicators-card">
-          <q-card-section class="row items-center justify-between q-col-gutter-sm">
-            <div class="text-h6">Indicadores por Estado</div>
-          </q-card-section>
-          <q-separator />
+          <!-- <q-card-section class="row items-center justify-between q-col-gutter-sm">
+            <div class="text-h6">DASHBOARD CERTIFICACIONES MINAAMP</div>
+          </q-card-section> -->
+          <!-- <q-separator /> -->
           <q-card-section>
             <q-inner-loading :showing="isStateIndicatorsLoading">
               <q-spinner-dots size="40px" color="primary" />
@@ -191,12 +217,16 @@
         </q-card>
       </div>
 
+
+
       <!-- Tabla: Círculos por Estado / Municipio -->
       <div class="col-12">
         <q-card flat bordered style="min-height: 250px;">
           <q-card-section class="row items-center q-col-gutter-md">
             <div class="col">
-              <div class="text-h6">CÍRCULOS POR ESTADO Y MUNICIPIO</div>
+              <div class="text-h6">Dashboard MIANAAMP - Certificaciones</div>
+        <q-img src="/images/minaamp.png" alt="MinaAMP" class="full-width" style="width: 100%; max-height: 200px; margin-top: 8px;" />
+        <div class="text-subtitle2">Fecha: {{ currentDate }}</div>
             </div>
             <div class="col-12 col-md-3">
               <q-select
@@ -282,7 +312,11 @@ import { storeToRefs } from 'pinia';
 import DataVisualizer from 'components/DataVisualizer.vue';
 import ComunaDataVisualizer from 'components/ComunaDataVisualizer.vue';
 import { utils, writeFile } from 'xlsx';
-import { exportFile } from 'quasar';
+import { exportFile, Notify } from 'quasar';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+// New ref for current date
+const currentDate = ref(new Date().toLocaleDateString('es-ES'));
 
 const dashboardStore = useDashboardStore();
 const authStore = useAuthStore();
@@ -435,6 +469,61 @@ const exportMunicipios = (format) => {
     const content = JSON.stringify(data, null, 2);
     const status = exportFile(`${filename}.json`, content, 'application/json');
     if (status !== true) console.error('Error al exportar JSON');
+  }
+};
+
+const exportPage = async (format) => {
+  try {
+    Notify.create({
+      type: 'info',
+      message: 'Generando exportación...',
+      timeout: 2000
+    });
+
+    // Capture the entire page
+    const canvas = await html2canvas(document.body, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: '#f5f5f5'
+    });
+
+    const filename = `dashboard_${getTimestamp()}`;
+
+    if (format === 'png') {
+      // Convert canvas to blob and download
+      canvas.toBlob((blob) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${filename}.png`;
+        link.click();
+        URL.revokeObjectURL(url);
+        Notify.create({
+          type: 'positive',
+          message: 'PNG exportado exitosamente'
+        });
+      });
+    } else if (format === 'pdf') {
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save(`${filename}.pdf`);
+      Notify.create({
+        type: 'positive',
+        message: 'PDF exportado exitosamente'
+      });
+    }
+  } catch (error) {
+    console.error('Error al exportar:', error);
+    Notify.create({
+      type: 'negative',
+      message: 'Error al exportar la página'
+    });
   }
 };
 
