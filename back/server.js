@@ -3,7 +3,14 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const { WebSocketServer } = require('ws');
-require('dotenv').config({ path: require('path').join(__dirname, '.env') });
+const path = require('path');
+const dotenv = require('dotenv');
+
+const envFile = process.env.NODE_ENV === 'production' ? '.env.production' : '.env.development';
+dotenv.config({ path: path.join(__dirname, envFile) });
+
+console.log(`[INFO] Loading environment: ${envFile}`);
+console.log(`[INFO] NODE_ENV: ${process.env.NODE_ENV}`);
 
 const { startListening } = require('./services/notificationListener');
 const websocketService = require('./services/websocketService');
@@ -27,7 +34,17 @@ const app = express();
 app.disable('etag');
 //////////EOLO EN DESARROLLO, ELIMINAR ANTES DEL DEPLOY///////////
 
-app.use(cors()); // Habilita CORS para todas las rutas
+app.use(cors({
+  origin: [
+    'https://certificacion.minaamp.gob.ve',
+    'http://localhost:9001',
+    'http://localhost:9100',
+    'http://localhost:8080',
+    'http://192.168.0.32:6080',
+    'http://localhost:3100'
+  ],
+  credentials: true
+}));
 app.use(helmet()); // Añade cabeceras de seguridad
 app.use(express.json()); // Permite al servidor entender JSON en las peticiones
 
