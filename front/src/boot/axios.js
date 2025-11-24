@@ -4,13 +4,28 @@ import axios from 'axios';
 import { useAuthStore } from 'stores/auth-store';
 import { storeInstance, routerInstance } from 'src/router/index'; // <-- Importación clave
 
-const api = axios.create({ baseURL: `${import.meta.env.VITE_API_URL}/api` });
+const api = axios.create({
+  baseURL: `${import.meta.env.VITE_API_URL}`,
+  headers: {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+});
 
 // Ya no necesitamos pasar { store, router } a la función boot
 export default boot(({ app }) => {
   const authStore = useAuthStore(storeInstance);
 
   api.interceptors.request.use((config) => {
+    console.log('🔍 Debug - Request config:', {
+      method: config.method,
+      url: config.url,
+      baseURL: config.baseURL,
+      fullURL: `${config.baseURL}${config.url}`,
+      headers: config.headers,
+      data: config.data
+    });
+
     if (authStore.token) {
       config.headers.Authorization = `Bearer ${authStore.token}`;
     }

@@ -7,8 +7,10 @@ let socket;
 
 export default boot(() => {
   // Determinar URL del WS basado en VITE_API_URL
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3100';
-  const WS_URL = apiUrl.replace(/^http/, 'ws');
+  const apiUrl = import.meta.env.VITE_API_URL || 'https://certificacion.minaamp.gob.ve';
+  // const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3100';
+  const WS_URL = apiUrl.replace(/^https/, 'wss');
+  // const WS_URL = apiUrl.replace(/^http/, 'ws');
 
   const connect = () => {
     socket = new WebSocket(WS_URL);

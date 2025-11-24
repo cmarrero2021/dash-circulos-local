@@ -42,18 +42,32 @@ export const useAuthStore = defineStore('auth', () => {
   };
 
   const login = async (email, password) => {
-    const response = await api.post('/auth/login', { email, password });
-    const { token: newToken, user: newUser } = response.data;
+    try {
+      console.log('🔍 Debug - Login attempt:', { email, password: '***' });
+      console.log('🔍 Debug - API URL:', import.meta.env.VITE_API_URL);
+      console.log('🔍 Debug - Full URL:', `${import.meta.env.VITE_API_URL}/auth/login`);
 
-    // Guardar en el estado de Pinia
-    token.value = newToken;
-    user.value = normalizeUser(newUser); // El backend ya nos devuelve el objeto de usuario completo
+      const response = await api.post('/auth/login', { email, password });
 
-    // Guardar token en localStorage para persistencia
-    localStorage.setItem('token', newToken);
+      console.log('🔍 Debug - Response:', response);
+      const { token: newToken, user: newUser } = response.data;
 
-    // Devolver true para indicar que el login fue exitoso
-    return true;
+      // Guardar en el estado de Pinia
+      token.value = newToken;
+      user.value = normalizeUser(newUser); // El backend ya nos devuelve el objeto de usuario completo
+
+      // Guardar token en localStorage para persistencia
+      localStorage.setItem('token', newToken);
+
+      // Devolver true para indicar que el login fue exitoso
+      return true;
+    } catch (error) {
+      console.error('🔍 Debug - Login error:', error);
+      console.error('🔍 Debug - Error response:', error.response);
+      console.error('🔍 Debug - Error status:', error.response?.status);
+      console.error('🔍 Debug - Error data:', error.response?.data);
+      throw error;
+    }
   };
 
   const logout = async () => {
