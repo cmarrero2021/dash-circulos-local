@@ -37,11 +37,10 @@ app.disable('etag');
 app.use(cors({
   origin: [
     'https://certificacion.minaamp.gob.ve',
-    'http://localhost:9001',
     'http://localhost:9100',
-    'http://localhost:8080',
-    'http://192.168.0.32:6080',
-    'http://localhost:3100'
+    // 'http://localhost:8080',
+    // 'http://192.168.0.32:6080',
+    // 'http://localhost:3100'
   ],
   credentials: true
 }));

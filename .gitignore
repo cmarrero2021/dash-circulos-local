@@ -14,3 +14,5 @@ yarn-error.log*
 table.txt
 ENDPOINTS.txt
 recursos/*.*
+192.168.0.11.conf
+192.168.0.32
