@@ -6,11 +6,33 @@ import { storeInstance } from 'src/router/index';
 let socket;
 
 export default boot(() => {
-  // Determinar URL del WS basado en VITE_API_URL
-  const apiUrl = import.meta.env.VITE_API_URL || 'https://certificacion.minaamp.gob.ve';
-  // const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3100';
-  const WS_URL = apiUrl.replace(/^https/, 'wss');
-  // const WS_URL = apiUrl.replace(/^http/, 'ws');
+  /**
+   * Construye la URL de WebSocket basándose en VITE_API_URL
+   * - En desarrollo: ws://localhost:3100
+   * - En producción: wss://certificacion.minaamp.gob.ve/ws
+   */
+  const getWebSocketUrl = () => {
+    const apiUrl = import.meta.env.VITE_API_URL || 'https://certificacion.minaamp.gob.ve/api';
+
+    // Remover /api del final si existe para obtener la URL base
+    const baseUrl = apiUrl.replace(/\/api$/, '');
+
+    // Determinar si estamos en desarrollo (localhost)
+    const isLocal = baseUrl.includes('localhost');
+
+    // Convertir http(s) a ws(s)
+    let wsUrl = baseUrl.replace(/^https/, 'wss').replace(/^http/, 'ws');
+
+    // En producción, agregar ruta /ws dedicada
+    if (!isLocal) {
+      wsUrl += '/ws';
+    }
+
+    return wsUrl;
+  };
+
+  const WS_URL = getWebSocketUrl();
+  console.log('[WS] Connecting to:', WS_URL);
 
   const connect = () => {
     socket = new WebSocket(WS_URL);
