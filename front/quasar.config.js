@@ -63,15 +63,9 @@ export default defineConfig((ctx) => {
       // distDir
 
       // extendViteConf (viteConf) {},
-      extendViteConf(viteConf) {
-        // Configurar variables de entorno para producción
-        if (ctx.modeName === 'production') {
-          viteConf.define = {
-            ...viteConf.define,
-            'import.meta.env.VITE_API_URL': JSON.stringify('https://certificacion.minaamp.gob.ve')
-          }
-        }
-      },
+      // extendViteConf(viteConf) {
+      //   // Las variables de entorno se cargan automáticamente desde .env.development y .env.production
+      // },
       // viteVuePluginOptions: {},
 
       vitePlugins: [
