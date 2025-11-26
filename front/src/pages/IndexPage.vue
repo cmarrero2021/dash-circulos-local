@@ -77,7 +77,7 @@
             </q-inner-loading>
             <DataVisualizer
 v-show="!isStateIndicatorsLoading" title="Indicadores por Estado" type="table"
-              :data="stateIndicators" row-key="estado_id" :column-map="stateIndicatorColumnMap"
+              :data="filteredStateIndicators" row-key="estado_id" :column-map="stateIndicatorColumnMap"
               :height="stateIndicatorsHeight" class="state-indicators-table"
               @update:height="val => stateIndicatorsHeight = val" />
           </q-card-section>
@@ -270,7 +270,7 @@ const currentDate = ref(new Date().toLocaleDateString('es-ES'));
 
 const dashboardStore = useDashboardStore();
 const authStore = useAuthStore();
-const { indicators: rawIndicators, circlesByState, circlesByMunicipio, stateIndicators } = storeToRefs(dashboardStore);
+const { indicators: rawIndicators, circlesByState, circlesByMunicipio, stateIndicators, manualStateFilter } = storeToRefs(dashboardStore);
 const { isStateIndicatorsLoading } = storeToRefs(dashboardStore);
 
 const dailyCertificationsHeight = ref(425);
@@ -286,6 +286,14 @@ const municipioFilter = ref([]); // selected municipio(s)
 const allowedStateIds = computed(() => authStore.allowedStates);
 const isAdmin = computed(() => authStore.user?.role === 'Administrador');
 const showStateIndicators = computed(() => isAdmin.value || (Array.isArray(allowedStateIds.value) && allowedStateIds.value.length === 0));
+
+// Filter state indicators based on map selection
+const filteredStateIndicators = computed(() => {
+  if (!manualStateFilter.value) {
+    return stateIndicators.value;
+  }
+  return stateIndicators.value.filter(row => Number(row.estado_id) === Number(manualStateFilter.value));
+});
 
 // Compute unique estado options from circlesByState
 const estadoOptions = computed(() => {
