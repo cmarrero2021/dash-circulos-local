@@ -48,3 +48,14 @@ exports.getTotalCircles = (req, res) => handleRequest(dashboardService.getTotalC
 exports.getDailyAverage = (req, res) => handleRequest(dashboardService.getDailyAverage, req, res);
 exports.getRawData = (req, res) => handleRequest(dashboardService.getRawData, req, res);
 exports.getDailyCertifications = (req, res) => handleRequest(dashboardService.getDailyCertifications, req, res);
+
+// Endpoint para obtener datos del mapa de Venezuela (porcentajes por estado)
+exports.getMapaEstados = async (req, res) => {
+    try {
+        const data = await dashboardService.getMapaEstados();
+        res.json(data);
+    } catch (error) {
+        console.error('Error al obtener datos del mapa:', error.message);
+        res.status(500).send('Error del servidor');
+    }
+};

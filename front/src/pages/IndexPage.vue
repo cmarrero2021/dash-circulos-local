@@ -3,54 +3,65 @@
     <!-- Header banner image -->
     <q-img src="/images/cintillo.png" alt="Cintillo" class="full-width" style="width: 100%; max-height: 300px;" />
     <div class="row q-col-gutter-md" style="margin-top: 16px;">
-    <div v-if="showStateIndicators" class="col-12">
-      <q-card flat bordered class="state-indicators-card">
-        <q-card-section class="row items-center justify-between q-col-gutter-sm">
-          <!-- Logo and Title Container -->
-          <div class="col-12 col-md-8 row items-center q-gutter-x-md">
-            <!-- <q-img 
+      <div v-if="showStateIndicators" class="col-12">
+        <q-card flat bordered class="state-indicators-card">
+          <q-card-section class="row items-center justify-between q-col-gutter-sm">
+            <!-- Logo and Title Container -->
+            <div class="col-12 col-md-8 row items-center q-gutter-x-md">
+              <!-- <q-img 
               src="/images/logo_nobg.png" 
               alt="Logo" 
               style="max-width: 150px; height: auto;" 
               fit="contain"
             /> -->
-            <div class="text-h5 text-weight-bold text-primary">DASHBOARD CERTIFICACIONES MINAAMP - {{ currentDate }}</div>
-          </div>
+              <div class="text-h5 text-weight-bold text-primary">DASHBOARD CERTIFICACIONES MINAAMP - {{ currentDate }}
+              </div>
+            </div>
 
-          <!-- Export Options -->
-          <div class="col-12 col-md-auto">
-            <q-btn-dropdown color="primary" label="Exportar Página" icon="file_download" flat dense class="q-mr-sm">
-              <q-list>
-                <q-item v-close-popup clickable @click="exportPage('png')">
-                  <q-item-section avatar><q-icon name="image" /></q-item-section>
-                  <q-item-section>PNG</q-item-section>
-                </q-item>
-                <q-item v-close-popup clickable @click="exportPage('pdf')">
-                  <q-item-section avatar><q-icon name="picture_as_pdf" /></q-item-section>
-                  <q-item-section>PDF</q-item-section>
-                </q-item>
-              </q-list>
-            </q-btn-dropdown>
-          </div>
-        </q-card-section>
-      </q-card>
-    </div>
+            <!-- Export Options -->
+            <div class="col-12 col-md-auto">
+              <q-btn-dropdown color="primary" label="Exportar Página" icon="file_download" flat dense class="q-mr-sm">
+                <q-list>
+                  <q-item v-close-popup clickable @click="exportPage('png')">
+                    <q-item-section avatar><q-icon name="image" /></q-item-section>
+                    <q-item-section>PNG</q-item-section>
+                  </q-item>
+                  <q-item v-close-popup clickable @click="exportPage('pdf')">
+                    <q-item-section avatar><q-icon name="picture_as_pdf" /></q-item-section>
+                    <q-item-section>PDF</q-item-section>
+                  </q-item>
+                </q-list>
+              </q-btn-dropdown>
+            </div>
+          </q-card-section>
+        </q-card>
+      </div>
 
       <!-- Indicadores Principales -->
-        <div v-for="indicator in indicators" :key="indicator.label" class="col-12 col-md-3">
-          <q-card flat bordered>
-            <q-card-section>
-              <div class="row items-center no-wrap">
-                <div class="col">
-                  <div class="text-subtitle2 text-grey-8">{{ indicator.label }}</div>
-                  <div class="text-h5 text-weight-bold">
-                    {{ indicator.value }}
-                    <q-icon :name="indicator.icon" :color="indicator.color" size="sm" />
-                  </div>
+      <div v-for="indicator in indicators" :key="indicator.label" class="col-12 col-md-3">
+        <q-card flat bordered>
+          <q-card-section>
+            <div class="row items-center no-wrap">
+              <div class="col">
+                <div class="text-subtitle2 text-grey-8">{{ indicator.label }}</div>
+                <div class="text-h5 text-weight-bold">
+                  {{ indicator.value }}
+                  <q-icon :name="indicator.icon" :color="indicator.color" size="sm" />
                 </div>
               </div>
-            </q-card-section>
+            </div>
+          </q-card-section>
 
+        </q-card>
+      </div>
+
+      <!-- Mapa de Venezuela -->
+      <div class="col-12">
+        <q-card flat bordered>
+          <q-card-section>
+            <div class="text-h6 text-weight-bold text-primary q-mb-md">Mapa de Cumplimiento por Estado</div>
+            <mapa-venezuela />
+          </q-card-section>
         </q-card>
       </div>
 
@@ -64,17 +75,10 @@
             <q-inner-loading :showing="isStateIndicatorsLoading">
               <q-spinner-dots size="40px" color="primary" />
             </q-inner-loading>
-            <DataVisualizer
-              v-show="!isStateIndicatorsLoading"
-              title="Indicadores por Estado"
-              type="table"
-              :data="stateIndicators"
-              row-key="estado_id"
-              :column-map="stateIndicatorColumnMap"
-              :height="stateIndicatorsHeight"
-              class="state-indicators-table"
-              @update:height="val => stateIndicatorsHeight = val"
-            />
+            <DataVisualizer v-show="!isStateIndicatorsLoading" title="Indicadores por Estado" type="table"
+              :data="stateIndicators" row-key="estado_id" :column-map="stateIndicatorColumnMap"
+              :height="stateIndicatorsHeight" class="state-indicators-table"
+              @update:height="val => stateIndicatorsHeight = val" />
           </q-card-section>
         </q-card>
       </div>
@@ -86,15 +90,9 @@
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer
-            v-show="!dashboardStore.isLoading"
-            title="CERTIFICACIONES DIARIAS"
-            :data="dashboardStore.dailyCertifications"
-            type="line"
-            row-key="fecha"
-            :column-map="{ label: 'fecha', value: 'certificaciones' }"
-            :height="dailyCertificationsHeight"
-          />
+          <DataVisualizer v-show="!dashboardStore.isLoading" title="CERTIFICACIONES DIARIAS"
+            :data="dashboardStore.dailyCertifications" type="line" row-key="fecha"
+            :column-map="{ label: 'fecha', value: 'certificaciones' }" :height="dailyCertificationsHeight" />
         </q-card>
       </div>
 
@@ -104,15 +102,10 @@
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer
-            v-show="!dashboardStore.isLoading"
-            title="Certificaciones Diarias"
-            :data="dashboardStore.dailyCertifications"
-            type="table"
-            row-key="fecha"
+          <DataVisualizer v-show="!dashboardStore.isLoading" title="Certificaciones Diarias"
+            :data="dashboardStore.dailyCertifications" type="table" row-key="fecha"
             :column-map="{ label: 'fecha', labelHeader: 'Fecha', value: 'certificaciones' }"
-            @update:height="newHeight => dailyCertificationsHeight = newHeight"
-          />
+            @update:height="newHeight => dailyCertificationsHeight = newHeight" />
         </q-card>
       </div>
 
@@ -123,47 +116,32 @@
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
           <!-- v-show mantiene el componente en el DOM pero oculto -->
-          <DataVisualizer
-            v-show="!dashboardStore.isLoading"
-            title="CÍRCULOS CUMPLIMIENTO vs META"
-            :data="dashboardStore.circlesByState"
-            type="bar"
-            row-key="estado"
-            :column-map="{
+          <DataVisualizer v-show="!dashboardStore.isLoading" title="CÍRCULOS CUMPLIMIENTO vs META"
+            :data="dashboardStore.circlesByState" type="bar" row-key="estado" :column-map="{
               label: 'estado',
               value: [
                 { name: 'Círculos Certificados', key: 'circulos_certificados' },
                 { name: 'Meta de Círculos', key: 'meta_circulos' }
               ]
-            }"
-            stacked
-            :height="circlesByStateHeight"
-          />
+            }" stacked :height="circlesByStateHeight" />
         </q-card>
       </div>
 
       <!-- Indicador: Círculos por Estado (Tabla) -->
       <div class="col-12 col-md-6">
         <q-card flat bordered style="min-height: 425px;">
-           <q-inner-loading :showing="dashboardStore.isLoading">
+          <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer
-            v-show="!dashboardStore.isLoading"
-            title="Círculos por Estado"
-            :data="dashboardStore.circlesByState"
-            type="table"
-            row-key="estado"
-            :column-map="{
+          <DataVisualizer v-show="!dashboardStore.isLoading" title="Círculos por Estado"
+            :data="dashboardStore.circlesByState" type="table" row-key="estado" :column-map="{
               label: 'estado',
               labelHeader: 'Estado',
               value: [
                 { name: 'Círculos Certificados', key: 'circulos_certificados' },
                 { name: 'Meta de Círculos', key: 'meta_circulos' }
               ]
-            }"
-            @update:height="newHeight => circlesByStateHeight = newHeight"
-          />
+            }" @update:height="newHeight => circlesByStateHeight = newHeight" />
         </q-card>
       </div>
 
@@ -173,22 +151,14 @@
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer
-            v-show="!dashboardStore.isLoading"
-            title="PARTICIPANTES CUMPLIMIENTO vs META"
-            :data="dashboardStore.circlesByState"
-            type="bar"
-            row-key="estado"
-            :column-map="{
+          <DataVisualizer v-show="!dashboardStore.isLoading" title="PARTICIPANTES CUMPLIMIENTO vs META"
+            :data="dashboardStore.circlesByState" type="bar" row-key="estado" :column-map="{
               label: 'estado',
               value: [
                 { name: 'Participantes Certificados', key: 'participantes_certificados' },
                 { name: 'Meta de Participantes', key: 'meta_participantes' }
               ]
-            }"
-            stacked
-            :height="participantsByStateHeight"
-          />
+            }" stacked :height="participantsByStateHeight" />
         </q-card>
       </div>
 
@@ -198,22 +168,15 @@
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer
-            v-show="!dashboardStore.isLoading"
-            title="Participantes por Estado"
-            :data="dashboardStore.circlesByState"
-            type="table"
-            row-key="estado"
-            :column-map="{
+          <DataVisualizer v-show="!dashboardStore.isLoading" title="Participantes por Estado"
+            :data="dashboardStore.circlesByState" type="table" row-key="estado" :column-map="{
               label: 'estado',
               labelHeader: 'Estado',
               value: [
                 { name: 'Participantes Certificados', key: 'participantes_certificados' },
                 { name: 'Meta de Participantes', key: 'meta_participantes' }
               ]
-            }"
-            @update:height="newHeight => participantsByStateHeight = newHeight"
-          />
+            }" @update:height="newHeight => participantsByStateHeight = newHeight" />
         </q-card>
       </div>
 
@@ -225,35 +188,17 @@
           <q-card-section class="row items-center q-col-gutter-md">
             <div class="col">
               <div class="text-h6">Dashboard MIANAAMP - Certificaciones</div>
-        <q-img src="/images/minaamp.png" alt="MinaAMP" class="full-width" style="width: 100%; max-height: 200px; margin-top: 8px;" />
-        <div class="text-subtitle2">Fecha: {{ currentDate }}</div>
+              <q-img src="/images/minaamp.png" alt="MinaAMP" class="full-width"
+                style="width: 100%; max-height: 200px; margin-top: 8px;" />
+              <div class="text-subtitle2">Fecha: {{ currentDate }}</div>
             </div>
             <div class="col-12 col-md-3">
-              <q-select
-                v-model="estadoFilter"
-                clearable
-                outlined
-                dense
-                label="Estado"
-                :options="estadoOptions"
-              />
+              <q-select v-model="estadoFilter" clearable outlined dense label="Estado" :options="estadoOptions" />
             </div>
             <div class="col-12 col-md-4">
-              <q-select
-                v-model="municipioFilter"
-                v-model:input-value="municipioInput"
-                multiple
-                clearable
-                outlined
-                dense
-                use-input
-                input-debounce="300"
-                label="Municipio (autocompletar)"
-                :options="municipioOptions"
-                :disable="!estadoFilter"
-                map-options
-                emit-value
-              />
+              <q-select v-model="municipioFilter" v-model:input-value="municipioInput" multiple clearable outlined dense
+                use-input input-debounce="300" label="Municipio (autocompletar)" :options="municipioOptions"
+                :disable="!estadoFilter" map-options emit-value />
             </div>
             <div class="col-auto">
               <q-btn color="grey-7" round flat icon="more_vert">
@@ -284,14 +229,8 @@
               <q-spinner-dots size="30px" color="primary" />
             </q-inner-loading>
 
-            <q-table
-              v-model:pagination="municipioPagination"
-              :rows="municipioTableRows"
-              :columns="municipioTableColumns"
-              :row-key="row => `${row.estado}__${row.municipio}`"
-              flat
-              dense
-            />
+            <q-table v-model:pagination="municipioPagination" :rows="municipioTableRows"
+              :columns="municipioTableColumns" :row-key="row => `${row.estado}__${row.municipio}`" flat dense />
           </q-card-section>
         </q-card>
       </div>
@@ -311,6 +250,7 @@ import { useAuthStore } from 'stores/auth-store';
 import { storeToRefs } from 'pinia';
 import DataVisualizer from 'components/DataVisualizer.vue';
 import ComunaDataVisualizer from 'components/ComunaDataVisualizer.vue';
+import MapaVenezuela from 'components/MapaVenezuela.vue';
 import { utils, writeFile } from 'xlsx';
 import { exportFile, Notify } from 'quasar';
 import html2canvas from 'html2canvas';

@@ -24,4 +24,7 @@ router.get('/daily-average', dashboardController.getDailyAverage);
 // --- Endpoint de Datos Crudos ---
 router.get('/raw-data', dashboardController.getRawData);
 
+// --- Endpoint de Mapa de Venezuela ---
+router.get('/mapa-estados', dashboardController.getMapaEstados);
+
 module.exports = router;

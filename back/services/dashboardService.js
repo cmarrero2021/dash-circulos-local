@@ -248,12 +248,12 @@ exports.getRawData = async (userId, filters) => {
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const limit = filters.limit || 100;
     const offset = filters.page ? (filters.page - 1) * limit : 0;
-    
+
     const query = `
         SELECT * FROM rm_circulos_remoto ${whereClause} 
         ORDER BY estado, municipio, parroquia 
         LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-    
+
     const result = await pool.query(query, [...params, limit, offset]);
     return result.rows;
 };
@@ -303,3 +303,15 @@ exports.getStateIndicatorsView = async (userId, filters = {}) => {
     const { rows } = await pool.query(query, params);
     return rows;
 };
+
+// --- Función para obtener datos del mapa (porcentajes por estado) ---
+exports.getMapaEstados = async () => {
+    const query = `
+        SELECT estado_id, porcentaje
+        FROM vcumplimiento_circulos_estados
+        ORDER BY estado_id;
+    `;
+    const { rows } = await pool.query(query);
+    return rows;
+};
+

@@ -53,6 +53,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const isStateIndicatorsLoading = ref(false);
   const lastUpdateAt = ref(0);
   const highlightedStateId = ref(null);
+  const manualStateFilter = ref(null); // Filtro manual desde el mapa
 
   const userHasNationalAccess = () => {
     const authStore = useAuthStore();
@@ -254,6 +255,25 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   };
 
+  /**
+   * Establece un filtro manual por estado desde el mapa
+   * Equivale a que un usuario con permiso solo de ese estado esté logueado
+   */
+  const setManualStateFilter = async (estadoId) => {
+    manualStateFilter.value = estadoId;
+    // Recargar todos los datos con el filtro aplicado
+    await refetchAll();
+  };
+
+  /**
+   * Limpia el filtro manual y vuelve a la vista nacional
+   */
+  const clearManualStateFilter = async () => {
+    manualStateFilter.value = null;
+    // Recargar todos los datos sin filtro
+    await refetchAll();
+  };
+
   return {
     // State
     circlesByState,
@@ -266,6 +286,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     isStateIndicatorsLoading,
     lastUpdateAt,
     highlightedStateId,
+    manualStateFilter,
 
     // Actions
     fetchCirclesByState,
@@ -276,5 +297,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     refetchAll,
     handleDBChange,
     fetchStateIndicators,
+    setManualStateFilter,
+    clearManualStateFilter,
   };
 });
