@@ -5,53 +5,18 @@
         <div class="col-auto text-h6">{{ title }}</div>
 
         <div class="col">
-          <q-select
-            v-model="selectedEstado"
-            :options="estadoOptions"
-            label="Estado"
-            multiple
-            use-input
-            emit-value
-            map-options
-            outlined
-            clearable
-            dense
-            @filter="filterEstados"
-            @update:model-value="onEstadoChange"
-          />
+          <q-select v-model="selectedEstado" :options="estadoOptions" label="Estado" multiple use-input emit-value
+            map-options outlined clearable dense @filter="filterEstados" @update:model-value="onEstadoChange" />
         </div>
         <div class="col">
-          <q-select
-            v-model="selectedMunicipio"
-            :options="municipioOptions"
-            label="Municipio"
-            multiple
-            use-input
-            emit-value
-            outlined
-            map-options
-            clearable
-            dense
-            :disable="!selectedEstado || selectedEstado.length === 0"
-            @filter="filterMunicipios"
-            @update:model-value="onMunicipioChange"
-          />
+          <q-select v-model="selectedMunicipio" :options="municipioOptions" label="Municipio" multiple use-input
+            emit-value outlined map-options clearable dense :disable="!selectedEstado || selectedEstado.length === 0"
+            @filter="filterMunicipios" @update:model-value="onMunicipioChange" />
         </div>
         <div class="col">
-          <q-select
-            v-model="selectedComuna"
-            :options="comunaOptions"
-            label="Comuna"
-            multiple
-            use-input
-            emit-value
-            outlined
-            map-options
-            clearable
-            dense
-            :disable="!selectedMunicipio || selectedMunicipio.length === 0"
-            @filter="filterComunas"
-          />
+          <q-select v-model="selectedComuna" :options="comunaOptions" label="Comuna" multiple use-input emit-value
+            outlined map-options clearable dense :disable="!selectedMunicipio || selectedMunicipio.length === 0"
+            @filter="filterComunas" />
         </div>
         <div class="col-auto">
           <q-btn color="grey-7" round flat icon="more_vert">
@@ -77,14 +42,7 @@
     </q-card-section>
 
     <q-card-section>
-      <q-table
-        v-model:pagination="pagination"
-        :rows="filteredData"
-        :columns="columns"
-        row-key="comuna"
-        flat
-        dense
-      />
+      <q-table v-model:pagination="pagination" :rows="filteredData" :columns="columns" row-key="comuna" flat dense />
     </q-card-section>
   </q-card>
 </template>
@@ -151,7 +109,11 @@ const sanitizeEstadoSelection = (ids = []) => {
 const applyStateFilters = () => {
   const baseStates = rawEstados.value;
   let filteredStates;
-  if (isAdmin.value) {
+
+  // Si hay filtro manual del mapa, mostrar solo ese estado
+  if (dashboardStore.manualStateFilter) {
+    filteredStates = baseStates.filter(state => state.value === dashboardStore.manualStateFilter);
+  } else if (isAdmin.value) {
     filteredStates = baseStates;
   } else if (allowedStateIds.value.length === 0) {
     filteredStates = [];
@@ -159,6 +121,7 @@ const applyStateFilters = () => {
     const allowedSet = new Set(allowedStateIds.value);
     filteredStates = baseStates.filter(state => allowedSet.has(state.value));
   }
+
   allEstados.value = filteredStates;
   estadoOptions.value = filteredStates;
   const sanitized = sanitizeEstadoSelection(selectedEstado.value);
@@ -166,6 +129,25 @@ const applyStateFilters = () => {
     selectedEstado.value = sanitized;
   }
 };
+
+// const applyStateFilters = () => {
+//   const baseStates = rawEstados.value;
+//   let filteredStates;
+//   if (isAdmin.value) {
+//     filteredStates = baseStates;
+//   } else if (allowedStateIds.value.length === 0) {
+//     filteredStates = [];
+//   } else {
+//     const allowedSet = new Set(allowedStateIds.value);
+//     filteredStates = baseStates.filter(state => allowedSet.has(state.value));
+//   }
+//   allEstados.value = filteredStates;
+//   estadoOptions.value = filteredStates;
+//   const sanitized = sanitizeEstadoSelection(selectedEstado.value);
+//   if (sanitized.length !== selectedEstado.value.length) {
+//     selectedEstado.value = sanitized;
+//   }
+// };
 
 const fetchEstados = async () => {
   try {
@@ -313,7 +295,34 @@ watch([allowedStateIds, () => authStore.user?.role], () => {
     applyStateFilters();
   }
 });
+////////////////////CRMM////////////////
+// Watch manualStateFilter del dashboard para sincronizar la selección de estado
+watch(() => dashboardStore.manualStateFilter, (manualFilter) => {
+  if (manualFilter) {
+    // Actualizar opciones para mostrar solo el estado filtrado
+    if (rawEstados.value.length > 0) {
+      applyStateFilters();
+    }
+    // Seleccionar el estado
+    selectedEstado.value = [manualFilter];
+    onEstadoChange([manualFilter]);
+  } else {
+    // Limpiar selección primero
+    selectedEstado.value = [];
+    selectedMunicipio.value = [];
+    selectedComuna.value = [];
+    allMunicipios.value = [];
+    municipioOptions.value = [];
+    allComunas.value = [];
+    comunaOptions.value = [];
 
+    // Actualizar opciones para mostrar todos los estados
+    if (rawEstados.value.length > 0) {
+      applyStateFilters();
+    }
+  }
+});
+////////////////////CRMM////////////////
 const getTimestamp = () => new Date().toISOString().replace(/[:.]/g, '-');
 
 const exportData = (format) => {
@@ -360,5 +369,4 @@ const exportData = (format) => {
 .data-card {
   height: 100%;
 }
-
 </style>
