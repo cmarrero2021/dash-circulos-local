@@ -55,8 +55,11 @@ export default defineComponent({
             const sid = e.target.feature.properties.state_id;
             const nam = e.target.feature.properties.NAM || 'Desconocido';
             const est = findEstadoById(sid);
-            const estadoNombre = est ? est.estado : nam.replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
+            console.log('[Click] state_id:', sid, 'encontrado:', est);
+            console.log('[Click] Propiedades completas:', est ? Object.keys(est) : 'No encontrado');
+            const estadoNombre = est ? (est.estado_nombre || est.estado || nam.replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '')) : nam.replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
             const pct = est ? parseFloat(est.porcentaje) : 0;
+            console.log('[Click] Nombre final:', estadoNombre, 'porcentaje:', pct);
             selectedState.value = { id: sid, nombre: estadoNombre, porcentaje: pct.toFixed(2) };
             dashboardStore.setManualStateFilter(Number(sid));
             map.fitBounds(e.target.getBounds());
@@ -70,23 +73,23 @@ export default defineComponent({
             const sid = feature.properties.state_id;
             const nam = feature.properties.NAM || 'Desconocido';
             const est = findEstadoById(sid);
-            const estadoNombre = est ? est.estado : nam.replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
+            const estadoNombre = est ? (est.estado_nombre || est.estado || nam.replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '')) : nam.replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
             const pct = est ? parseFloat(est.porcentaje) : 0;
             layer.bindPopup('<div style="text-align:center;"><strong>' + estadoNombre + '</strong><br/>Cumplimiento: <strong>' + pct.toFixed(2) + '%</strong></div>');
             layer.on({ mouseover: highlightFeature, mouseout: resetHighlight, click: clickState });
         };
         const loadMapaData = async () => {
             try {
-                console.log('[Mapa] Cargando datos del backend con autenticación...');
                 const response = await api.get('/dashboard/mapa-estados');
                 estadosData.value = response.data;
                 console.log('[Mapa] ✓ Datos cargados:', estadosData.value.length, 'estados');
-                estadosData.value.forEach(e => {
-                    console.log(`  estado_id: ${e.estado_id} (${typeof e.estado_id}) → ${e.estado}: ${e.porcentaje}%`);
-                });
+                if (estadosData.value.length > 0) {
+                    console.log('[Mapa] Primer registro completo:', estadosData.value[0]);
+                    console.log('[Mapa] Claves disponibles:', Object.keys(estadosData.value[0]));
+                }
                 return true;
             } catch (error) {
-                console.error('[Mapa] ✗ Error al cargar datos:', error.message);
+                console.error('[Mapa] ✗ Error:', error.message);
                 return false;
             }
         };
@@ -114,13 +117,6 @@ export default defineComponent({
             } catch (e) { console.warn('[Mapa] Sin contorno:', e); }
             try {
                 const s = await (await fetch('/geojson/estados_final.geojson')).json();
-                console.log('[Mapa] GeoJSON cargado:', s.features.length, 'features');
-                console.log('[Mapa] Correlación:');
-                s.features.forEach(f => {
-                    const sid = f.properties.state_id;
-                    const est = findEstadoById(sid);
-                    console.log(`  ${sid} (${typeof sid}) → ${est ? est.estado + ': ' + est.porcentaje + '%' : 'NO ENCONTRADO'}`);
-                });
                 estadosLayer = L.geoJSON(s, { style: stateStyle, onEachFeature }).addTo(map);
                 L.control.layers(null, { 'Estados': estadosLayer, 'Contorno': contornoLayer }, { position: 'topright' }).addTo(map);
             } catch (e) { console.error('[Mapa] Error GeoJSON:', e); }
