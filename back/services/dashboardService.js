@@ -307,7 +307,12 @@ exports.getStateIndicatorsView = async (userId, filters = {}) => {
 // --- Función para obtener datos del mapa (porcentajes por estado) ---
 exports.getMapaEstados = async () => {
     const query = `
-        SELECT estado_id, porcentaje
+        SELECT 
+            estado_id, 
+            estado, 
+            meta_circulo, 
+            circulos, 
+            porcentaje
         FROM vcumplimiento_circulos_estados
         ORDER BY estado_id;
     `;

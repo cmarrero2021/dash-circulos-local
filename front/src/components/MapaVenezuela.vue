@@ -1,8 +1,7 @@
 <template>
     <div class="mapa-venezuela-container">
         <div ref="mapContainer" class="map-container"></div>
-        <q-btn
-v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close" size="md"
+        <q-btn v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close" size="md"
             @click="clearStateFilter">
             <q-tooltip>Limpiar filtro y ver vista nacional</q-tooltip>
         </q-btn>
@@ -65,8 +64,20 @@ export default defineComponent({
             const sid = f.properties.state_id;
             const est = findEstadoById(sid);
             const nom = est ? (est.estado || est.estado_nombre || (f.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '')) : (f.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
+            const meta = est ? (est.meta_circulo || 0) : 0;
+            const circulos = est ? (est.circulos || 0) : 0;
             const pct = est ? parseFloat(est.porcentaje) : 0;
-            layer.bindPopup('<div style="text-align:center;"><strong>' + nom + '</strong><br/>Cumplimiento: <strong>' + pct.toFixed(2) + '%</strong></div>');
+
+            const popupContent = `
+                <div style="text-align:center; padding: 5px;">
+                    <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #1976d2;">CÍRCULOS</div>
+                    <div style="margin: 3px 0;"><strong>ESTADO:</strong> ${nom}</div>
+                    <div style="margin: 3px 0;"><strong>META:</strong> ${meta.toLocaleString('de-DE')}</div>
+                    <div style="margin: 3px 0;"><strong>CUMPLIMIENTO:</strong> ${circulos.toLocaleString('de-DE')}</div>
+                    <div style="margin: 3px 0;"><strong>PORCENTAJE:</strong> ${pct.toFixed(2)}%</div>
+                </div>
+            `;
+            layer.bindPopup(popupContent);
             layer.on({ mouseover: highlightFeature, mouseout: resetHighlight, click: clickState });
         };
         const loadMapaData = async () => {
