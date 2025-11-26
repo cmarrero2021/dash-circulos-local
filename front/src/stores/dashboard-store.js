@@ -65,12 +65,12 @@ export const useDashboardStore = defineStore('dashboard', () => {
   // --- ACTIONS ---
 
   // Fetches data without showing global loading, for silent updates
-  const fetchIndicators = async () => {
+  const fetchIndicators = async (filters = {}) => {
     const authStore = useAuthStore();
     if (!authStore.isAuthenticated) return; // No hacer nada si no está autenticado
 
     try {
-      const response = await api.get('/dashboard/indicators');
+      const response = await api.get('/dashboard/indicators', { params: filters });
       indicators.value = response.data;
     } catch (error) {
       console.error('Error al obtener los indicadores:', error);
@@ -143,14 +143,16 @@ export const useDashboardStore = defineStore('dashboard', () => {
   // Encadenar recarga para todos los datasets usados en IndexPage
   const refetchAll = async () => {
     isLoading.value = true;
+    const filters = manualStateFilter.value ? { estado_id: manualStateFilter.value } : {};
+    console.log('[Dashboard Store] refetchAll con filtros:', filters);
     await Promise.allSettled([
-      fetchIndicators(),
-      fetchCirclesByState(),
-      fetchDailyCertifications(),
-      fetchCirclesByMunicipios(),
-      fetchCirclesByComunas(),
+      fetchIndicators(filters),
+      fetchCirclesByState(filters),
+      fetchDailyCertifications(filters),
+      fetchCirclesByMunicipios(filters),
+      fetchCirclesByComunas(filters),
     ]);
-    if (userHasNationalAccess()) {
+    if (userHasNationalAccess() && !manualStateFilter.value) {
       await fetchStateIndicators();
     }
     lastUpdateAt.value = Date.now();
@@ -261,6 +263,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
    */
   const setManualStateFilter = async (estadoId) => {
     manualStateFilter.value = estadoId;
+    console.log('[Dashboard Store] Filtro manual establecido:', estadoId);
     // Recargar todos los datos con el filtro aplicado
     await refetchAll();
   };
@@ -270,6 +273,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
    */
   const clearManualStateFilter = async () => {
     manualStateFilter.value = null;
+    console.log('[Dashboard Store] Filtro manual limpiado');
     // Recargar todos los datos sin filtro
     await refetchAll();
   };
