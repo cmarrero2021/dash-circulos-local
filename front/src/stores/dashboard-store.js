@@ -171,6 +171,12 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
     if (change === 0) return;
 
+    // Si hay un filtro manual activo, solo procesar si el estado coincide
+    if (manualStateFilter.value && Number(state_id) !== Number(manualStateFilter.value)) {
+      console.log('[WebSocket] Ignorando cambio: estado del payload no coincide con filtro activo');
+      return;
+    }
+
     // 1. Update Circles by State
     const stateRow = circlesByState.value.find(s => s.estado_id === state_id);
     if (stateRow) {
@@ -195,9 +201,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
       comunaRow.__highlightedAt = Date.now();
     }
 
-    // 4. Refresh global indicators as they might have changed
-    fetchIndicators();
-    fetchDailyCertifications();
+    // 4. Refresh global indicators with current filter
+    const filters = manualStateFilter.value ? { estado_id: manualStateFilter.value } : {};
+    fetchIndicators(filters);
+    fetchDailyCertifications(filters);
 
     // 5. Notify components of the update
     lastUpdateAt.value = Date.now();

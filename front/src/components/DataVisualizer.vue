@@ -1,5 +1,5 @@
 <template>
-  <q-card ref="cardRef" class="data-card" flat  bordered>
+  <q-card ref="cardRef" class="data-card" flat bordered>
     <q-card-section>
       <div class="row items-center no-wrap">
         <div class="col">
@@ -10,23 +10,23 @@
           <q-btn color="grey-7" round flat icon="more_vert">
             <q-menu cover auto-close>
               <q-list style="min-width: 150px">
-                <q-item v-if="type === 'table'" clickable @click="exportData('xlsx')" >
+                <q-item v-if="type === 'table'" clickable @click="exportData('xlsx')">
                   <q-item-section avatar><q-icon name="description" /></q-item-section>
                   <q-item-section>Exportar a XLSX</q-item-section>
                 </q-item>
-                <q-item  v-if="type === 'table'" clickable @click="exportData('csv')">
-                   <q-item-section avatar><q-icon name="toc" /></q-item-section>
+                <q-item v-if="type === 'table'" clickable @click="exportData('csv')">
+                  <q-item-section avatar><q-icon name="toc" /></q-item-section>
                   <q-item-section>Exportar a CSV</q-item-section>
                 </q-item>
                 <q-item v-if="type === 'table'" clickable @click="exportData('json')">
                   <q-item-section avatar><q-icon name="code" /></q-item-section>
                   <q-item-section>Exportar a JSON</q-item-section>
                 </q-item>
-                <q-item v-if="type !== 'table'" clickable @click="exportChart('png')" >
+                <q-item v-if="type !== 'table'" clickable @click="exportChart('png')">
                   <q-item-section avatar><q-icon name="image" /></q-item-section>
                   <q-item-section>Exportar a PNG</q-item-section>
                 </q-item>
-                <q-item v-if="type !== 'table'" clickable @click="exportChart('pdf')" >
+                <q-item v-if="type !== 'table'" clickable @click="exportChart('pdf')">
                   <q-item-section avatar><q-icon name="picture_as_pdf" /></q-item-section>
                   <q-item-section>Exportar a PDF</q-item-section>
                 </q-item>
@@ -41,28 +41,15 @@
 
     <q-card-section>
       <!-- Renderizado de la TABLA -->
-          <q-table
-            v-if="type === 'table'"
-            ref="tableRef"
-            v-model:pagination="pagination"
-            :rows="tableRows"
-            :columns="tableColumns"
-            :row-key="rowKey"
-            :row-class="rowClass"
-            flat
-            dense
-          />
+      <q-table
+v-if="type === 'table'" ref="tableRef" v-model:pagination="pagination" :rows="tableRows"
+        :columns="tableColumns" :row-key="rowKey" :row-class="rowClass" flat dense />
 
       <!-- Renderizado del GRÁFICO -->
       <div :id="`chart-container-${title.replace(/\s+/g, '-')}`">
         <vue-apex-charts
-          v-if="type !== 'table'"
-          ref="chartRef"
-          :type="type"
-          :height="height"
-          :options="chartOptions"
-          :series="chartSeries"
-        ></vue-apex-charts>
+v-if="type !== 'table'" ref="chartRef" :type="type" :height="height" :options="chartOptions"
+          :series="chartSeries"></vue-apex-charts>
       </div>
     </q-card-section>
   </q-card>
@@ -229,7 +216,7 @@ const tableRows = computed(() => {
 const chartOptions = computed(() => {
   // Work with a copy of data for date/time charts (ensure chronological order)
   const dataForChart = (props.type === 'line' && props.columnMap && props.columnMap.label && String(props.columnMap.label).toLowerCase().includes('fecha'))
-    ? (props.data || []).slice().sort((a,b) => new Date(a[props.columnMap.label]) - new Date(b[props.columnMap.label]))
+    ? (props.data || []).slice().sort((a, b) => new Date(a[props.columnMap.label]) - new Date(b[props.columnMap.label]))
     : (props.data || []);
 
   const labels = dataForChart.map(item => item[props.columnMap.label]);
@@ -259,10 +246,12 @@ const chartOptions = computed(() => {
       },
     },
     labels,
-    xaxis: {
-      categories,
-      type: (props.type === 'line' && String(props.columnMap.label).toLowerCase().includes('fecha')) ? 'datetime' : undefined,
-    },
+    ...((props.type !== 'pie' && props.type !== 'donut') && {
+      xaxis: {
+        categories,
+        type: (props.type === 'line' && String(props.columnMap.label).toLowerCase().includes('fecha')) ? 'datetime' : undefined,
+      }
+    }),
     legend: { position: 'bottom' },
     // Se ajustan los colores dinámicamente más abajo
     dataLabels: {
@@ -280,7 +269,7 @@ const chartOptions = computed(() => {
         color: '#fff',
         opacity: 0.9
       },
-      formatter: function(val, { seriesIndex }) {
+      formatter: function (val, { seriesIndex }) {
         if (seriesIndex === 0) { // Solo mostrar etiqueta en la parte superior de la barra azul (certificados)
           const numVal = Number(val);
           return isNaN(numVal) ? '' : `${Math.round(numVal)}%`;
@@ -337,7 +326,7 @@ const chartOptions = computed(() => {
       max: 100,
       tickAmount: 5, // Muestra 5 marcas en el eje Y (0%, 25%, 50%, 75%, 100%)
       labels: {
-        formatter: function(val) {
+        formatter: function (val) {
           // Mostrar solo la parte entera del porcentaje
           return Math.round(val) + '%';
         }
@@ -360,7 +349,7 @@ const chartOptions = computed(() => {
         color: '#fff',
         opacity: 0.9
       },
-      formatter: function(val, { seriesIndex }) {
+      formatter: function (val, { seriesIndex }) {
         if (seriesIndex === 0) { // Solo mostrar etiqueta en la parte superior de la barra azul (certificados)
           const numVal = Number(val);
           return isNaN(numVal) ? '' : `${Math.round(numVal)}%`; // Redondear al entero más cercano
@@ -375,6 +364,11 @@ const chartOptions = computed(() => {
   } else {
     // Configuración por defecto para otros tipos de gráficos
     baseOptions.colors = ['#008FFB'];
+  }
+
+  // Configuración para gráficos de donut
+  if (props.type === 'donut') {
+    baseOptions.colors = ['#008FFB', '#FFA500']; // Azul para certificados, Naranja para faltante
   }
 
   // Configuración para gráficos de línea
@@ -404,7 +398,7 @@ const chartOptions = computed(() => {
                 fontSize: '11px',
                 fontFamily: 'Arial, sans-serif'
               },
-              formatter: function(value) {
+              formatter: function (value) {
                 const date = new Date(value);
                 return date.toLocaleDateString('es-VE', {
                   day: '2-digit',
@@ -426,7 +420,7 @@ const chartOptions = computed(() => {
     // Configurar eje Y para números enteros con separador de miles
     baseOptions.yaxis = {
       labels: {
-        formatter: function(value) {
+        formatter: function (value) {
           return value.toLocaleString('es-VE', { maximumFractionDigits: 0 });
         }
       },
@@ -439,7 +433,7 @@ const chartOptions = computed(() => {
       x: {
         show: true,
         format: 'dd/MM/yyyy',
-        formatter: function(_, ctx = {}) {
+        formatter: function (_, ctx = {}) {
           const { dataPointIndex, w } = ctx;
           const rawLabel = w?.globals?.categoryLabels?.[dataPointIndex] ?? _;
           const date = new Date(rawLabel);
@@ -454,7 +448,7 @@ const chartOptions = computed(() => {
         }
       },
       y: {
-        formatter: function(value) {
+        formatter: function (value) {
           return value.toLocaleString('es-VE', { maximumFractionDigits: 0 });
         }
       }
@@ -463,7 +457,7 @@ const chartOptions = computed(() => {
     // Configurar etiquetas de datos
     baseOptions.dataLabels = {
       enabled: true,
-      formatter: function(val) {
+      formatter: function (val) {
         return Number(val).toLocaleString('es-VE', { maximumFractionDigits: 0 });
       },
       style: {
@@ -531,13 +525,13 @@ const chartSeries = computed(() => {
   if (props.type === 'line') {
     const values = Array.isArray(props.columnMap.value)
       ? props.columnMap.value.map(series => ({
-          name: series.name,
-          data: dataForChart.map(item => Number(item[series.key] || 0))
-        }))
+        name: series.name,
+        data: dataForChart.map(item => Number(item[series.key] || 0))
+      }))
       : [{
-          name: props.title,
-          data: dataForChart.map(item => Number(item[props.columnMap.value] || 0))
-        }];
+        name: props.title,
+        data: dataForChart.map(item => Number(item[props.columnMap.value] || 0))
+      }];
 
     return values;
   }
@@ -576,16 +570,16 @@ watch(
       highlighted.forEach(r => {
         const key = r.estado || r.estado_id;
         applyDomHighlight(String(key));
-          // If there's an incoming payload with new values, update the DOM cells
-          if (r.__pendingUpdate) {
-            try {
-              updateRowDomValues(String(key), r.__pendingUpdate, r);
-              // remove pending after applying
-              delete r.__pendingUpdate;
-            } catch (e) {
-              console.error('[DataVisualizer] error applying DOM value update', e);
-            }
+        // If there's an incoming payload with new values, update the DOM cells
+        if (r.__pendingUpdate) {
+          try {
+            updateRowDomValues(String(key), r.__pendingUpdate, r);
+            // remove pending after applying
+            delete r.__pendingUpdate;
+          } catch (e) {
+            console.error('[DataVisualizer] error applying DOM value update', e);
           }
+        }
       });
     }
   },
@@ -613,9 +607,9 @@ const applyDomHighlight = (stateKey) => {
     });
   });
 
-    if (!target) {
-      return;
-    }
+  if (!target) {
+    return;
+  }
 
   target.classList.add('row-highlight');
   target.__wasHighlightedByScript = true;
@@ -783,18 +777,18 @@ const exportData = (format) => {
     utils.book_append_sheet(workbook, worksheet, 'Datos');
     writeFile(workbook, `${filename}.xlsx`);
   } else if (format === 'csv') {
-      const content = [columns.map(col => col.label).join(',')]
-        .concat(
-          props.data.map(row =>
-            columns.map(col => row[col.field]).join(',')
-          )
+    const content = [columns.map(col => col.label).join(',')]
+      .concat(
+        props.data.map(row =>
+          columns.map(col => row[col.field]).join(',')
         )
-        .join('\r\n');
+      )
+      .join('\r\n');
 
-      const status = exportFile(`${filename}.csv`, content, 'text/csv');
-      if (status !== true) {
-        console.error('Error al descargar el archivo CSV');
-      }
+    const status = exportFile(`${filename}.csv`, content, 'text/csv');
+    if (status !== true) {
+      console.error('Error al descargar el archivo CSV');
+    }
   } else if (format === 'json') {
     const content = JSON.stringify(props.data, null, 2);
     const status = exportFile(`${filename}.json`, content, 'application/json');
@@ -864,15 +858,16 @@ const exportChart = async (format) => {
 .data-card {
   height: 100%;
 }
-  /* Highlighted row style for persistent change indication (green) */
-  .row-highlight {
-    background-color: rgba(0, 128, 0, 0.12) !important;
-  }
+
+/* Highlighted row style for persistent change indication (green) */
+.row-highlight {
+  background-color: rgba(0, 128, 0, 0.12) !important;
+}
 </style>
 
 <!-- Global style so QTable internal rows (rendered by child component) pick up the class -->
 <style>
-  .row-highlight {
-    background-color: rgba(0, 128, 0, 0.12) !important;
-  }
+.row-highlight {
+  background-color: rgba(0, 128, 0, 0.12) !important;
+}
 </style>

@@ -114,7 +114,23 @@ v-show="!dashboardStore.isLoading" title="Certificaciones Diarias"
         </q-card>
       </div>
 
-      <div class="col-12 col-md-6">
+
+      <!-- Gráfica de Anillo: Círculos (cuando hay filtro de estado) -->
+      <div v-if="showDonutCharts" class="col-12 col-md-6">
+        <q-card flat bordered style="min-height: 425px;">
+          <q-inner-loading :showing="dashboardStore.isLoading">
+            <q-spinner-dots size="50px" color="primary" />
+          </q-inner-loading>
+          <DataVisualizer
+v-show="!dashboardStore.isLoading" title="CÍRCULOS - Certificados vs Faltante" :data="[
+            { label: 'Certificados', value: circlesDonutData[0] },
+            { label: 'Faltante', value: circlesDonutData[1] }
+          ]" type="donut" row-key="label" :column-map="{ label: 'label', value: 'value' }"
+            :height="circlesByStateHeight" />
+        </q-card>
+      </div>
+
+      <div v-if="!showDonutCharts" class="col-12 col-md-6">
         <q-card flat bordered style="min-height: 425px;">
           <!-- El spinner ahora se muestra SOBRE el contenido -->
           <q-inner-loading :showing="dashboardStore.isLoading">
@@ -152,8 +168,24 @@ v-show="!dashboardStore.isLoading" title="Círculos por Estado"
         </q-card>
       </div>
 
+
+      <!-- Gráfica de Anillo: Participantes (cuando hay filtro de estado) -->
+      <div v-if="showDonutCharts" class="col-12 col-md-6">
+        <q-card flat bordered style="min-height: 425px;">
+          <q-inner-loading :showing="dashboardStore.isLoading">
+            <q-spinner-dots size="50px" color="primary" />
+          </q-inner-loading>
+          <DataVisualizer
+v-show="!dashboardStore.isLoading" title="PARTICIPANTES - Certificados vs Faltante" :data="[
+            { label: 'Certificados', value: participantsDonutData[0] },
+            { label: 'Faltante', value: participantsDonutData[1] }
+          ]" type="donut" row-key="label" :column-map="{ label: 'label', value: 'value' }"
+            :height="participantsByStateHeight" />
+        </q-card>
+      </div>
+
       <!-- Nuevo par: Participantes por Estado (Gráfico) -->
-      <div class="col-12 col-md-6">
+      <div v-if="!showDonutCharts" class="col-12 col-md-6">
         <q-card flat bordered style="min-height: 425px;">
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
@@ -288,6 +320,31 @@ const municipioFilter = ref([]); // selected municipio(s)
 const allowedStateIds = computed(() => authStore.allowedStates);
 const isAdmin = computed(() => authStore.user?.role === 'Administrador');
 const showStateIndicators = computed(() => isAdmin.value || (Array.isArray(allowedStateIds.value) && allowedStateIds.value.length === 0));
+
+// Determine whether to show donut charts or stacked bar charts
+const showDonutCharts = computed(() => {
+  if (manualStateFilter.value) return true;
+  if (!isAdmin.value && allowedStateIds.value?.length === 1) return true;
+  return false;
+});
+
+// Prepare data for circles donut chart
+const circlesDonutData = computed(() => {
+  const data = circlesByState.value[0] || {};
+  const certificados = Number(data.circulos_certificados || 0);
+  const meta = Number(data.meta_circulos || 0);
+  const faltante = Math.max(0, meta - certificados);
+  return [certificados, faltante];
+});
+
+// Prepare data for participants donut chart
+const participantsDonutData = computed(() => {
+  const data = circlesByState.value[0] || {};
+  const certificados = Number(data.participantes_certificados || 0);
+  const meta = Number(data.meta_participantes || 0);
+  const faltante = Math.max(0, meta - certificados);
+  return [certificados, faltante];
+});
 
 // Filter state indicators based on map selection
 const filteredStateIndicators = computed(() => {
