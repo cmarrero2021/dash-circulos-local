@@ -1,7 +1,8 @@
 <template>
     <div class="mapa-venezuela-container">
         <div ref="mapContainer" class="map-container"></div>
-        <q-btn v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close" size="md"
+        <q-btn
+v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close" size="md"
             @click="clearStateFilter">
             <q-tooltip>Limpiar filtro y ver vista nacional</q-tooltip>
         </q-btn>
@@ -25,7 +26,6 @@ export default defineComponent({
         const mapContainer = ref(null);
         let map = null;
         let estadosLayer = null;
-        let contornoLayer = null;
         const selectedState = ref(null);
         const estadosData = ref([]);
         const getColor = (p) => {
@@ -113,13 +113,10 @@ export default defineComponent({
             const dataLoaded = await loadMapaData();
             if (!dataLoaded) { console.error('[Mapa] No se pudieron cargar datos'); return; }
             try {
-                const c = await (await fetch('/geojson/contorno_venezuela.geojson')).json();
-                contornoLayer = L.geoJSON(c, { style: { fillColor: 'transparent', weight: 3, opacity: 1, color: '#000', fillOpacity: 0 }, interactive: false }).addTo(map);
-            } catch (e) { console.warn('[Mapa] Sin contorno:', e); }
-            try {
                 const s = await (await fetch('/geojson/estados_final.geojson')).json();
                 estadosLayer = L.geoJSON(s, { style: stateStyle, onEachFeature }).addTo(map);
-                L.control.layers(null, { 'Estados': estadosLayer, 'Contorno': contornoLayer }, { position: 'topright' }).addTo(map);
+                // Crear control de capas - Grupo "Círculos"
+                L.control.layers(null, { 'Círculos - Estados': estadosLayer }, { position: 'topright', collapsed: false }).addTo(map);
             } catch (e) { console.error('[Mapa] Error GeoJSON:', e); }
             addLegend();
         };
