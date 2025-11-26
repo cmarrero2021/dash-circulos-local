@@ -32,19 +32,15 @@ export default defineComponent({
             if (p == null || p === undefined || isNaN(p)) return '#808080';
             const num = Number(p);
             if (num >= 80) return '#2e7d32';
-            if (num >= 60) return '#66bb6a';
+            if (num >= 60) return '#c0ca33';
             if (num >= 40) return '#ffeb3b';
             if (num >= 20) return '#ff9800';
             return '#d32f2f';
         };
-        const findEstadoById = (sid) => {
-            return estadosData.value.find(e => Number(e.estado_id) === Number(sid));
-        };
-        const stateStyle = (feature) => {
-            const sid = feature.properties.state_id;
-            const est = findEstadoById(sid);
-            const pct = est ? parseFloat(est.porcentaje) : null;
-            return { fillColor: getColor(pct), weight: 2, opacity: 1, color: 'white', dashArray: '3', fillOpacity: 0.7 };
+        const findEstadoById = (sid) => estadosData.value.find(e => Number(e.estado_id) === Number(sid));
+        const stateStyle = (f) => {
+            const est = findEstadoById(f.properties.state_id);
+            return { fillColor: getColor(est ? parseFloat(est.porcentaje) : null), weight: 2, opacity: 1, color: 'white', dashArray: '3', fillOpacity: 0.7 };
         };
         const highlightFeature = (e) => {
             e.target.setStyle({ weight: 3, color: '#666', dashArray: '', fillOpacity: 0.9 });
@@ -53,14 +49,9 @@ export default defineComponent({
         const resetHighlight = (e) => estadosLayer.resetStyle(e.target);
         const clickState = (e) => {
             const sid = e.target.feature.properties.state_id;
-            const nam = e.target.feature.properties.NAM || 'Desconocido';
             const est = findEstadoById(sid);
-            console.log('[Click] state_id:', sid, 'encontrado:', est);
-            console.log('[Click] Propiedades completas:', est ? Object.keys(est) : 'No encontrado');
-            const estadoNombre = est ? (est.estado_nombre || est.estado || nam.replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '')) : nam.replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
-            const pct = est ? parseFloat(est.porcentaje) : 0;
-            console.log('[Click] Nombre final:', estadoNombre, 'porcentaje:', pct);
-            selectedState.value = { id: sid, nombre: estadoNombre, porcentaje: pct.toFixed(2) };
+            const nom = est ? (est.estado || est.estado_nombre || (e.target.feature.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '')) : (e.target.feature.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
+            selectedState.value = { id: sid, nombre: nom, porcentaje: est ? parseFloat(est.porcentaje).toFixed(2) : '0.00' };
             dashboardStore.setManualStateFilter(Number(sid));
             map.fitBounds(e.target.getBounds());
         };
@@ -69,27 +60,25 @@ export default defineComponent({
             dashboardStore.clearManualStateFilter();
             if (map) map.setView([8, -66], 6);
         };
-        const onEachFeature = (feature, layer) => {
-            const sid = feature.properties.state_id;
-            const nam = feature.properties.NAM || 'Desconocido';
+        const onEachFeature = (f, layer) => {
+            const sid = f.properties.state_id;
             const est = findEstadoById(sid);
-            const estadoNombre = est ? (est.estado_nombre || est.estado || nam.replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '')) : nam.replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
+            const nom = est ? (est.estado || est.estado_nombre || (f.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '')) : (f.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
             const pct = est ? parseFloat(est.porcentaje) : 0;
-            layer.bindPopup('<div style="text-align:center;"><strong>' + estadoNombre + '</strong><br/>Cumplimiento: <strong>' + pct.toFixed(2) + '%</strong></div>');
+            layer.bindPopup('<div style="text-align:center;"><strong>' + nom + '</strong><br/>Cumplimiento: <strong>' + pct.toFixed(2) + '%</strong></div>');
             layer.on({ mouseover: highlightFeature, mouseout: resetHighlight, click: clickState });
         };
         const loadMapaData = async () => {
             try {
                 const response = await api.get('/dashboard/mapa-estados');
                 estadosData.value = response.data;
-                console.log('[Mapa] ✓ Datos cargados:', estadosData.value.length, 'estados');
+                console.log('[Mapa] Datos cargados:', estadosData.value.length, 'estados');
                 if (estadosData.value.length > 0) {
-                    console.log('[Mapa] Primer registro completo:', estadosData.value[0]);
-                    console.log('[Mapa] Claves disponibles:', Object.keys(estadosData.value[0]));
+                    console.log('[Mapa] Ejemplo:', estadosData.value[0]);
                 }
                 return true;
             } catch (error) {
-                console.error('[Mapa] ✗ Error:', error.message);
+                console.error('[Mapa] Error:', error.message);
                 return false;
             }
         };
