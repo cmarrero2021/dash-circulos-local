@@ -1,0 +1,9 @@
+﻿
+D:\proyectos\dash-circulos-local\front\src\components\ComunaDataVisualizer.vue
+   8:21  warning  Expected a linebreak before this attribute  vue/first-attribute-linebreak
+  12:21  warning  Expected a linebreak before this attribute  vue/first-attribute-linebreak
+  17:21  warning  Expected a linebreak before this attribute  vue/first-attribute-linebreak
+
+Ô£û 3 problems (0 errors, 3 warnings)
+  0 errors and 3 warnings potentially fixable with the `--fix` option.
+
