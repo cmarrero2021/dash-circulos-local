@@ -38,22 +38,24 @@
       </div>
 
       <!-- Indicadores Principales -->
-      <div v-for="indicator in indicators" :key="indicator.label" class="col-12 col-md-3">
-        <q-card flat bordered>
-          <q-card-section>
-            <div class="row items-center no-wrap">
-              <div class="col">
-                <div class="text-subtitle2 text-grey-8">{{ indicator.label }}</div>
-                <div class="text-h5 text-weight-bold">
-                  {{ indicator.value }}
-                  <q-icon :name="indicator.icon" :color="indicator.color" size="sm" />
+      <template v-if="!manualStateFilter">
+        <div v-for="indicator in indicators" :key="indicator.label" class="col-12 col-md-3">
+          <q-card flat bordered>
+            <q-card-section>
+              <div class="row items-center no-wrap">
+                <div class="col">
+                  <div class="text-subtitle2 text-grey-8">{{ indicator.label }}</div>
+                  <div class="text-h5 text-weight-bold">
+                    {{ indicator.value }}
+                    <q-icon :name="indicator.icon" :color="indicator.color" size="sm" />
+                  </div>
                 </div>
               </div>
-            </div>
-          </q-card-section>
+            </q-card-section>
 
-        </q-card>
-      </div>
+          </q-card>
+        </div>
+      </template>
 
       <!-- Mapa de Venezuela -->
       <div class="col-12">
