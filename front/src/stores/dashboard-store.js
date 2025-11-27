@@ -152,7 +152,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
       fetchCirclesByMunicipios(filters),
       fetchCirclesByComunas(filters),
     ]);
-    if (userHasNationalAccess() && !manualStateFilter.value) {
+    // if (userHasNationalAccess() && !manualStateFilter.value) {
+    if (!manualStateFilter.value) {
       await fetchStateIndicators();
     }
     lastUpdateAt.value = Date.now();
@@ -218,11 +219,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
     const authStore = useAuthStore();
     if (!authStore.isAuthenticated) return;
 
-    if (!userHasNationalAccess()) {
-      stateIndicators.value = [];
-      highlightedStateId.value = null;
-      return;
-    }
+    // if (!userHasNationalAccess()) {
+    //   stateIndicators.value = [];
+    //   highlightedStateId.value = null;
+    //   return;
+    // }
 
     isStateIndicatorsLoading.value = true;
     try {

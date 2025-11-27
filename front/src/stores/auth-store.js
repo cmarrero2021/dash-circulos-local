@@ -3,6 +3,7 @@ import { defineStore } from 'pinia';
 import { api } from 'boot/axios'; // Importamos la instancia de Axios
 import { ref, computed } from 'vue'; // Importamos ref y computed de Vue
 import { jwtDecode } from 'jwt-decode'; // Importamos la librería para decodificar JWT
+import { useDashboardStore } from './dashboard-store';
 
 export const useAuthStore = defineStore('auth', () => {
   // --- STATE ---
@@ -40,7 +41,36 @@ export const useAuthStore = defineStore('auth', () => {
       }
     }
   };
-
+  /*
+    const login = async (email, password) => {
+      try {
+        console.log('🔍 Debug - Login attempt:', { email, password: '***' });
+        console.log('🔍 Debug - API URL:', import.meta.env.VITE_API_URL);
+        console.log('🔍 Debug - Full URL:', `${import.meta.env.VITE_API_URL}/auth/login`);
+  
+        const response = await api.post('/auth/login', { email, password });
+  
+        console.log('🔍 Debug - Response:', response);
+        const { token: newToken, user: newUser } = response.data;
+  
+        // Guardar en el estado de Pinia
+        token.value = newToken;
+        user.value = normalizeUser(newUser); // El backend ya nos devuelve el objeto de usuario completo
+  
+        // Guardar token en localStorage para persistencia
+        localStorage.setItem('token', newToken);
+  
+        // Devolver true para indicar que el login fue exitoso
+        return true;
+      } catch (error) {
+        console.error('🔍 Debug - Login error:', error);
+        console.error('🔍 Debug - Error response:', error.response);
+        console.error('🔍 Debug - Error status:', error.response?.status);
+        console.error('🔍 Debug - Error data:', error.response?.data);
+        throw error;
+      }
+    };
+  */
   const login = async (email, password) => {
     try {
       console.log('🔍 Debug - Login attempt:', { email, password: '***' });
@@ -54,12 +84,15 @@ export const useAuthStore = defineStore('auth', () => {
 
       // Guardar en el estado de Pinia
       token.value = newToken;
-      user.value = normalizeUser(newUser); // El backend ya nos devuelve el objeto de usuario completo
+      user.value = normalizeUser(newUser);
 
       // Guardar token en localStorage para persistencia
       localStorage.setItem('token', newToken);
 
-      // Devolver true para indicar que el login fue exitoso
+      // 🎯 AGREGAR ESTO: Recargar datos del dashboard después del login
+      const dashboardStore = useDashboardStore();
+      await dashboardStore.refetchAll();
+
       return true;
     } catch (error) {
       console.error('🔍 Debug - Login error:', error);
@@ -69,7 +102,6 @@ export const useAuthStore = defineStore('auth', () => {
       throw error;
     }
   };
-
   const logout = async () => {
     // Limpiar el estado de Pinia
     token.value = null;
