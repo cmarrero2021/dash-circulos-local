@@ -38,12 +38,21 @@ app.use(cors({
   origin: [
     'https://certificacion.minaamp.gob.ve',
     'http://localhost:9100',
+    'http://192.168.0.247:9100'
     // 'http://localhost:8080',
     // 'http://192.168.0.32:6080',
     // 'http://localhost:3100'
   ],
   credentials: true
 }));
+// Middleware manual para manejar solicitudes OPTIONS (preflight)
+app.options('*', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
 app.use(helmet()); // Añade cabeceras de seguridad
 app.use(express.json()); // Permite al servidor entender JSON en las peticiones
 

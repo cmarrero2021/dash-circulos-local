@@ -3,7 +3,8 @@
     <!-- Header banner image -->
     <q-img src="/images/cintillo.png" alt="Cintillo" class="full-width" style="width: 100%; max-height: 300px;" />
     <div class="row q-col-gutter-md" style="margin-top: 16px;">
-      <div v-if="showStateIndicators" class="col-12">
+      <div class="col-12">
+        <!-- <div v-if="showStateIndicators" class="col-12"> -->
         <q-card flat bordered class="state-indicators-card">
           <q-card-section class="row items-center justify-between q-col-gutter-sm">
             <!-- Logo and Title Container -->
@@ -67,7 +68,8 @@
         </q-card>
       </div>
 
-      <div v-if="showStateIndicators" class="col-12">
+      <div class="col-12">
+        <!-- <div v-if="showStateIndicators" class="col-12"> -->
         <q-card flat bordered class="state-indicators-card">
           <!-- <q-card-section class="row items-center justify-between q-col-gutter-sm">
             <div class="text-h6">DASHBOARD CERTIFICACIONES MINAAMP</div>
