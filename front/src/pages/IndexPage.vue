@@ -150,24 +150,6 @@ v-show="!dashboardStore.isLoading" title="CÍRCULOS CUMPLIMIENTO vs META"
         </q-card>
       </div>
 
-      <!-- Indicador: Círculos por Estado (Tabla) -->
-      <div class="col-12 col-md-6">
-        <q-card flat bordered style="min-height: 425px;">
-          <q-inner-loading :showing="dashboardStore.isLoading">
-            <q-spinner-dots size="50px" color="primary" />
-          </q-inner-loading>
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="Círculos por Estado"
-            :data="dashboardStore.circlesByState" type="table" row-key="estado" :column-map="{
-              label: 'estado',
-              labelHeader: 'Estado',
-              value: [
-                { name: 'Círculos Certificados', key: 'circulos_certificados' },
-                { name: 'Meta de Círculos', key: 'meta_circulos' }
-              ]
-            }" />
-        </q-card>
-      </div>
 
 
       <!-- Gráfica de Anillo: Participantes (cuando hay filtro de estado) -->
@@ -220,6 +202,32 @@ v-show="!dashboardStore.isLoading" title="Participantes por Estado"
             }" />
         </q-card>
       </div>
+
+
+
+
+
+      <!-- Indicador: Círculos por Estado (Tabla) -->
+      <div class="col-12 col-md-6">
+        <q-card flat bordered style="min-height: 425px;">
+          <q-inner-loading :showing="dashboardStore.isLoading">
+            <q-spinner-dots size="50px" color="primary" />
+          </q-inner-loading>
+          <DataVisualizer
+v-show="!dashboardStore.isLoading" title="Círculos por Estado"
+            :data="dashboardStore.circlesByState" type="table" row-key="estado" :column-map="{
+              label: 'estado',
+              labelHeader: 'Estado',
+              value: [
+                { name: 'Círculos Certificados', key: 'circulos_certificados' },
+                { name: 'Meta de Círculos', key: 'meta_circulos' }
+              ]
+            }" />
+        </q-card>
+      </div>
+
+
+
 
 
 
@@ -625,8 +633,9 @@ const indicators = computed(() => {
     { label: 'Meta', value: formatNumber(data.meta), icon: 'flag', color: 'blue-grey-8' },
     { label: 'Acumulado', value: formatNumber(data.acumulado), icon: 'leaderboard', color: 'green-7' },
     { label: 'Diferencia', value: formatNumber(data.diferencia), icon: 'trending_down', color: 'red-7' },
-    { label: 'Días Faltantes', value: data.dias_faltantes || 0, icon: 'calendar_today', color: 'orange-8' },
-    { label: 'Promedio Necesario', value: formatNumber(data.promedio_necesario), icon: 'speed', color: 'purple-8' },
+    { label: 'Días Faltantes', value: 18, icon: 'calendar_today', color: 'orange-8' },
+    // { label: 'Días Faltantes', value: data.dias_faltantes || 0, icon: 'calendar_today', color: 'orange-8' },
+    // { label: 'Promedio Necesario', value: formatNumber(data.promedio_necesario), icon: 'speed', color: 'purple-8' },
     { label: 'Promedio Diario', value: formatNumber(data.promedio_diario), icon: 'bar_chart', color: 'teal-7' },
     { label: 'Total de Participantes', value: formatNumber(data.participantes), icon: 'groups', color: 'orange' },
     { label: 'Promedio Integrantes/Círculo', value: formatNumber(data.promedio), icon: 'people_alt', color: 'teal' }
