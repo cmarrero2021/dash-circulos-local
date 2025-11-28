@@ -76,6 +76,7 @@ const props = defineProps({
   stacked: { type: Boolean, default: false }, // Para gráficos de barras apiladas
   rowKey: { type: String, default: 'estado_id' }, // clave estable para QTable
   height: { type: [String, Number], default: 350 },
+  pagination: { type: Object, default: () => ({ rowsPerPage: 24 }) }, // Configuración de paginación para tablas
 });
 
 const chartRef = ref(null);
@@ -117,8 +118,7 @@ onBeforeUnmount(() => {
 });
 
 const pagination = ref({
-  rowsPerPage: 24
-  // rowsPerPage: 10
+  rowsPerPage: props.pagination?.rowsPerPage || 24
 });
 
 // --- Lógica de la TABLA ---

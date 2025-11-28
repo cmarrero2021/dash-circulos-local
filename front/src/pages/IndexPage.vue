@@ -112,7 +112,7 @@ v-show="!dashboardStore.isLoading" title="CERTIFICACIONES DIARIAS"
 v-show="!dashboardStore.isLoading" title="Certificaciones Diarias"
             :data="dashboardStore.dailyCertifications" type="table" row-key="fecha"
             :column-map="{ label: 'fecha', labelHeader: 'Fecha', value: 'certificaciones' }"
-            @update:height="newHeight => dailyCertificationsHeight = newHeight" />
+            :pagination="{ rowsPerPage: 13 }" />
         </q-card>
       </div>
 
@@ -127,8 +127,7 @@ v-show="!dashboardStore.isLoading" title="Certificaciones Diarias"
 v-show="!dashboardStore.isLoading" title="CÍRCULOS - Certificados vs Faltante" :data="[
             { label: 'Certificados', value: circlesDonutData[0] },
             { label: 'Faltante', value: circlesDonutData[1] }
-          ]" type="donut" row-key="label" :column-map="{ label: 'label', value: 'value' }"
-            :height="circlesByStateHeight" />
+          ]" type="donut" row-key="label" :column-map="{ label: 'label', value: 'value' }" />
         </q-card>
       </div>
 
@@ -147,7 +146,7 @@ v-show="!dashboardStore.isLoading" title="CÍRCULOS CUMPLIMIENTO vs META"
                 { name: 'Círculos Certificados', key: 'circulos_certificados' },
                 { name: 'Meta de Círculos', key: 'meta_circulos' }
               ]
-            }" stacked :height="circlesByStateHeight" />
+            }" stacked />
         </q-card>
       </div>
 
@@ -166,7 +165,7 @@ v-show="!dashboardStore.isLoading" title="Círculos por Estado"
                 { name: 'Círculos Certificados', key: 'circulos_certificados' },
                 { name: 'Meta de Círculos', key: 'meta_circulos' }
               ]
-            }" @update:height="newHeight => circlesByStateHeight = newHeight" />
+            }" />
         </q-card>
       </div>
 
@@ -181,8 +180,7 @@ v-show="!dashboardStore.isLoading" title="Círculos por Estado"
 v-show="!dashboardStore.isLoading" title="PARTICIPANTES - Certificados vs Faltante" :data="[
             { label: 'Certificados', value: participantsDonutData[0] },
             { label: 'Faltante', value: participantsDonutData[1] }
-          ]" type="donut" row-key="label" :column-map="{ label: 'label', value: 'value' }"
-            :height="participantsByStateHeight" />
+          ]" type="donut" row-key="label" :column-map="{ label: 'label', value: 'value' }" />
         </q-card>
       </div>
 
@@ -200,7 +198,7 @@ v-show="!dashboardStore.isLoading" title="PARTICIPANTES CUMPLIMIENTO vs META"
                 { name: 'Participantes Certificados', key: 'participantes_certificados' },
                 { name: 'Meta de Participantes', key: 'meta_participantes' }
               ]
-            }" stacked :height="participantsByStateHeight" />
+            }" stacked />
         </q-card>
       </div>
 
@@ -219,7 +217,7 @@ v-show="!dashboardStore.isLoading" title="Participantes por Estado"
                 { name: 'Participantes Certificados', key: 'participantes_certificados' },
                 { name: 'Meta de Participantes', key: 'meta_participantes' }
               ]
-            }" @update:height="newHeight => participantsByStateHeight = newHeight" />
+            }" />
         </q-card>
       </div>
 
@@ -310,8 +308,8 @@ const { indicators: rawIndicators, circlesByState, circlesByMunicipio, stateIndi
 const { isStateIndicatorsLoading } = storeToRefs(dashboardStore);
 
 const dailyCertificationsHeight = ref(425);
-const circlesByStateHeight = ref(425);
-const participantsByStateHeight = ref(425);
+// const circlesByStateHeight = ref(425);
+// const participantsByStateHeight = ref(425);
 const stateIndicatorsHeight = ref(425);
 
 // Filters for municipios table
