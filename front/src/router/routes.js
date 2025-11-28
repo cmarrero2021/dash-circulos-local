@@ -9,6 +9,11 @@ const routes = [
         path: 'admin/users',
         component: () => import('src/pages/UsersPage.vue'), // Corregido para que apunte al archivo correcto
         meta: { requiresAuth: true, requiresAdmin: true }
+      },
+      {
+        path: 'admin/email-edit',
+        component: () => import('src/pages/EmailEditPage.vue'),
+        meta: { requiresAuth: true }
       }
     ],
     meta: { requiresAuth: true }

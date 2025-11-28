@@ -11,7 +11,9 @@
           <q-list>
             <q-item-label header>
               {{ authStore.user?.email || 'Usuario' }}
-              <q-chip dense class="q-ml-sm" color="primary" text-color="white">{{ authStore.user?.role || 'Rol no definido' }}</q-chip>
+              <q-chip dense class="q-ml-sm" color="primary" text-color="white">
+                {{ authStore.user?.role || 'Sin rol' }}
+              </q-chip>
             </q-item-label>
             <q-item v-close-popup clickable @click="handleLogout">
               <q-item-section avatar>
@@ -36,11 +38,7 @@
         <div v-if="authStore.user?.role === 'Administrador'">
           <q-separator class="q-my-md" />
           <q-item-label header>Administración</q-item-label>
-          <EssentialLink
-            v-for="link in adminLinksList"
-            :key="link.title"
-            v-bind="link"
-          />
+          <EssentialLink v-for="link in adminLinksList" :key="link.title" v-bind="link" />
         </div>
       </q-list>
     </q-drawer>
@@ -64,9 +62,14 @@ const linksList = [
     title: 'Dashboard',
     caption: 'Visualización de datos',
     icon: 'dashboard',
-    link: '/', // Asumiendo que la ruta principal es el dashboard
+    link: '/',
   },
-  // Puedes añadir más links aquí si es necesario
+  {
+    title: 'Edición de Correo',
+    caption: 'Modificar correos electrónicos',
+    icon: 'email',
+    link: '/admin/email-edit',
+  },
 ];
 
 const adminLinksList = [

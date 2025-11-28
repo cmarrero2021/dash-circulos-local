@@ -26,6 +26,7 @@ const locationRoutes = require('./routes/locations');
 const dashboardRoutes = require('./routes/dashboard');
 const comunaRoutes = require('./routes/comunas');
 const adminRoutes = require('./routes/admin');
+const emailRoutes = require('./routes/emailRoutes');
 
 // --- Configuración de Express ---
 const app = express();
@@ -72,7 +73,7 @@ app.use('/api/locations', locationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/comunas', comunaRoutes);
 app.use('/api/admin', adminRoutes);
-
+app.use('/api/email', emailRoutes);
 // Solo habilitar esta ruta en entorno de desarrollo
 if (process.env.NODE_ENV !== 'production') {
   app.use('/api/utility', utilityRoutes); // <-- Añadir
