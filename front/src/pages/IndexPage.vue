@@ -455,8 +455,12 @@ const stateIndicatorColumnMap = computed(() => ({
     { name: 'Diferencia', key: 'diferencia' },
     { name: 'Promedio Necesario', key: 'promedio_necesario' },
     { name: 'Promedio Diario', key: 'promedio_diario' },
-    { name: 'Máximo por Fecha', key: 'maximo_por_fecha' },
-    { name: 'Fecha Máxima', key: 'fecha_maxima' },
+
+    { name: 'Participantes', key: 'participantes' },
+    { name: 'Promedio Integrantes/Círculo', key: 'promedio' },
+
+    // { name: 'Máximo por Fecha', key: 'maximo_por_fecha' },
+    // { name: 'Fecha Máxima', key: 'fecha_maxima' },
   ],
 }));
 
@@ -548,9 +552,9 @@ const exportPage = async (format) => {
 
 const indicators = computed(() => {
   const data = rawIndicators.value || {};
-  const formattedFechaMaxima = data.fecha_maxima
-    ? new Date(data.fecha_maxima).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    : 'N/A';
+  // const formattedFechaMaxima = data.fecha_maxima
+  //   ? new Date(data.fecha_maxima).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  //   : 'N/A';
 
   // Robust helper to format numbers with '.' as thousands separator (Spanish style)
   // Accepts numbers or strings that may already contain thousand/decimal separators
@@ -626,8 +630,10 @@ const indicators = computed(() => {
     { label: 'Días Faltantes', value: data.dias_faltantes || 0, icon: 'calendar_today', color: 'orange-8' },
     { label: 'Promedio Necesario', value: formatNumber(data.promedio_necesario), icon: 'speed', color: 'purple-8' },
     { label: 'Promedio Diario', value: formatNumber(data.promedio_diario), icon: 'bar_chart', color: 'teal-7' },
-    { label: 'Máximo por Fecha', value: formatNumber(data.maximo_por_fecha), icon: 'military_tech', color: 'indigo-7' },
-    { label: 'Fecha Máxima', value: formattedFechaMaxima, icon: 'event', color: 'brown-6' }
+    { label: 'Total de Participantes', value: formatNumber(data.participantes), icon: 'groups', color: 'orange' },
+    { label: 'Promedio Integrantes/Círculo', value: formatNumber(data.promedio), icon: 'people_alt', color: 'teal' }
+    // { label: 'Máximo por Fecha', value: formatNumber(data.maximo_por_fecha), icon: 'military_tech', color: 'indigo-7' },
+    // { label: 'Fecha Máxima', value: formattedFechaMaxima, icon: 'event', color: 'brown-6' }
   ];
 });
 

@@ -23,8 +23,8 @@ const buildEmptyIndicators = (dias_faltantes) => ({
     dias_faltantes,
     promedio_necesario: 0,
     promedio_diario: 0,
-    maximo_por_fecha: 0,
-    fecha_maxima: null,
+    participantes: 0,
+    promedio: 0,
 });
 
 /**
@@ -107,7 +107,7 @@ exports.getIndicators = async (userId) => {
     const hasNationalAccess = await hasNationalDashboardAccess(userId);
 
     if (hasNationalAccess) {
-        const query = `SELECT meta, acumulado, diferencia, dias_faltantes, promedio_necesario, promedio_diario, maximo_por_fecha, fecha_maxima FROM vindicadores;`;
+        const query = `SELECT meta, acumulado, diferencia, dias_faltantes, promedio_necesario, promedio_diario, participantes, promedio FROM vindicadores;`;
         const result = await pool.query(query);
         const row = result.rows[0] || {};
         return {
@@ -117,8 +117,8 @@ exports.getIndicators = async (userId) => {
             dias_faltantes: Number(row.dias_faltantes ?? diasFaltantes),
             promedio_necesario: Number(row.promedio_necesario ?? 0),
             promedio_diario: Number(row.promedio_diario ?? 0),
-            maximo_por_fecha: Number(row.maximo_por_fecha ?? 0),
-            fecha_maxima: row.fecha_maxima || null,
+            participantes: Number(row.participantes ?? 0),
+            promedio: Number(row.promedio ?? 0),
         };
     }
 
@@ -127,7 +127,7 @@ exports.getIndicators = async (userId) => {
         return buildEmptyIndicators(diasFaltantes);
     }
 
-    const [metaResult, totalsResult, peakResult] = await Promise.all([
+    const [metaResult, totalsResult, participantesResult] = await Promise.all([
         pool.query(
             'SELECT COALESCE(SUM(circulos), 0) AS meta FROM metas_estado WHERE estado_id = ANY($1)',
             [allowedStates]
@@ -141,12 +141,11 @@ exports.getIndicators = async (userId) => {
             [allowedStates]
         ),
         pool.query(
-            `SELECT certificacion::date AS fecha, COUNT(*)::integer AS total
+            `SELECT 
+                SUM(participantes)::integer AS total_participantes,
+                AVG(participantes)::integer AS promedio_participantes
             FROM rm_circulos_remoto
-            WHERE estado_id = ANY($1)
-            GROUP BY certificacion::date
-            ORDER BY total DESC, fecha DESC
-            LIMIT 1;`,
+            WHERE estado_id = ANY($1);`,
             [allowedStates]
         ),
     ]);
@@ -154,8 +153,8 @@ exports.getIndicators = async (userId) => {
     const meta = Number(metaResult.rows[0]?.meta || 0);
     const acumulado = Number(totalsResult.rows[0]?.acumulado || 0);
     const diasConRegistro = Number(totalsResult.rows[0]?.dias_con_registro || 0);
-    const maximo_por_fecha = Number(peakResult.rows[0]?.total || 0);
-    const fecha_maxima = peakResult.rows[0]?.fecha || null;
+    const participantes = Number(participantesResult.rows[0]?.total_participantes || 0);
+    const promedio = Number(participantesResult.rows[0]?.promedio_participantes || 0);
 
     const diferencia = meta - acumulado;
     const restante = Math.max(diferencia, 0);
@@ -170,8 +169,8 @@ exports.getIndicators = async (userId) => {
         dias_faltantes: diasFaltantes,
         promedio_necesario,
         promedio_diario,
-        maximo_por_fecha,
-        fecha_maxima,
+        participantes,
+        promedio,
     };
 }
 
@@ -293,7 +292,7 @@ exports.getStateIndicatorsView = async (userId, filters = {}) => {
 
     const whereClause = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
     const query = `
-        SELECT estado_id, estado_nombre, meta, acumulado, diferencia, dias_faltantes, promedio_necesario, promedio_diario, maximo_por_fecha, fecha_maxima
+        SELECT estado_id, estado_nombre, meta, acumulado, diferencia, dias_faltantes, promedio_necesario, promedio_diario, participantes, promedio
         FROM vindicadores_estados
         ${whereClause}
         ORDER BY estado_nombre;

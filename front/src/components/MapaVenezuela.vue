@@ -171,4 +171,9 @@ export default defineComponent({
     margin-right: 8px;
     opacity: 0.7;
 }
+
+/* Ocultar elemento de atribución de Leaflet */
+:deep(.leaflet-bottom.leaflet-right) {
+    display: none !important;
+}
 </style>
