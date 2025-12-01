@@ -7,47 +7,33 @@
       </q-card-section>
 
       <q-card-section>
-        <q-form class="q-gutter-md" @submit="handleLogin" >
+        <q-form class="q-gutter-md" @submit="handleLogin">
           <!-- Atributos reordenados -->
           <q-input
-            ref="emailRef"
-            v-model="form.email"
-            filled
-            label="Email"
-            type="email"
-            lazy-rules
-            :rules="[val => !!val || 'El email es requerido', val => /.+@.+\..+/.test(val) || 'Email inválido']"
-          />
+ref="emailRef" v-model="form.email" filled label="Email" type="email" lazy-rules
+            :rules="[val => !!val || 'El email es requerido', val => /.+@.+\..+/.test(val) || 'Email inválido']" />
 
           <!-- Atributos reordenados -->
           <q-input
-            ref="passwordRef"
-            v-model="form.password"
-            filled
-            label="Contraseña"
-            type="password"
-            lazy-rules
-            :rules="[val => !!val || 'La contraseña es requerida']"
-          />
+ref="passwordRef" v-model="form.password" filled label="Contraseña"
+            :type="isPwd ? 'password' : 'text'" lazy-rules :rules="[val => !!val || 'La contraseña es requerida']">
+            <template #append>
+              <q-icon :name="isPwd ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="isPwd = !isPwd" />
+            </template>
+          </q-input>
 
           <div>
-            <q-btn
-              class="full-width"
-              label="Ingresar"
-              type="submit"
-              color="primary"
-              :loading="isLoading"
-            />
+            <q-btn class="full-width" label="Ingresar" type="submit" color="primary" :loading="isLoading" />
           </div>
         </q-form>
       </q-card-section>
 
-      <q-card-section class="text-center q-pt-none">
+      <!-- <q-card-section class="text-center q-pt-none">
         <div class="text-grey-8">
           ¿Olvidaste tu contraseña?
           <a href="#" class="text-primary text-weight-bold" style="text-decoration: none">Recuperar</a>
         </div>
-      </q-card-section>
+      </q-card-section> -->
     </q-card>
   </q-page>
 </template>
@@ -69,6 +55,7 @@ const form = ref({
   password: '',
 });
 const isLoading = ref(false);
+const isPwd = ref(true);
 const emailRef = ref(null);
 const passwordRef = ref(null);
 
