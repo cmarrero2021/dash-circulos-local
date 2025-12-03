@@ -78,6 +78,11 @@ export default defineComponent({
                 </div>
             `;
             layer.bindPopup(popupContent);
+            layer.bindTooltip(nom, {
+                permanent: false,
+                direction: 'center',
+                className: 'state-tooltip'
+            });
             layer.on({ mouseover: highlightFeature, mouseout: resetHighlight, click: clickState });
         };
         const loadMapaData = async () => {
@@ -170,6 +175,22 @@ export default defineComponent({
     float: left;
     margin-right: 8px;
     opacity: 0.7;
+}
+
+/* Tooltip personalizado para estados */
+:deep(.state-tooltip) {
+    background: rgba(0, 0, 0, 0.8);
+    border: none;
+    border-radius: 4px;
+    color: white;
+    font-weight: bold;
+    font-size: 13px;
+    padding: 6px 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+:deep(.state-tooltip::before) {
+    border-top-color: rgba(0, 0, 0, 0.8);
 }
 
 /* Ocultar elemento de atribución de Leaflet */
