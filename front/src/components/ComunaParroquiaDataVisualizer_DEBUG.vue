@@ -47,15 +47,8 @@
                     </q-btn>
                 </div>
             </div>
-
-            <!-- Debug info -->
-            <div class="q-mt-md text-caption">
-                <div>Selected Municipios: {{ selectedMunicipio }}</div>
-                <div>Parroquia Options Count: {{ parroquiaOptions.length }}</div>
-                <div>All Parroquias Count: {{ allParroquias.length }}</div>
-            </div>
         </q-card-section>
-
+        <div class="text-subtitle2">Fecha: {{ currentDate }}</div>
         <q-card-section>
             <q-table v-model:pagination="pagination" :rows="filteredData" :columns="columns" row-key="comuna" flat
                 dense />
@@ -70,7 +63,7 @@ import { utils, writeFile } from 'xlsx';
 import { exportFile } from 'quasar';
 import { api } from 'boot/axios';
 import { useAuthStore } from 'stores/auth-store';
-
+const currentDate = ref(new Date().toLocaleDateString('es-ES'));
 const props = defineProps({
     title: { type: String, required: true },
 });

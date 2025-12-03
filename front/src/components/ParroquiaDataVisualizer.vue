@@ -18,13 +18,7 @@
                 <div class="col">
                     <q-select v-model="selectedParroquia" :options="parroquiaOptions" label="Parroquia" multiple
                         use-input emit-value outlined map-options clearable dense
-                        :disable="!selectedMunicipio || selectedMunicipio.length === 0" @filter="filterParroquias"
-                        @update:model-value="onParroquiaChange" />
-                </div>
-                <div class="col">
-                    <q-select v-model="selectedComuna" :options="comunaOptions" label="Comuna" multiple use-input
-                        emit-value outlined map-options clearable dense
-                        :disable="!selectedParroquia || selectedParroquia.length === 0" @filter="filterComunas" />
+                        :disable="!selectedMunicipio || selectedMunicipio.length === 0" @filter="filterParroquias" />
                 </div>
                 <div class="col-auto">
                     <q-btn color="grey-7" round flat icon="more_vert">
@@ -48,11 +42,14 @@
                 </div>
             </div>
             <div class="text-subtitle2">Fecha: {{ currentDate }}</div>
+
         </q-card-section>
+
         <q-card-section>
-            <q-table v-model:pagination="pagination" :rows="filteredData" :columns="columns" row-key="comuna" flat
+            <q-table v-model:pagination="pagination" :rows="filteredData" :columns="columns" row-key="parroquia" flat
                 dense />
         </q-card-section>
+
     </q-card>
 </template>
 
@@ -64,6 +61,7 @@ import { exportFile } from 'quasar';
 import { api } from 'boot/axios';
 import { useAuthStore } from 'stores/auth-store';
 const currentDate = ref(new Date().toLocaleDateString('es-ES'));
+
 const props = defineProps({
     title: { type: String, required: true },
 });
@@ -74,18 +72,15 @@ const authStore = useAuthStore();
 const selectedEstado = ref([]);
 const selectedMunicipio = ref([]);
 const selectedParroquia = ref([]);
-const selectedComuna = ref([]);
 
 const rawEstados = ref([]);
 const allEstados = ref([]);
 const allMunicipios = ref([]);
 const allParroquias = ref([]);
-const allComunas = ref([]);
 
 const estadoOptions = ref([]);
 const municipioOptions = ref([]);
 const parroquiaOptions = ref([]);
-const comunaOptions = ref([]);
 
 const pagination = ref({
     rowsPerPage: 15
@@ -95,12 +90,11 @@ const columns = [
     { name: 'estado', label: 'Estado', field: 'estado', align: 'left', sortable: true },
     { name: 'municipio', label: 'Municipio', field: 'municipio', align: 'left', sortable: true },
     { name: 'parroquia', label: 'Parroquia', field: 'parroquia', align: 'left', sortable: true },
-    { name: 'comuna', label: 'Comuna', field: 'comuna', align: 'left', sortable: true },
     { name: 'avance', label: 'Avance', field: 'avance', align: 'right', sortable: true },
 ];
 
 watch(() => dashboardStore.lastUpdateAt, () => {
-    // dashboardStore.fetchCirclesByComunasParroquias();
+    dashboardStore.fetchCirclesByParroquias();
 });
 
 const allowedStateIds = computed(() => authStore.allowedStates);
@@ -202,35 +196,6 @@ const fetchParroquias = async (municipioIds) => {
     }
 };
 
-const fetchComunas = async (parroquiaIds) => {
-    console.log('🔍 fetchComunas called with:', parroquiaIds);
-    if (!parroquiaIds || parroquiaIds.length === 0) {
-        allComunas.value = [];
-        comunaOptions.value = [];
-        return;
-    }
-    try {
-        const requests = parroquiaIds.map(id => {
-            const url = `/locations/parroquias/${id}/comunas`;
-            console.log('📡 Fetching comunas from:', url);
-            return api.get(url);
-        });
-        const responses = await Promise.all(requests);
-        console.log('✅ Comuna responses received:', responses.length);
-        const comunas = responses.flatMap(res => res.data);
-        console.log('📊 Total comunas fetched:', comunas.length, comunas);
-
-        // Remove duplicates based on comuna_id
-        const uniqueComunas = Array.from(new Map(comunas.map(c => [c.comuna_id, c])).values());
-        console.log('✨ Unique comunas:', uniqueComunas.length);
-
-        allComunas.value = uniqueComunas.map(c => ({ label: c.comuna, value: c.comuna_id }));
-        comunaOptions.value = allComunas.value;
-    } catch (error) {
-        console.error('❌ Error fetching comunas:', error);
-    }
-};
-
 const onEstadoChange = (estadoIds) => {
     const validStateIds = sanitizeEstadoSelection(estadoIds || []);
     if (validStateIds.length !== (estadoIds || []).length) {
@@ -240,13 +205,10 @@ const onEstadoChange = (estadoIds) => {
     // Clear downstream selections and options
     selectedMunicipio.value = [];
     selectedParroquia.value = [];
-    selectedComuna.value = [];
     allMunicipios.value = [];
     municipioOptions.value = [];
     allParroquias.value = [];
     parroquiaOptions.value = [];
-    allComunas.value = [];
-    comunaOptions.value = [];
 
     if (validStateIds.length > 0) {
         console.log('🔄 State changed, fetching municipios for:', validStateIds);
@@ -263,37 +225,14 @@ const onMunicipioChange = (municipioIds) => {
 
     // Clear downstream selections and options
     selectedParroquia.value = [];
-    selectedComuna.value = [];
     allParroquias.value = [];
     parroquiaOptions.value = [];
-    allComunas.value = [];
-    comunaOptions.value = [];
 
     if (validIds.length > 0) {
         console.log('✅ Calling fetchParroquias with:', validIds);
         fetchParroquias(validIds);
     } else {
         console.log('⚠️ No valid municipio IDs to fetch');
-    }
-};
-
-const onParroquiaChange = (parroquiaIds) => {
-    console.log('🎯 onParroquiaChange called with:', parroquiaIds);
-
-    // Ensure we have an array of numbers
-    const validIds = (parroquiaIds || []).map(id => Number(id)).filter(id => !isNaN(id));
-    console.log('🔢 Validated Parroquia IDs:', validIds);
-
-    // Clear downstream selections and options
-    selectedComuna.value = [];
-    allComunas.value = [];
-    comunaOptions.value = [];
-
-    if (validIds.length > 0) {
-        console.log('✅ Calling fetchComunas with:', validIds);
-        fetchComunas(validIds);
-    } else {
-        console.log('⚠️ No valid parroquia IDs to fetch comunas');
     }
 };
 
@@ -336,21 +275,8 @@ const filterParroquias = (val, update) => {
     });
 };
 
-const filterComunas = (val, update) => {
-    if (val === '') {
-        update(() => {
-            comunaOptions.value = allComunas.value;
-        });
-        return;
-    }
-    update(() => {
-        const needle = val.toLowerCase();
-        comunaOptions.value = allComunas.value.filter(v => v.label.toLowerCase().indexOf(needle) > -1);
-    });
-};
-
 const filteredData = computed(() => {
-    let data = dashboardStore.circlesByComunaParroquia;
+    let data = dashboardStore.circlesByParroquia;
 
     if (selectedEstado.value?.length > 0) {
         data = data.filter(row => selectedEstado.value.includes(row.estado_id));
@@ -364,16 +290,12 @@ const filteredData = computed(() => {
         data = data.filter(row => selectedParroquia.value.includes(row.parroquia_id));
     }
 
-    if (selectedComuna.value?.length > 0) {
-        data = data.filter(row => selectedComuna.value.includes(row.comuna_id));
-    }
-
     return data;
 });
 
 onMounted(() => {
     fetchEstados();
-    dashboardStore.fetchCirclesByComunasParroquias();
+    dashboardStore.fetchCirclesByParroquias();
 });
 
 watch([allowedStateIds, () => authStore.user?.role], () => {
@@ -393,13 +315,10 @@ watch(() => dashboardStore.manualStateFilter, (manualFilter) => {
         selectedEstado.value = [];
         selectedMunicipio.value = [];
         selectedParroquia.value = [];
-        selectedComuna.value = [];
         allMunicipios.value = [];
         municipioOptions.value = [];
         allParroquias.value = [];
         parroquiaOptions.value = [];
-        allComunas.value = [];
-        comunaOptions.value = [];
 
         if (rawEstados.value.length > 0) {
             applyStateFilters();

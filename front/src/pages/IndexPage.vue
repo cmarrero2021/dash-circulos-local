@@ -216,12 +216,6 @@
             }" />
         </q-card>
       </div>
-
-
-
-
-
-
       <!-- Tabla: Círculos por Estado / Municipio -->
       <div class="col-12">
         <q-card flat bordered style="min-height: 250px;">
@@ -273,6 +267,11 @@
         </q-card>
       </div>
 
+      <!-- Tabla: Círculos por Estado / Municipio / Parroquia -->
+      <div class="col-12">
+        <ParroquiaDataVisualizer title="CÍRCULOS POR ESTADO, MUNICIPIO Y PARROQUIA" />
+      </div>
+
       <!-- Tabla: Círculos por Estado / Municipio / Parroquia / Comuna -->
       <div class="col-12">
         <ComunaParroquiaDataVisualizer title="CÍRCULOS POR ESTADO, MUNICIPIO, PARROQUIA Y COMUNA" />
@@ -287,6 +286,7 @@ import { useDashboardStore } from 'stores/dashboard-store';
 import { useAuthStore } from 'stores/auth-store';
 import { storeToRefs } from 'pinia';
 import DataVisualizer from 'components/DataVisualizer.vue';
+import ParroquiaDataVisualizer from 'components/ParroquiaDataVisualizer.vue';
 import ComunaParroquiaDataVisualizer from 'components/ComunaParroquiaDataVisualizer.vue';
 import MapaVenezuela from 'components/MapaVenezuela.vue';
 import { utils, writeFile } from 'xlsx';

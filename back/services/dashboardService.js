@@ -215,10 +215,20 @@ exports.getCirclesByStateMunicipios = async (userId, filters = {}) => {
 exports.getCirclesByStateMunicipiosParroquias = async (userId, filters = {}) => {
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
-        SELECT estado_id, estado, municipio_id, municipio, parroquia_id, parroquia, avance
-        FROM vcirculos_estados_municipios_parroquias
-        ${whereClause}
-        ORDER BY estado, municipio, parroquia;
+        WITH parroquias_filtradas AS (
+            SELECT DISTINCT estado_id, estado, municipio_id, municipio, parroquia_id, parroquia
+            FROM rm_comunas
+            ${whereClause}
+        )
+        SELECT 
+            p.estado_id, p.estado, 
+            p.municipio_id, p.municipio, 
+            p.parroquia_id, p.parroquia, 
+            COUNT(r.id) as avance
+        FROM parroquias_filtradas p
+        LEFT JOIN rm_circulos_remoto r ON p.parroquia_id = r.parroquia_id
+        GROUP BY p.estado_id, p.estado, p.municipio_id, p.municipio, p.parroquia_id, p.parroquia
+        ORDER BY p.estado, p.municipio, p.parroquia;
     `;
     const result = await pool.query(query, params);
     return result.rows;
