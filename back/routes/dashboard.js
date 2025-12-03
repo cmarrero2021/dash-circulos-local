@@ -14,6 +14,8 @@ router.get('/state-indicators', dashboardController.getStateIndicatorsView);
 router.get('/by-state', dashboardController.getCirclesByState);
 router.get('/by-municipality', dashboardController.getCirclesByMunicipality);
 router.get('/circles-states-municipios', dashboardController.getCirclesByStateMunicipios);
+router.get('/circles-states-municipios-parroquias', dashboardController.getCirclesByStateMunicipiosParroquias);
+router.get('/circles-states-municipios-parroquias-comunas', dashboardController.getCirclesByStateMunicipiosParroquiasComunas);
 router.get('/circles-states-municipios-comunas', dashboardController.getCirclesByStateMunicipiosComunas);
 router.get('/daily-certifications', dashboardController.getDailyCertifications);
 

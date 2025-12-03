@@ -1,15 +1,16 @@
 {
-    "watch": ["back/"],
+    "watch": [
+        "."
+    ],
     "ext": "js,json",
     "ignore": [
-        "back/tests/",
-        "back/node_modules/",
-        "front/",
+        "tests/",
         "node_modules/",
+        "../front/",
         ".git/",
         "*.test.js"
     ],
-    "exec": "node back/server.js",
+    "exec": "node server.js",
     "verbose": true,
     "events": {
         "start": "cls || clear"

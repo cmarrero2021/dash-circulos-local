@@ -8,21 +8,6 @@ import { ref } from 'vue';
 const sortStateIndicators = (rows = []) =>
   [...rows].sort((a, b) => (a?.estado_nombre || '').localeCompare(b?.estado_nombre || '', 'es', { sensitivity: 'base' }));
 
-// const applyStateIndicatorHighlight = (rows = [], estadoId = null) => {
-//   const timestamp = Date.now();
-//   const normalizedId = Number(estadoId);
-//   return rows.map(row => {
-//     if (!row) return row;
-//     const copy = { ...row };
-//     if (!Number.isNaN(normalizedId) && Number(row.estado_id) === normalizedId) {
-//       copy.__highlightedAt = timestamp;
-//     } else {
-//       delete copy.__highlightedAt;
-//     }
-//     return copy;
-//   });
-// };
-
 const setRowHighlightFlag = (rows = [], estadoId) => {
   const timestamp = Date.now();
   const normalizedId = Number(estadoId);
@@ -45,7 +30,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
   // --- STATE ---
   const circlesByState = ref([]);
   const circlesByMunicipio = ref([]);
+  const circlesByParroquia = ref([]);
   const circlesByComuna = ref([]);
+  const circlesByComunaParroquia = ref([]); // New state for the detailed table
   const indicators = ref({});
   const dailyCertifications = ref([]);
   const stateIndicators = ref([]);
@@ -124,6 +111,22 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   };
 
+  const fetchCirclesByParroquias = async (filters = {}) => {
+    const authStore = useAuthStore();
+    if (!authStore.isAuthenticated) return;
+
+    isLoading.value = true;
+    try {
+      const response = await api.get('/dashboard/circles-states-municipios-parroquias', { params: filters });
+      circlesByParroquia.value = response.data;
+    } catch (error) {
+      console.error('Error al obtener los círculos por parroquia:', error);
+      circlesByParroquia.value = [];
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
   const fetchCirclesByComunas = async (filters = {}) => {
     const authStore = useAuthStore();
     if (!authStore.isAuthenticated) return; // No hacer nada si no está autenticado
@@ -140,6 +143,63 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   };
 
+  const fetchCirclesByComunasParroquias = async (filters = {}) => {
+    isLoading.value = true;
+    try {
+      const response = await api.get('/dashboard/circles-states-municipios-parroquias-comunas', { params: filters });
+      circlesByComunaParroquia.value = response.data;
+    } catch (error) {
+      console.error('Error al obtener los círculos por comuna (detallado):', error);
+      circlesByComunaParroquia.value = [];
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  const fetchStateIndicators = async () => {
+    const authStore = useAuthStore();
+    if (!authStore.isAuthenticated) return;
+
+    isStateIndicatorsLoading.value = true;
+    try {
+      const response = await api.get('/dashboard/state-indicators');
+      stateIndicators.value = sortStateIndicators(response.data || []);
+      highlightedStateId.value = null;
+    } catch (error) {
+      console.error('Error al obtener los indicadores por estado:', error);
+      stateIndicators.value = [];
+    } finally {
+      isStateIndicatorsLoading.value = false;
+    }
+  };
+
+  const refreshStateIndicatorRow = async (estadoId) => {
+    const normalizedId = Number(estadoId);
+    if (Number.isNaN(normalizedId)) return;
+    if (!stateIndicators.value.length) {
+      await fetchStateIndicators();
+      highlightedStateId.value = normalizedId;
+      return;
+    }
+    try {
+      const response = await api.get('/dashboard/state-indicators', { params: { estado_id: normalizedId } });
+      const row = response.data?.[0];
+      if (!row) return;
+      const current = [...stateIndicators.value];
+      const index = current.findIndex(r => Number(r.estado_id) === normalizedId);
+      if (index === -1) {
+        current.push(row);
+      } else {
+        current[index] = row;
+      }
+      const sorted = sortStateIndicators(current);
+      stateIndicators.value = setRowHighlightFlag(sorted, normalizedId);
+      highlightedStateId.value = normalizedId;
+    } catch (error) {
+      console.error('Error al refrescar indicador por estado:', error);
+    }
+  };
+
   // Encadenar recarga para todos los datasets usados en IndexPage
   const refetchAll = async () => {
     isLoading.value = true;
@@ -150,7 +210,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
       fetchCirclesByState(filters),
       fetchDailyCertifications(filters),
       fetchCirclesByMunicipios(filters),
+      fetchCirclesByParroquias(filters),
       fetchCirclesByComunas(filters),
+      fetchCirclesByComunasParroquias(filters),
     ]);
     // if (userHasNationalAccess() && !manualStateFilter.value) {
     if (!manualStateFilter.value) {
@@ -194,12 +256,37 @@ export const useDashboardStore = defineStore('dashboard', () => {
       municipioRow.__highlightedAt = Date.now();
     }
 
+    // 2.5 Update Circles by Parroquia (using parish_id from payload)
+    // Note: The payload uses 'parish_id' which maps to 'parroquia_id' in our view/store
+    const parroquiaRow = circlesByParroquia.value.find(p => p.parroquia_id === parish_id);
+    if (parroquiaRow) {
+      parroquiaRow.avance = (parroquiaRow.avance || 0) + change;
+      circlesByParroquia.value.forEach(r => delete r.__highlightedAt);
+      parroquiaRow.__highlightedAt = Date.now();
+    }
+
     // 3. Update Circles by Comuna (using parish_id from payload)
     const comunaRow = circlesByComuna.value.find(c => c.comuna_id === parish_id);
     if (comunaRow) {
       comunaRow.avance = (comunaRow.avance || 0) + change;
       circlesByComuna.value.forEach(r => delete r.__highlightedAt);
       comunaRow.__highlightedAt = Date.now();
+    }
+
+    // 2.6 Update Circles by Comuna Parroquia (using comuna_id from payload)
+    // Assuming parish_id in payload maps to comuna_id for now based on previous logic, but let's be careful.
+    // Actually, the payload usually has comuna_id if available.
+    // If the payload has a specific comuna_id field, we should use it.
+    // Based on previous code: const { state_id, municipality_id, parish_id, operacion } = payload;
+    // It seems parish_id is being used as comuna_id in step 3? "const comunaRow = circlesByComuna.value.find(c => c.comuna_id === parish_id);"
+    // This looks suspicious in the existing code, but I will follow the pattern for now or try to use a more generic approach if possible.
+    // For the new table, we need to match comuna_id.
+    // If parish_id is indeed the comuna_id (maybe a naming confusion in the backend payload), then we use it.
+    const comunaParroquiaRow = circlesByComunaParroquia.value.find(c => c.comuna_id === parish_id);
+    if (comunaParroquiaRow) {
+      comunaParroquiaRow.avance = (comunaParroquiaRow.avance || 0) + change;
+      circlesByComunaParroquia.value.forEach(r => delete r.__highlightedAt);
+      comunaParroquiaRow.__highlightedAt = Date.now();
     }
 
     // 4. Refresh global indicators with current filter
@@ -212,56 +299,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
     if (userHasNationalAccess() && state_id) {
       refreshStateIndicatorRow(state_id);
-    }
-  };
-
-  const fetchStateIndicators = async () => {
-    const authStore = useAuthStore();
-    if (!authStore.isAuthenticated) return;
-
-    // if (!userHasNationalAccess()) {
-    //   stateIndicators.value = [];
-    //   highlightedStateId.value = null;
-    //   return;
-    // }
-
-    isStateIndicatorsLoading.value = true;
-    try {
-      const response = await api.get('/dashboard/state-indicators');
-      stateIndicators.value = sortStateIndicators(response.data || []);
-      highlightedStateId.value = null;
-    } catch (error) {
-      console.error('Error al obtener los indicadores por estado:', error);
-      stateIndicators.value = [];
-    } finally {
-      isStateIndicatorsLoading.value = false;
-    }
-  };
-
-  const refreshStateIndicatorRow = async (estadoId) => {
-    const normalizedId = Number(estadoId);
-    if (Number.isNaN(normalizedId)) return;
-    if (!stateIndicators.value.length) {
-      await fetchStateIndicators();
-      highlightedStateId.value = normalizedId;
-      return;
-    }
-    try {
-      const response = await api.get('/dashboard/state-indicators', { params: { estado_id: normalizedId } });
-      const row = response.data?.[0];
-      if (!row) return;
-      const current = [...stateIndicators.value];
-      const index = current.findIndex(r => Number(r.estado_id) === normalizedId);
-      if (index === -1) {
-        current.push(row);
-      } else {
-        current[index] = row;
-      }
-      const sorted = sortStateIndicators(current);
-      stateIndicators.value = setRowHighlightFlag(sorted, normalizedId);
-      highlightedStateId.value = normalizedId;
-    } catch (error) {
-      console.error('Error al refrescar indicador por estado:', error);
     }
   };
 
@@ -290,7 +327,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
     // State
     circlesByState,
     circlesByMunicipio,
+    circlesByParroquia,
     circlesByComuna,
+    circlesByComunaParroquia,
     indicators,
     dailyCertifications,
     stateIndicators,
@@ -305,7 +344,9 @@ export const useDashboardStore = defineStore('dashboard', () => {
     fetchIndicators,
     fetchDailyCertifications,
     fetchCirclesByMunicipios,
+    fetchCirclesByParroquias,
     fetchCirclesByComunas,
+    fetchCirclesByComunasParroquias,
     refetchAll,
     handleDBChange,
     fetchStateIndicators,

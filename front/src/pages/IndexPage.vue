@@ -79,8 +79,7 @@
             <q-inner-loading :showing="isStateIndicatorsLoading">
               <q-spinner-dots size="40px" color="primary" />
             </q-inner-loading>
-            <DataVisualizer
-v-show="!isStateIndicatorsLoading" title="Indicadores por Estado" type="table"
+            <DataVisualizer v-show="!isStateIndicatorsLoading" title="Indicadores por Estado" type="table"
               :data="filteredStateIndicators" row-key="estado_id" :column-map="stateIndicatorColumnMap"
               :height="stateIndicatorsHeight" class="state-indicators-table"
               @update:height="val => stateIndicatorsHeight = val" />
@@ -95,8 +94,7 @@ v-show="!isStateIndicatorsLoading" title="Indicadores por Estado" type="table"
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="CERTIFICACIONES DIARIAS"
+          <DataVisualizer v-show="!dashboardStore.isLoading" title="CERTIFICACIONES DIARIAS"
             :data="dashboardStore.dailyCertifications" type="line" row-key="fecha"
             :column-map="{ label: 'fecha', value: 'certificaciones' }" :height="dailyCertificationsHeight" />
         </q-card>
@@ -108,8 +106,7 @@ v-show="!dashboardStore.isLoading" title="CERTIFICACIONES DIARIAS"
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="Certificaciones Diarias"
+          <DataVisualizer v-show="!dashboardStore.isLoading" title="Certificaciones Diarias"
             :data="dashboardStore.dailyCertifications" type="table" row-key="fecha"
             :column-map="{ label: 'fecha', labelHeader: 'Fecha', value: 'certificaciones' }"
             :pagination="{ rowsPerPage: 13 }" />
@@ -123,8 +120,7 @@ v-show="!dashboardStore.isLoading" title="Certificaciones Diarias"
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="CÍRCULOS - Certificados vs Faltante" :data="[
+          <DataVisualizer v-show="!dashboardStore.isLoading" title="CÍRCULOS - Certificados vs Faltante" :data="[
             { label: 'Certificados', value: circlesDonutData[0] },
             { label: 'Faltante', value: circlesDonutData[1] }
           ]" type="donut" row-key="label" :column-map="{ label: 'label', value: 'value' }" />
@@ -138,8 +134,7 @@ v-show="!dashboardStore.isLoading" title="CÍRCULOS - Certificados vs Faltante" 
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
           <!-- v-show mantiene el componente en el DOM pero oculto -->
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="CÍRCULOS CUMPLIMIENTO vs META"
+          <DataVisualizer v-show="!dashboardStore.isLoading" title="CÍRCULOS CUMPLIMIENTO vs META"
             :data="dashboardStore.circlesByState" type="bar" row-key="estado" :column-map="{
               label: 'estado',
               value: [
@@ -158,8 +153,7 @@ v-show="!dashboardStore.isLoading" title="CÍRCULOS CUMPLIMIENTO vs META"
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="PARTICIPANTES - Certificados vs Faltante" :data="[
+          <DataVisualizer v-show="!dashboardStore.isLoading" title="PARTICIPANTES - Certificados vs Faltante" :data="[
             { label: 'Certificados', value: participantsDonutData[0] },
             { label: 'Faltante', value: participantsDonutData[1] }
           ]" type="donut" row-key="label" :column-map="{ label: 'label', value: 'value' }" />
@@ -172,8 +166,7 @@ v-show="!dashboardStore.isLoading" title="PARTICIPANTES - Certificados vs Faltan
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="PARTICIPANTES CUMPLIMIENTO vs META"
+          <DataVisualizer v-show="!dashboardStore.isLoading" title="PARTICIPANTES CUMPLIMIENTO vs META"
             :data="dashboardStore.circlesByState" type="bar" row-key="estado" :column-map="{
               label: 'estado',
               value: [
@@ -190,8 +183,7 @@ v-show="!dashboardStore.isLoading" title="PARTICIPANTES CUMPLIMIENTO vs META"
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="Participantes por Estado"
+          <DataVisualizer v-show="!dashboardStore.isLoading" title="Participantes por Estado"
             :data="dashboardStore.circlesByState" type="table" row-key="estado" :column-map="{
               label: 'estado',
               labelHeader: 'Estado',
@@ -213,8 +205,7 @@ v-show="!dashboardStore.isLoading" title="Participantes por Estado"
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="Círculos por Estado"
+          <DataVisualizer v-show="!dashboardStore.isLoading" title="Círculos por Estado"
             :data="dashboardStore.circlesByState" type="table" row-key="estado" :column-map="{
               label: 'estado',
               labelHeader: 'Estado',
@@ -237,8 +228,7 @@ v-show="!dashboardStore.isLoading" title="Círculos por Estado"
           <q-card-section class="row items-center q-col-gutter-md">
             <div class="col">
               <div class="text-h6">Dashboard MIANAAMP - Certificaciones</div>
-              <q-img
-src="/images/minaamp.png" alt="MinaAMP" class="full-width"
+              <q-img src="/images/minaamp.png" alt="MinaAMP" class="full-width"
                 style="width: 100%; max-height: 200px; margin-top: 8px;" />
               <div class="text-subtitle2">Fecha: {{ currentDate }}</div>
             </div>
@@ -246,8 +236,7 @@ src="/images/minaamp.png" alt="MinaAMP" class="full-width"
               <q-select v-model="estadoFilter" clearable outlined dense label="Estado" :options="estadoOptions" />
             </div>
             <div class="col-12 col-md-4">
-              <q-select
-v-model="municipioFilter" v-model:input-value="municipioInput" multiple clearable outlined dense
+              <q-select v-model="municipioFilter" v-model:input-value="municipioInput" multiple clearable outlined dense
                 use-input input-debounce="300" label="Municipio (autocompletar)" :options="municipioOptions"
                 :disable="!estadoFilter" map-options emit-value />
             </div>
@@ -280,16 +269,15 @@ v-model="municipioFilter" v-model:input-value="municipioInput" multiple clearabl
               <q-spinner-dots size="30px" color="primary" />
             </q-inner-loading>
 
-            <q-table
-v-model:pagination="municipioPagination" :rows="municipioTableRows"
+            <q-table v-model:pagination="municipioPagination" :rows="municipioTableRows"
               :columns="municipioTableColumns" :row-key="row => `${row.estado}__${row.municipio}`" flat dense />
           </q-card-section>
         </q-card>
       </div>
 
-      <!-- Tabla: Círculos por Estado / Municipio / Comuna -->
+      <!-- Tabla: Círculos por Estado / Municipio / Parroquia / Comuna -->
       <div class="col-12">
-        <ComunaDataVisualizer title="CÍRCULOS POR ESTADO, MUNICIPIO Y COMUNA" />
+        <ComunaParroquiaDataVisualizer title="CÍRCULOS POR ESTADO, MUNICIPIO, PARROQUIA Y COMUNA" />
       </div>
     </div>
   </q-page>
@@ -301,7 +289,7 @@ import { useDashboardStore } from 'stores/dashboard-store';
 import { useAuthStore } from 'stores/auth-store';
 import { storeToRefs } from 'pinia';
 import DataVisualizer from 'components/DataVisualizer.vue';
-import ComunaDataVisualizer from 'components/ComunaDataVisualizer.vue';
+import ComunaParroquiaDataVisualizer from 'components/ComunaParroquiaDataVisualizer.vue';
 import MapaVenezuela from 'components/MapaVenezuela.vue';
 import { utils, writeFile } from 'xlsx';
 import { exportFile, Notify } from 'quasar';

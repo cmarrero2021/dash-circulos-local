@@ -116,3 +116,70 @@ const ensureMunicipalityAccess = async (userId, municipalityId) => {
   const allowedStates = await getAllowedStatesForUser(userId);
   return allowedStates.includes(stateId);
 };
+
+// Helper para validar acceso por parroquia (derivado del municipio -> estado)
+const ensureParroquiaAccess = async (userId, parroquiaId) => {
+  const hasNationalAccess = await hasNationalDashboardAccess(userId);
+  if (hasNationalAccess) return true;
+
+  const lookupQuery = `SELECT municipio_id FROM rm_comunas WHERE parroquia_id = $1 LIMIT 1`;
+  const { rows } = await pool.query(lookupQuery, [parroquiaId]);
+  const municipioId = rows[0]?.municipio_id;
+  if (!municipioId) return false;
+
+  return ensureMunicipalityAccess(userId, municipioId);
+};
+
+// @desc    Obtener una lista única de parroquias para un municipio específico
+exports.getParroquiasByMunicipality = async (req, res) => {
+  const { municipalityId } = req.params;
+  try {
+    const parsedMunicipalityId = Number(municipalityId);
+    const userId = req.user.id;
+    const hasAccess = await ensureMunicipalityAccess(userId, parsedMunicipalityId);
+
+    if (!hasAccess) {
+      return res.status(403).json({ message: 'No tiene permisos para ver parroquias de este municipio.' });
+    }
+
+    const query = `
+      SELECT parroquia_id, parroquia
+      FROM rm_comunas
+      WHERE municipio_id = $1
+      GROUP BY parroquia_id, parroquia
+      ORDER BY parroquia;
+    `;
+    const result = await pool.query(query, [parsedMunicipalityId]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Error del servidor');
+  }
+};
+
+// @desc    Obtener una lista única de comunas para una parroquia específica
+exports.getComunasByParroquia = async (req, res) => {
+  const { parroquiaId } = req.params;
+  try {
+    const parsedParroquiaId = Number(parroquiaId);
+    const userId = req.user.id;
+    const hasAccess = await ensureParroquiaAccess(userId, parsedParroquiaId);
+
+    if (!hasAccess) {
+      return res.status(403).json({ message: 'No tiene permisos para ver comunas de esta parroquia.' });
+    }
+
+    const query = `
+      SELECT comuna_id, comuna
+      FROM rm_comunas
+      WHERE parroquia_id = $1
+      GROUP BY comuna_id, comuna
+      ORDER BY comuna;
+    `;
+    const result = await pool.query(query, [parsedParroquiaId]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error(error.message);
+    res.status(500).send('Error del servidor');
+  }
+};

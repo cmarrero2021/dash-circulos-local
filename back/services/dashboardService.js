@@ -202,11 +202,35 @@ exports.getCirclesByStateMunicipiosComunas = async (userId, filters = {}) => {
 exports.getCirclesByStateMunicipios = async (userId, filters = {}) => {
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
-        SELECT estado, municipio, COUNT(*) as avance
+        SELECT estado_id, estado, municipio_id, municipio, COUNT(*) as avance
         FROM rm_circulos_remoto
         ${whereClause}
-        GROUP BY estado, municipio
+        GROUP BY estado_id, estado, municipio_id, municipio
         ORDER BY estado, municipio;
+    `;
+    const result = await pool.query(query, params);
+    return result.rows;
+};
+
+exports.getCirclesByStateMunicipiosParroquias = async (userId, filters = {}) => {
+    const { whereClause, params } = await buildFilterClause(userId, filters);
+    const query = `
+        SELECT estado_id, estado, municipio_id, municipio, parroquia_id, parroquia, avance
+        FROM vcirculos_estados_municipios_parroquias
+        ${whereClause}
+        ORDER BY estado, municipio, parroquia;
+    `;
+    const result = await pool.query(query, params);
+    return result.rows;
+};
+
+exports.getCirclesByStateMunicipiosParroquiasComunas = async (userId, filters = {}) => {
+    const { whereClause, params } = await buildFilterClause(userId, filters);
+    const query = `
+        SELECT estado_id, estado, municipio_id, municipio, parroquia_id, parroquia, comuna_id, comuna, avance
+        FROM vcirculos_estados_municipios_parroquias_comunas
+        ${whereClause}
+        ORDER BY estado, municipio, parroquia, comuna;
     `;
     const result = await pool.query(query, params);
     return result.rows;
