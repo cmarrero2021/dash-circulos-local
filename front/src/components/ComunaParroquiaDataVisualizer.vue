@@ -5,28 +5,24 @@
                 <div class="col-auto text-h6">{{ title }}</div>
 
                 <div class="col">
-                    <q-select
-v-model="selectedEstado" :options="estadoOptions" label="Estado" multiple use-input
+                    <q-select v-model="selectedEstado" :options="estadoOptions" label="Estado" multiple use-input
                         emit-value map-options outlined clearable dense @filter="filterEstados"
                         @update:model-value="onEstadoChange" />
                 </div>
                 <div class="col">
-                    <q-select
-v-model="selectedMunicipio" :options="municipioOptions" label="Municipio" multiple
+                    <q-select v-model="selectedMunicipio" :options="municipioOptions" label="Municipio" multiple
                         use-input emit-value outlined map-options clearable dense
                         :disable="!selectedEstado || selectedEstado.length === 0" @filter="filterMunicipios"
                         @update:model-value="onMunicipioChange" />
                 </div>
                 <div class="col">
-                    <q-select
-v-model="selectedParroquia" :options="parroquiaOptions" label="Parroquia" multiple
+                    <q-select v-model="selectedParroquia" :options="parroquiaOptions" label="Parroquia" multiple
                         use-input emit-value outlined map-options clearable dense
                         :disable="!selectedMunicipio || selectedMunicipio.length === 0" @filter="filterParroquias"
                         @update:model-value="onParroquiaChange" />
                 </div>
                 <div class="col">
-                    <q-select
-v-model="selectedComuna" :options="comunaOptions" label="Comuna" multiple use-input
+                    <q-select v-model="selectedComuna" :options="comunaOptions" label="Comuna" multiple use-input
                         emit-value outlined map-options clearable dense
                         :disable="!selectedParroquia || selectedParroquia.length === 0" @filter="filterComunas" />
                 </div>
@@ -61,8 +57,7 @@ v-model="selectedComuna" :options="comunaOptions" label="Comuna" multiple use-in
         </q-card-section>
 
         <q-card-section>
-            <q-table
-v-model:pagination="pagination" :rows="filteredData" :columns="columns" row-key="comuna" flat
+            <q-table v-model:pagination="pagination" :rows="filteredData" :columns="columns" row-key="comuna" flat
                 dense />
         </q-card-section>
     </q-card>
@@ -127,23 +122,35 @@ const sanitizeEstadoSelection = (ids = []) => {
 
 const applyStateFilters = () => {
     const baseStates = rawEstados.value;
+    console.log('🔍 applyStateFilters - baseStates:', baseStates.length);
+    console.log('👤 isAdmin:', isAdmin.value);
+    console.log('🔐 allowedStateIds:', allowedStateIds.value);
+    console.log('🖐 manualStateFilter:', dashboardStore.manualStateFilter);
+
     let filteredStates;
 
     if (dashboardStore.manualStateFilter) {
-        filteredStates = baseStates.filter(state => state.value === dashboardStore.manualStateFilter);
+        console.log('🎯 Filtering by manualStateFilter');
+        filteredStates = baseStates.filter(state => Number(state.value) === Number(dashboardStore.manualStateFilter));
     } else if (isAdmin.value) {
+        console.log('👑 User is Admin, showing all states');
         filteredStates = baseStates;
     } else if (allowedStateIds.value.length === 0) {
+        console.warn('⚠️ Non-admin user with no allowed states');
         filteredStates = [];
     } else {
-        const allowedSet = new Set(allowedStateIds.value);
-        filteredStates = baseStates.filter(state => allowedSet.has(state.value));
+        console.log('🔒 Filtering by allowedStateIds');
+        const allowedSet = new Set(allowedStateIds.value.map(id => Number(id)));
+        filteredStates = baseStates.filter(state => allowedSet.has(Number(state.value)));
     }
 
+    console.log('✅ filteredStates result:', filteredStates.length);
     allEstados.value = filteredStates;
     estadoOptions.value = filteredStates;
+
     const sanitized = sanitizeEstadoSelection(selectedEstado.value);
     if (sanitized.length !== selectedEstado.value.length) {
+        console.log('🧹 Sanitizing selectedEstado');
         selectedEstado.value = sanitized;
     }
 };
@@ -203,19 +210,31 @@ const fetchParroquias = async (municipioIds) => {
 };
 
 const fetchComunas = async (parroquiaIds) => {
+    console.log('🔍 fetchComunas called with:', parroquiaIds);
     if (!parroquiaIds || parroquiaIds.length === 0) {
         allComunas.value = [];
         comunaOptions.value = [];
         return;
     }
     try {
-        const requests = parroquiaIds.map(id => api.get(`/locations/parroquias/${id}/comunas`));
+        const requests = parroquiaIds.map(id => {
+            const url = `/locations/parroquias/${id}/comunas`;
+            console.log('📡 Fetching comunas from:', url);
+            return api.get(url);
+        });
         const responses = await Promise.all(requests);
+        console.log('✅ Comuna responses received:', responses.length);
         const comunas = responses.flatMap(res => res.data);
-        allComunas.value = comunas.map(c => ({ label: c.comuna, value: c.comuna_id }));
+        console.log('📊 Total comunas fetched:', comunas.length, comunas);
+
+        // Remove duplicates based on comuna_id
+        const uniqueComunas = Array.from(new Map(comunas.map(c => [c.comuna_id, c])).values());
+        console.log('✨ Unique comunas:', uniqueComunas.length);
+
+        allComunas.value = uniqueComunas.map(c => ({ label: c.comuna, value: c.comuna_id }));
         comunaOptions.value = allComunas.value;
     } catch (error) {
-        console.error('Error fetching comunas:', error);
+        console.error('❌ Error fetching comunas:', error);
     }
 };
 
@@ -224,6 +243,8 @@ const onEstadoChange = (estadoIds) => {
     if (validStateIds.length !== (estadoIds || []).length) {
         selectedEstado.value = validStateIds;
     }
+
+    // Clear downstream selections and options
     selectedMunicipio.value = [];
     selectedParroquia.value = [];
     selectedComuna.value = [];
@@ -233,15 +254,21 @@ const onEstadoChange = (estadoIds) => {
     parroquiaOptions.value = [];
     allComunas.value = [];
     comunaOptions.value = [];
+
     if (validStateIds.length > 0) {
+        console.log('🔄 State changed, fetching municipios for:', validStateIds);
         fetchMunicipios(validStateIds);
     }
 };
 
 const onMunicipioChange = (municipioIds) => {
     console.log('🎯 onMunicipioChange called with:', municipioIds);
-    console.log('Type:', typeof municipioIds, 'Is Array:', Array.isArray(municipioIds));
 
+    // Ensure we have an array of numbers
+    const validIds = (municipioIds || []).map(id => Number(id)).filter(id => !isNaN(id));
+    console.log('🔢 Validated IDs:', validIds);
+
+    // Clear downstream selections and options
     selectedParroquia.value = [];
     selectedComuna.value = [];
     allParroquias.value = [];
@@ -249,20 +276,31 @@ const onMunicipioChange = (municipioIds) => {
     allComunas.value = [];
     comunaOptions.value = [];
 
-    if (municipioIds && municipioIds.length > 0) {
-        console.log('✅ Calling fetchParroquias with:', municipioIds);
-        fetchParroquias(municipioIds);
+    if (validIds.length > 0) {
+        console.log('✅ Calling fetchParroquias with:', validIds);
+        fetchParroquias(validIds);
     } else {
-        console.log('⚠️ No municipio IDs to fetch');
+        console.log('⚠️ No valid municipio IDs to fetch');
     }
 };
 
 const onParroquiaChange = (parroquiaIds) => {
+    console.log('🎯 onParroquiaChange called with:', parroquiaIds);
+
+    // Ensure we have an array of numbers
+    const validIds = (parroquiaIds || []).map(id => Number(id)).filter(id => !isNaN(id));
+    console.log('🔢 Validated Parroquia IDs:', validIds);
+
+    // Clear downstream selections and options
     selectedComuna.value = [];
     allComunas.value = [];
     comunaOptions.value = [];
-    if (parroquiaIds && parroquiaIds.length > 0) {
-        fetchComunas(parroquiaIds);
+
+    if (validIds.length > 0) {
+        console.log('✅ Calling fetchComunas with:', validIds);
+        fetchComunas(validIds);
+    } else {
+        console.log('⚠️ No valid parroquia IDs to fetch comunas');
     }
 };
 
@@ -322,31 +360,19 @@ const filteredData = computed(() => {
     let data = dashboardStore.circlesByComunaParroquia;
 
     if (selectedEstado.value?.length > 0) {
-        const estadoNames = allEstados.value
-            .filter(e => selectedEstado.value.includes(e.value))
-            .map(e => e.label);
-        data = data.filter(row => estadoNames.includes(row.estado));
+        data = data.filter(row => selectedEstado.value.includes(row.estado_id));
     }
 
     if (selectedMunicipio.value?.length > 0) {
-        const municipioNames = allMunicipios.value
-            .filter(m => selectedMunicipio.value.includes(m.value))
-            .map(m => m.label);
-        data = data.filter(row => municipioNames.includes(row.municipio));
+        data = data.filter(row => selectedMunicipio.value.includes(row.municipio_id));
     }
 
     if (selectedParroquia.value?.length > 0) {
-        const parroquiaNames = allParroquias.value
-            .filter(p => selectedParroquia.value.includes(p.value))
-            .map(p => p.label);
-        data = data.filter(row => parroquiaNames.includes(row.parroquia));
+        data = data.filter(row => selectedParroquia.value.includes(row.parroquia_id));
     }
 
     if (selectedComuna.value?.length > 0) {
-        const comunaNames = allComunas.value
-            .filter(c => selectedComuna.value.includes(c.value))
-            .map(c => c.label);
-        data = data.filter(row => comunaNames.includes(row.comuna));
+        data = data.filter(row => selectedComuna.value.includes(row.comuna_id));
     }
 
     return data;

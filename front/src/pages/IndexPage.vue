@@ -227,9 +227,7 @@
         <q-card flat bordered style="min-height: 250px;">
           <q-card-section class="row items-center q-col-gutter-md">
             <div class="col">
-              <div class="text-h6">Dashboard MIANAAMP - Certificaciones</div>
-              <q-img src="/images/minaamp.png" alt="MinaAMP" class="full-width"
-                style="width: 100%; max-height: 200px; margin-top: 8px;" />
+              <div class="text-h6">CÍRCULOS POR ESTADO Y MUNICIPIO</div>
               <div class="text-subtitle2">Fecha: {{ currentDate }}</div>
             </div>
             <div class="col-12 col-md-3">
