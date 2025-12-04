@@ -313,7 +313,7 @@ const municipioFilter = ref([]); // selected municipio(s)
 
 const allowedStateIds = computed(() => authStore.allowedStates);
 const isAdmin = computed(() => authStore.user?.role === 'Administrador');
-const showStateIndicators = computed(() => isAdmin.value || (Array.isArray(allowedStateIds.value) && allowedStateIds.value.length === 0));
+const showStateIndicators = computed(() => true); // Always show - backend filters by user permissions
 
 // Determine whether to show donut charts or stacked bar charts
 const showDonutCharts = computed(() => {
