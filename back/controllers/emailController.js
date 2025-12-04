@@ -14,7 +14,7 @@ const getEmailByVat = async (req, res) => {
         const { vat, nationality } = req.params;
         const userId = req.user.id;
 
-        console.log('[emailController] Buscando registro:', { vat, nationality, userId });
+
 
         // Validar VAT (solo números)
         if (!vat || !/^\d+$/.test(vat)) {
@@ -28,14 +28,14 @@ const getEmailByVat = async (req, res) => {
 
         // Buscar registro con VAT + nacionalidad
         const query = 'SELECT vat, email, state_id, user_nationality FROM rm_registros WHERE vat = $1 AND user_nationality = $2';
-        console.log('[emailController] Ejecutando query:', query, 'con params:', [vat, nationality]);
+
 
         const result = await pool.query(query, [vat, nationality]);
 
-        console.log('[emailController] Resultados encontrados:', result.rows.length);
+
 
         if (result.rows.length === 0) {
-            console.log('[emailController] No se encontró registro');
+
             return res.status(404).json({ error: 'Registro no encontrado con la cédula y nacionalidad proporcionadas.' });
         }
 
@@ -80,7 +80,7 @@ const updateEmailByVat = async (req, res) => {
         const { newEmail } = req.body;
         const userId = req.user.id;
 
-        console.log('[emailController] Iniciando actualización de email:', { vat, nationality, newEmail });
+
 
         // Validar VAT
         if (!vat || !/^\d+$/.test(vat)) {
@@ -124,7 +124,7 @@ const updateEmailByVat = async (req, res) => {
         // Iniciar transacción
         await client.query('BEGIN');
 
-        console.log('[emailController] Transacción iniciada');
+
 
         // Actualizar email en rm_registros
         const updateRegistros = await client.query(
@@ -132,7 +132,7 @@ const updateEmailByVat = async (req, res) => {
             [newEmail, vat, nationality]
         );
 
-        console.log('[emailController] rm_registros actualizado. Filas afectadas:', updateRegistros.rowCount);
+
 
         // Actualizar email en rm_credenciales
         const updateCredenciales = await client.query(
@@ -140,12 +140,12 @@ const updateEmailByVat = async (req, res) => {
             [newEmail, vat]
         );
 
-        console.log('[emailController] rm_credenciales actualizado. Filas afectadas:', updateCredenciales.rowCount);
+
 
         // Confirmar transacción
         await client.query('COMMIT');
 
-        console.log('[emailController] Transacción completada exitosamente');
+
 
         res.json({
             success: true,

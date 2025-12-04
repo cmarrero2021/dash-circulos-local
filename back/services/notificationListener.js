@@ -34,14 +34,14 @@ const startListening = () => {
   client.on('notification', (msg) => {
     try {
       const payload = JSON.parse(msg.payload);
-      console.log('Payload recibido de la BD:', payload);
-      
+
+
       // Envolvemos el payload en el formato que el frontend espera
       const message = {
         event: 'db_change',
         payload: payload
       };
-      
+
       // Enviamos el objeto estructurado a todos los clientes
       websocketService.broadcast(message);
 
@@ -49,9 +49,9 @@ const startListening = () => {
       console.error('Error al parsear el payload de la notificación:', error);
     }
   });
-  
+
   client.on('end', () => {
-  console.warn('🔚 Conexión del listener de la BD finalizada. Reintentando conexión...');
+    console.warn('🔚 Conexión del listener de la BD finalizada. Reintentando conexión...');
     setTimeout(startListening, 5000); // Intenta reconectar si la conexión se pierde
   });
 

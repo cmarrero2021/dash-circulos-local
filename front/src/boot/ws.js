@@ -32,13 +32,11 @@ export default boot(() => {
   };
 
   const WS_URL = getWebSocketUrl();
-  console.log('[WS] Connecting to:', WS_URL);
 
   const connect = () => {
     socket = new WebSocket(WS_URL);
 
     socket.onopen = () => {
-      console.log('[WS] Conectado.');
     };
 
     socket.onmessage = async (event) => {

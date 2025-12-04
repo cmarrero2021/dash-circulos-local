@@ -17,15 +17,6 @@ export default boot(({ app }) => {
   const authStore = useAuthStore(storeInstance);
 
   api.interceptors.request.use((config) => {
-    console.log('🔍 Debug - Request config:', {
-      method: config.method,
-      url: config.url,
-      baseURL: config.baseURL,
-      fullURL: `${config.baseURL}${config.url}`,
-      headers: config.headers,
-      data: config.data
-    });
-
     if (authStore.token) {
       config.headers.Authorization = `Bearer ${authStore.token}`;
     }

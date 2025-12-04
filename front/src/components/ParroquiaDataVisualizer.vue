@@ -109,35 +109,25 @@ const sanitizeEstadoSelection = (ids = []) => {
 
 const applyStateFilters = () => {
     const baseStates = rawEstados.value;
-    console.log('🔍 applyStateFilters - baseStates:', baseStates.length);
-    console.log('👤 isAdmin:', isAdmin.value);
-    console.log('🔐 allowedStateIds:', allowedStateIds.value);
-    console.log('🖐 manualStateFilter:', dashboardStore.manualStateFilter);
 
     let filteredStates;
 
     if (dashboardStore.manualStateFilter) {
-        console.log('🎯 Filtering by manualStateFilter');
         filteredStates = baseStates.filter(state => Number(state.value) === Number(dashboardStore.manualStateFilter));
     } else if (isAdmin.value) {
-        console.log('👑 User is Admin, showing all states');
         filteredStates = baseStates;
     } else if (allowedStateIds.value.length === 0) {
-        console.warn('⚠️ Non-admin user with no allowed states');
         filteredStates = [];
     } else {
-        console.log('🔒 Filtering by allowedStateIds');
         const allowedSet = new Set(allowedStateIds.value.map(id => Number(id)));
         filteredStates = baseStates.filter(state => allowedSet.has(Number(state.value)));
     }
 
-    console.log('✅ filteredStates result:', filteredStates.length);
     allEstados.value = filteredStates;
     estadoOptions.value = filteredStates;
 
     const sanitized = sanitizeEstadoSelection(selectedEstado.value);
     if (sanitized.length !== selectedEstado.value.length) {
-        console.log('🧹 Sanitizing selectedEstado');
         selectedEstado.value = sanitized;
     }
 };
@@ -170,29 +160,19 @@ const fetchMunicipios = async (estadoIds) => {
 };
 
 const fetchParroquias = async (municipioIds) => {
-    console.log('🔍 fetchParroquias called with:', municipioIds);
     if (!municipioIds || municipioIds.length === 0) {
-        console.log('⚠️ No municipio IDs provided');
         allParroquias.value = [];
         parroquiaOptions.value = [];
         return;
     }
     try {
-        const requests = municipioIds.map(id => {
-            const url = `/locations/municipalities/${id}/parroquias`;
-            console.log('📡 Fetching from:', url);
-            return api.get(url);
-        });
+        const requests = municipioIds.map(id => api.get(`/locations/municipalities/${id}/parroquias`));
         const responses = await Promise.all(requests);
-        console.log('✅ Responses received:', responses.length);
         const parroquias = responses.flatMap(res => res.data);
-        console.log('📊 Total parroquias:', parroquias.length, parroquias);
         allParroquias.value = parroquias.map(p => ({ label: p.parroquia, value: p.parroquia_id }));
         parroquiaOptions.value = allParroquias.value;
-        console.log('✨ Parroquia options set:', parroquiaOptions.value.length);
     } catch (error) {
-        console.error('❌ Error fetching parroquias:', error);
-        console.error('Error response:', error.response?.data);
+        console.error('Error fetching parroquias:', error);
     }
 };
 
@@ -202,7 +182,6 @@ const onEstadoChange = (estadoIds) => {
         selectedEstado.value = validStateIds;
     }
 
-    // Clear downstream selections and options
     selectedMunicipio.value = [];
     selectedParroquia.value = [];
     allMunicipios.value = [];
@@ -211,28 +190,19 @@ const onEstadoChange = (estadoIds) => {
     parroquiaOptions.value = [];
 
     if (validStateIds.length > 0) {
-        console.log('🔄 State changed, fetching municipios for:', validStateIds);
         fetchMunicipios(validStateIds);
     }
 };
 
 const onMunicipioChange = (municipioIds) => {
-    console.log('🎯 onMunicipioChange called with:', municipioIds);
-
-    // Ensure we have an array of numbers
     const validIds = (municipioIds || []).map(id => Number(id)).filter(id => !isNaN(id));
-    console.log('🔢 Validated IDs:', validIds);
 
-    // Clear downstream selections and options
     selectedParroquia.value = [];
     allParroquias.value = [];
     parroquiaOptions.value = [];
 
     if (validIds.length > 0) {
-        console.log('✅ Calling fetchParroquias with:', validIds);
         fetchParroquias(validIds);
-    } else {
-        console.log('⚠️ No valid municipio IDs to fetch');
     }
 };
 

@@ -43,13 +43,7 @@ export const useAuthStore = defineStore('auth', () => {
   };
   const login = async (email, password) => {
     try {
-      console.log('🔍 Debug - Login attempt:', { email, password: '***' });
-      console.log('🔍 Debug - API URL:', import.meta.env.VITE_API_URL);
-      console.log('🔍 Debug - Full URL:', `${import.meta.env.VITE_API_URL}/auth/login`);
-
       const response = await api.post('/auth/login', { email, password });
-
-      console.log('🔍 Debug - Response:', response);
       const { token: newToken, user: newUser } = response.data;
 
       // Guardar en el estado de Pinia
@@ -65,10 +59,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       return true;
     } catch (error) {
-      console.error('🔍 Debug - Login error:', error);
-      console.error('🔍 Debug - Error response:', error.response);
-      console.error('🔍 Debug - Error status:', error.response?.status);
-      console.error('🔍 Debug - Error data:', error.response?.data);
+      console.error('Error en login:', error.response?.data || error.message);
       throw error;
     }
   };

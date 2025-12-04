@@ -204,7 +204,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const refetchAll = async () => {
     isLoading.value = true;
     const filters = manualStateFilter.value ? { estado_id: manualStateFilter.value } : {};
-    console.log('[Dashboard Store] refetchAll con filtros:', filters);
+
     await Promise.allSettled([
       fetchIndicators(filters),
       fetchCirclesByState(filters),
@@ -236,7 +236,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
     // Si hay un filtro manual activo, solo procesar si el estado coincide
     if (manualStateFilter.value && Number(state_id) !== Number(manualStateFilter.value)) {
-      console.log('[WebSocket] Ignorando cambio: estado del payload no coincide con filtro activo');
+
       return;
     }
 
@@ -308,7 +308,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
    */
   const setManualStateFilter = async (estadoId) => {
     manualStateFilter.value = estadoId;
-    console.log('[Dashboard Store] Filtro manual establecido:', estadoId);
+
     // Recargar todos los datos con el filtro aplicado
     await refetchAll();
   };
@@ -318,7 +318,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
    */
   const clearManualStateFilter = async () => {
     manualStateFilter.value = null;
-    console.log('[Dashboard Store] Filtro manual limpiado');
+
     // Recargar todos los datos sin filtro
     await refetchAll();
   };

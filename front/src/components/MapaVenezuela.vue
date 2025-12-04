@@ -1,8 +1,7 @@
 <template>
     <div class="mapa-venezuela-container">
         <div ref="mapContainer" class="map-container"></div>
-        <q-btn
-v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close" size="md"
+        <q-btn v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close" size="md"
             @click="clearStateFilter">
             <q-tooltip>Limpiar filtro y ver vista nacional</q-tooltip>
         </q-btn>
@@ -89,10 +88,8 @@ export default defineComponent({
             try {
                 const response = await api.get('/dashboard/mapa-estados');
                 estadosData.value = response.data;
-                console.log('[Mapa] Datos cargados:', estadosData.value.length, 'estados');
-                if (estadosData.value.length > 0) {
-                    console.log('[Mapa] Ejemplo:', estadosData.value[0]);
-                }
+
+
                 return true;
             } catch (error) {
                 console.error('[Mapa] Error:', error.message);

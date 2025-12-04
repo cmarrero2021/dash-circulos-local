@@ -348,8 +348,6 @@ exports.getStateIndicatorsView = async (userId, filters = {}) => {
         ${whereClause}
         ORDER BY estado_nombre;
     `;
-    console.log('Query:', query);
-    console.log('Params:', params);
     const { rows } = await pool.query(query, params);
     return rows;
 };
