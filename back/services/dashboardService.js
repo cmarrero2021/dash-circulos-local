@@ -127,7 +127,8 @@ exports.getIndicators = async (userId) => {
         return buildEmptyIndicators(diasFaltantes);
     }
 
-    const [metaResult, totalsResult, participantesResult] = await Promise.all([
+    // Fetch dias_faltantes from the view for state-level users
+    const [metaResult, totalsResult, participantesResult, diasResult] = await Promise.all([
         pool.query(
             'SELECT COALESCE(SUM(circulos), 0) AS meta FROM metas_estado WHERE estado_id = ANY($1)',
             [allowedStates]
@@ -148,6 +149,10 @@ exports.getIndicators = async (userId) => {
             WHERE estado_id = ANY($1);`,
             [allowedStates]
         ),
+        pool.query(
+            `SELECT dias_faltantes FROM vindicadores_estados WHERE estado_id = ANY($1) LIMIT 1;`,
+            [allowedStates]
+        ),
     ]);
 
     const meta = Number(metaResult.rows[0]?.meta || 0);
@@ -155,10 +160,11 @@ exports.getIndicators = async (userId) => {
     const diasConRegistro = Number(totalsResult.rows[0]?.dias_con_registro || 0);
     const participantes = Number(participantesResult.rows[0]?.total_participantes || 0);
     const promedio = Number(participantesResult.rows[0]?.promedio_participantes || 0);
+    const diasFaltantesFromView = Number(diasResult.rows[0]?.dias_faltantes ?? diasFaltantes);
 
     const diferencia = meta - acumulado;
     const restante = Math.max(diferencia, 0);
-    const diasReferencia = diasFaltantes > 0 ? diasFaltantes : 0;
+    const diasReferencia = diasFaltantesFromView > 0 ? diasFaltantesFromView : 0;
     const promedio_necesario = diasReferencia > 0 ? Math.trunc(restante / diasReferencia) : restante;
     const promedio_diario = diasConRegistro > 0 ? Math.trunc(acumulado / diasConRegistro) : 0;
 
@@ -166,7 +172,7 @@ exports.getIndicators = async (userId) => {
         meta,
         acumulado,
         diferencia,
-        dias_faltantes: diasFaltantes,
+        dias_faltantes: diasFaltantesFromView,
         promedio_necesario,
         promedio_diario,
         participantes,
