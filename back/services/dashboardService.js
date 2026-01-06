@@ -368,3 +368,17 @@ exports.getMapaEstados = async () => {
     return rows;
 };
 
+// --- Función para obtener participantes por estado (capa de dispersión) ---
+exports.getParticipantesPorEstado = async () => {
+    const query = `
+        SELECT 
+            state_id, 
+            estado, 
+            registros AS participantes
+        FROM vregistros_estados
+        ORDER BY state_id;
+    `;
+    const { rows } = await pool.query(query);
+    return rows;
+};
+

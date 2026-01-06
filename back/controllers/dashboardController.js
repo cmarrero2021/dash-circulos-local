@@ -61,3 +61,14 @@ exports.getMapaEstados = async (req, res) => {
         res.status(500).send('Error del servidor');
     }
 };
+
+// Endpoint para obtener participantes por estado (capa de dispersión)
+exports.getParticipantesPorEstado = async (req, res) => {
+    try {
+        const data = await dashboardService.getParticipantesPorEstado();
+        res.json(data);
+    } catch (error) {
+        console.error('Error al obtener participantes por estado:', error.message);
+        res.status(500).send('Error del servidor');
+    }
+};

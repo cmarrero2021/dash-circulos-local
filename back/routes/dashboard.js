@@ -28,5 +28,6 @@ router.get('/raw-data', dashboardController.getRawData);
 
 // --- Endpoint de Mapa de Venezuela ---
 router.get('/mapa-estados', dashboardController.getMapaEstados);
+router.get('/mapa-participantes', dashboardController.getParticipantesPorEstado);
 
 module.exports = router;

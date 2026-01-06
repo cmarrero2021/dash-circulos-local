@@ -1,6 +1,6 @@
 // services/notificationListener.js
 
-require('dotenv').config();
+require('dotenv').config({ path: `.env.${process.env.NODE_ENV || 'development'}` });
 const { Client } = require('pg');
 const cache = require('./cacheService');
 const { refreshDashboardCache } = require('./dashboardWorker');
