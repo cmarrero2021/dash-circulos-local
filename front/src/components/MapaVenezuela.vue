@@ -2,14 +2,8 @@
     <div class="mapa-venezuela-container">
         <div ref="mapContainer" class="map-container"></div>
         <q-btn
-            v-if="selectedState"
-            round
-            class="clear-filter-btn"
-            color="primary"
-            icon="close"
-            size="md"
-            @click="clearStateFilter"
-        >
+v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close" size="md"
+            @click="clearStateFilter">
             <q-tooltip>Limpiar filtro y ver vista nacional</q-tooltip>
         </q-btn>
         <div v-if="selectedState" class="selected-state-badge">
@@ -193,45 +187,42 @@ export default defineComponent({
             return points;
         };
 
-        // Crea la capa de registros como dot-density con contornos
+        // Crea la capa de registros como dot-density (solo puntos)
         const createRegistrosLayer = (geojsonData) => {
-            const layers = [];
+            const markers = [];
 
+            // Crear contorno de estados (una sola capa GeoJSON para todos)
+            const outlineLayer = L.geoJSON(geojsonData, {
+                style: {
+                    fill: false, // Sin relleno
+                    color: '#333333',
+                    weight: 1.5,
+                    opacity: 0.6
+                },
+                onEachFeature: (feature, layer) => {
+                    const sid = feature.properties.state_id;
+                    const partData = findParticipantesByStateId(sid);
+                    const registros = partData ? partData.participantes : 0;
+                    const estadoNombre = partData ? partData.estado : (feature.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
+
+                    const popupContent = `
+                        <div style="text-align:center; padding: 5px;">
+                            <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #9c27b0;">REGISTROS</div>
+                            <div style="margin: 3px 0;"><strong>ESTADO:</strong> ${estadoNombre}</div>
+                            <div style="margin: 3px 0;"><strong>REGISTROS:</strong> ${registros.toLocaleString('de-DE')}</div>
+                        </div>
+                    `;
+                    layer.bindPopup(popupContent);
+                }
+            });
+            markers.push(outlineLayer);
+
+            // Generar puntos aleatorios dentro de cada estado
             geojsonData.features.forEach(feature => {
                 const sid = feature.properties.state_id;
                 const partData = findParticipantesByStateId(sid);
                 const registros = partData ? partData.participantes : 0;
-                const estadoNombre = partData ? partData.estado : (feature.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
 
-                // Crear contorno del estado (transparente con borde negro)
-                const outlineLayer = L.geoJSON(feature, {
-                    style: {
-                        fillColor: 'transparent',
-                        fillOpacity: 0,
-                        color: '#333333',
-                        weight: 1.5,
-                        opacity: 0.8
-                    }
-                });
-
-                // Popup para el contorno
-                const popupContent = `
-                    <div style="text-align:center; padding: 5px;">
-                        <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #9c27b0;">REGISTROS</div>
-                        <div style="margin: 3px 0;"><strong>ESTADO:</strong> ${estadoNombre}</div>
-                        <div style="margin: 3px 0;"><strong>REGISTROS:</strong> ${registros.toLocaleString('de-DE')}</div>
-                    </div>
-                `;
-                outlineLayer.bindPopup(popupContent);
-                outlineLayer.bindTooltip(`${estadoNombre}: ${registros.toLocaleString('de-DE')} registros`, {
-                    permanent: false,
-                    direction: 'center',
-                    className: 'registros-tooltip'
-                });
-
-                layers.push(outlineLayer);
-
-                // Generar puntos aleatorios dentro del estado
                 if (registros > 0) {
                     const pointCount = getPointCount(registros);
                     const randomPoints = generateRandomPointsInFeature(feature, pointCount);
@@ -245,12 +236,12 @@ export default defineComponent({
                             opacity: 0.8,
                             fillOpacity: 0.6
                         });
-                        layers.push(dotMarker);
+                        markers.push(dotMarker);
                     });
                 }
             });
 
-            return L.layerGroup(layers);
+            return L.layerGroup(markers);
         };
 
         const addLegend = () => {
