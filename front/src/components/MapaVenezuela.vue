@@ -125,62 +125,132 @@ export default defineComponent({
             }
         };
 
-        // Calcula el radio del círculo proporcional basado en participantes
-        const getParticipantesRadius = (participantes) => {
-            if (!participantes || participantes <= 0) return 5;
-            // Escala logarítmica para mejor visualización
-            const baseRadius = 8;
-            const scaleFactor = 3;
-            return baseRadius + Math.log10(participantes + 1) * scaleFactor;
+        // Calcula la cantidad de puntos a generar basado en registros
+        const getPointCount = (registros) => {
+            if (!registros || registros <= 0) return 0;
+            // Escalar: 1 punto por cada 50 registros, mínimo 5, máximo 200
+            const points = Math.floor(registros / 50);
+            return Math.max(5, Math.min(points, 200));
         };
 
-        // Obtiene el centroide de un feature GeoJSON
-        const getFeatureCentroid = (feature) => {
+        // Verifica si un punto está dentro de un polígono usando ray-casting
+        const isPointInPolygon = (point, polygon) => {
+            const [x, y] = point;
+            let inside = false;
+            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                const [xi, yi] = polygon[i];
+                const [xj, yj] = polygon[j];
+                if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) {
+                    inside = !inside;
+                }
+            }
+            return inside;
+        };
+
+        // Genera puntos aleatorios dentro de un feature GeoJSON
+        const generateRandomPointsInFeature = (feature, count) => {
+            const points = [];
+            if (count <= 0) return points;
+
+            // Obtener el bounding box del feature
             const bounds = L.geoJSON(feature).getBounds();
-            return bounds.getCenter();
+            const minLat = bounds.getSouth();
+            const maxLat = bounds.getNorth();
+            const minLng = bounds.getWest();
+            const maxLng = bounds.getEast();
+
+            // Obtener los anillos del polígono
+            const geometry = feature.geometry;
+            let rings = [];
+
+            if (geometry.type === 'Polygon') {
+                rings = [geometry.coordinates[0]]; // Solo el anillo exterior
+            } else if (geometry.type === 'MultiPolygon') {
+                // Para MultiPolygon, usar todos los anillos exteriores
+                rings = geometry.coordinates.map(poly => poly[0]);
+            }
+
+            // Generar puntos aleatorios dentro del polígono
+            let attempts = 0;
+            const maxAttempts = count * 20; // Evitar bucle infinito
+
+            while (points.length < count && attempts < maxAttempts) {
+                attempts++;
+                const lat = minLat + Math.random() * (maxLat - minLat);
+                const lng = minLng + Math.random() * (maxLng - minLng);
+
+                // Verificar si el punto está dentro de alguno de los polígonos
+                for (const ring of rings) {
+                    // GeoJSON usa [lng, lat], convertir para la comprobación
+                    const polygonCoords = ring.map(coord => [coord[0], coord[1]]);
+                    if (isPointInPolygon([lng, lat], polygonCoords)) {
+                        points.push([lat, lng]);
+                        break;
+                    }
+                }
+            }
+
+            return points;
         };
 
-        // Crea la capa de participantes como círculos proporcionales
-        const createParticipantesLayer = (geojsonData) => {
-            const markers = [];
+        // Crea la capa de registros como dot-density con contornos
+        const createRegistrosLayer = (geojsonData) => {
+            const layers = [];
 
             geojsonData.features.forEach(feature => {
                 const sid = feature.properties.state_id;
                 const partData = findParticipantesByStateId(sid);
+                const registros = partData ? partData.participantes : 0;
+                const estadoNombre = partData ? partData.estado : (feature.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
 
-                if (partData && partData.participantes > 0) {
-                    const centroid = getFeatureCentroid(feature);
-                    const radius = getParticipantesRadius(partData.participantes);
+                // Crear contorno del estado (transparente con borde negro)
+                const outlineLayer = L.geoJSON(feature, {
+                    style: {
+                        fillColor: 'transparent',
+                        fillOpacity: 0,
+                        color: '#333333',
+                        weight: 1.5,
+                        opacity: 0.8
+                    }
+                });
 
-                    const circleMarker = L.circleMarker(centroid, {
-                        radius: radius,
-                        fillColor: '#9c27b0',
-                        color: '#7b1fa2',
-                        weight: 2,
-                        opacity: 1,
-                        fillOpacity: 0.7
+                // Popup para el contorno
+                const popupContent = `
+                    <div style="text-align:center; padding: 5px;">
+                        <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #9c27b0;">REGISTROS</div>
+                        <div style="margin: 3px 0;"><strong>ESTADO:</strong> ${estadoNombre}</div>
+                        <div style="margin: 3px 0;"><strong>REGISTROS:</strong> ${registros.toLocaleString('de-DE')}</div>
+                    </div>
+                `;
+                outlineLayer.bindPopup(popupContent);
+                outlineLayer.bindTooltip(`${estadoNombre}: ${registros.toLocaleString('de-DE')} registros`, {
+                    permanent: false,
+                    direction: 'center',
+                    className: 'registros-tooltip'
+                });
+
+                layers.push(outlineLayer);
+
+                // Generar puntos aleatorios dentro del estado
+                if (registros > 0) {
+                    const pointCount = getPointCount(registros);
+                    const randomPoints = generateRandomPointsInFeature(feature, pointCount);
+
+                    randomPoints.forEach(([lat, lng]) => {
+                        const dotMarker = L.circleMarker([lat, lng], {
+                            radius: 3,
+                            fillColor: '#9c27b0',
+                            color: '#7b1fa2',
+                            weight: 1,
+                            opacity: 0.8,
+                            fillOpacity: 0.6
+                        });
+                        layers.push(dotMarker);
                     });
-
-                    const popupContent = `
-                        <div style="text-align:center; padding: 5px;">
-                            <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #9c27b0;">REGISTROS</div>
-                            <div style="margin: 3px 0;"><strong>ESTADO:</strong> ${partData.estado}</div>
-                            <div style="margin: 3px 0;"><strong>PARTICIPANTES:</strong> ${partData.participantes.toLocaleString('de-DE')}</div>
-                        </div>
-                    `;
-
-                    circleMarker.bindPopup(popupContent);
-                    circleMarker.bindTooltip(`${partData.estado}: ${partData.participantes.toLocaleString('de-DE')} participantes`, {
-                        permanent: false,
-                        direction: 'top',
-                        className: 'participantes-tooltip'
-                    });
-
-                    markers.push(circleMarker);
                 }
             });
 
-            return L.layerGroup(markers);
+            return L.layerGroup(layers);
         };
 
         const addLegend = () => {
@@ -192,9 +262,9 @@ export default defineComponent({
                 for (let i = 0; i < g.length; i++) {
                     d.innerHTML += '<i style="background:' + getColor(g[i] + 1) + '; width:18px;height:18px;float:left;margin-right:8px;opacity:0.7;"></i> ' + g[i] + (g[i + 1] ? '&ndash;' + g[i + 1] + '<br>' : '+');
                 }
-                // Agregar leyenda de participantes
-                d.innerHTML += '<br><strong>Participantes</strong><br>';
-                d.innerHTML += '<i style="background:#9c27b0; width:18px;height:18px;float:left;margin-right:8px;opacity:0.7;border-radius:50%;"></i> Tamaño proporcional';
+                // Agregar leyenda de registros
+                d.innerHTML += '<br><strong>Registros</strong><br>';
+                d.innerHTML += '<i style="background:#9c27b0; width:6px;height:6px;float:left;margin-right:8px;margin-top:6px;opacity:0.7;border-radius:50%;"></i> Densidad de puntos';
                 return d;
             };
             legend.addTo(map);
@@ -225,9 +295,9 @@ export default defineComponent({
                 estadosLayer = L.geoJSON(geojsonData, { style: stateStyle, onEachFeature });
                 estadosLayer.addTo(map);
 
-                // Crear capa de participantes (círculos proporcionales)
+                // Crear capa de registros (dot-density)
                 if (participantesLoaded && participantesData.value.length > 0) {
-                    participantesLayer = createParticipantesLayer(geojsonData);
+                    participantesLayer = createRegistrosLayer(geojsonData);
                     participantesLayer.addTo(map);
                 }
 
@@ -317,8 +387,8 @@ export default defineComponent({
     border-top-color: rgba(0, 0, 0, 0.8);
 }
 
-/* Tooltip para participantes */
-:deep(.participantes-tooltip) {
+/* Tooltip para registros */
+:deep(.registros-tooltip) {
     background: rgba(156, 39, 176, 0.9);
     border: none;
     border-radius: 4px;
@@ -329,7 +399,7 @@ export default defineComponent({
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-:deep(.participantes-tooltip::before) {
+:deep(.registros-tooltip::before) {
     border-top-color: rgba(156, 39, 176, 0.9);
 }
 
