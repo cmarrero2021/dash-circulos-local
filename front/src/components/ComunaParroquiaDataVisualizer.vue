@@ -5,24 +5,28 @@
                 <div class="col-auto text-h6">{{ title }}</div>
 
                 <div class="col">
-                    <q-select v-model="selectedEstado" :options="estadoOptions" label="Estado" multiple use-input
+                    <q-select
+v-model="selectedEstado" :options="estadoOptions" label="Estado" multiple use-input
                         emit-value map-options outlined clearable dense @filter="filterEstados"
                         @update:model-value="onEstadoChange" />
                 </div>
                 <div class="col">
-                    <q-select v-model="selectedMunicipio" :options="municipioOptions" label="Municipio" multiple
+                    <q-select
+v-model="selectedMunicipio" :options="municipioOptions" label="Municipio" multiple
                         use-input emit-value outlined map-options clearable dense
                         :disable="!selectedEstado || selectedEstado.length === 0" @filter="filterMunicipios"
                         @update:model-value="onMunicipioChange" />
                 </div>
                 <div class="col">
-                    <q-select v-model="selectedParroquia" :options="parroquiaOptions" label="Parroquia" multiple
+                    <q-select
+v-model="selectedParroquia" :options="parroquiaOptions" label="Parroquia" multiple
                         use-input emit-value outlined map-options clearable dense
                         :disable="!selectedMunicipio || selectedMunicipio.length === 0" @filter="filterParroquias"
                         @update:model-value="onParroquiaChange" />
                 </div>
                 <div class="col">
-                    <q-select v-model="selectedComuna" :options="comunaOptions" label="Comuna" multiple use-input
+                    <q-select
+v-model="selectedComuna" :options="comunaOptions" label="Comuna" multiple use-input
                         emit-value outlined map-options clearable dense
                         :disable="!selectedParroquia || selectedParroquia.length === 0" @filter="filterComunas" />
                 </div>
@@ -50,7 +54,8 @@
             <div class="text-subtitle2">Fecha: {{ currentDate }}</div>
         </q-card-section>
         <q-card-section>
-            <q-table v-model:pagination="pagination" :rows="filteredData" :columns="columns" row-key="comuna" flat
+            <q-table
+v-model:pagination="pagination" :rows="filteredData" :columns="columns" row-key="comuna" flat
                 dense />
         </q-card-section>
     </q-card>

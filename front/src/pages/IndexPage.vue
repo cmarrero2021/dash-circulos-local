@@ -79,7 +79,8 @@
             <q-inner-loading :showing="isStateIndicatorsLoading">
               <q-spinner-dots size="40px" color="primary" />
             </q-inner-loading>
-            <DataVisualizer v-show="!isStateIndicatorsLoading" title="Indicadores por Estado" type="table"
+            <DataVisualizer
+v-show="!isStateIndicatorsLoading" title="Indicadores por Estado" type="table"
               :data="filteredStateIndicators" row-key="estado_id" :column-map="stateIndicatorColumnMap"
               :height="stateIndicatorsHeight" class="state-indicators-table"
               @update:height="val => stateIndicatorsHeight = val" />
@@ -94,7 +95,8 @@
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer v-show="!dashboardStore.isLoading" title="CERTIFICACIONES DIARIAS"
+          <DataVisualizer
+v-show="!dashboardStore.isLoading" title="CERTIFICACIONES DIARIAS"
             :data="dashboardStore.dailyCertifications" type="line" row-key="fecha"
             :column-map="{ label: 'fecha', value: 'certificaciones' }" :height="dailyCertificationsHeight" />
         </q-card>
@@ -106,7 +108,8 @@
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer v-show="!dashboardStore.isLoading" title="Certificaciones Diarias"
+          <DataVisualizer
+v-show="!dashboardStore.isLoading" title="Certificaciones Diarias"
             :data="dashboardStore.dailyCertifications" type="table" row-key="fecha"
             :column-map="{ label: 'fecha', labelHeader: 'Fecha', value: 'certificaciones' }"
             :pagination="{ rowsPerPage: 13 }" />
@@ -120,7 +123,8 @@
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer v-show="!dashboardStore.isLoading" title="CÍRCULOS - Certificados vs Faltante" :data="[
+          <DataVisualizer
+v-show="!dashboardStore.isLoading" title="CÍRCULOS - Certificados vs Faltante" :data="[
             { label: 'Certificados', value: circlesDonutData[0] },
             { label: 'Faltante', value: circlesDonutData[1] }
           ]" type="donut" row-key="label" :column-map="{ label: 'label', value: 'value' }" />
@@ -134,7 +138,8 @@
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
           <!-- v-show mantiene el componente en el DOM pero oculto -->
-          <DataVisualizer v-show="!dashboardStore.isLoading" title="CÍRCULOS CUMPLIMIENTO vs META"
+          <DataVisualizer
+v-show="!dashboardStore.isLoading" title="CÍRCULOS CUMPLIMIENTO vs META"
             :data="dashboardStore.circlesByState" type="bar" row-key="estado" :column-map="{
               label: 'estado',
               value: [
@@ -153,7 +158,8 @@
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer v-show="!dashboardStore.isLoading" title="PARTICIPANTES - Certificados vs Faltante" :data="[
+          <DataVisualizer
+v-show="!dashboardStore.isLoading" title="PARTICIPANTES - Certificados vs Faltante" :data="[
             { label: 'Certificados', value: participantsDonutData[0] },
             { label: 'Faltante', value: participantsDonutData[1] }
           ]" type="donut" row-key="label" :column-map="{ label: 'label', value: 'value' }" />
@@ -166,7 +172,8 @@
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer v-show="!dashboardStore.isLoading" title="PARTICIPANTES CUMPLIMIENTO vs META"
+          <DataVisualizer
+v-show="!dashboardStore.isLoading" title="PARTICIPANTES CUMPLIMIENTO vs META"
             :data="dashboardStore.circlesByState" type="bar" row-key="estado" :column-map="{
               label: 'estado',
               value: [
@@ -183,7 +190,8 @@
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer v-show="!dashboardStore.isLoading" title="Participantes por Estado"
+          <DataVisualizer
+v-show="!dashboardStore.isLoading" title="Participantes por Estado"
             :data="dashboardStore.circlesByState" type="table" row-key="estado" :column-map="{
               label: 'estado',
               labelHeader: 'Estado',
@@ -205,7 +213,8 @@
           <q-inner-loading :showing="dashboardStore.isLoading">
             <q-spinner-dots size="50px" color="primary" />
           </q-inner-loading>
-          <DataVisualizer v-show="!dashboardStore.isLoading" title="Círculos por Estado"
+          <DataVisualizer
+v-show="!dashboardStore.isLoading" title="Círculos por Estado"
             :data="dashboardStore.circlesByState" type="table" row-key="estado" :column-map="{
               label: 'estado',
               labelHeader: 'Estado',
@@ -228,7 +237,8 @@
               <q-select v-model="estadoFilter" clearable outlined dense label="Estado" :options="estadoOptions" />
             </div>
             <div class="col-12 col-md-4">
-              <q-select v-model="municipioFilter" v-model:input-value="municipioInput" multiple clearable outlined dense
+              <q-select
+v-model="municipioFilter" v-model:input-value="municipioInput" multiple clearable outlined dense
                 use-input input-debounce="300" label="Municipio (autocompletar)" :options="municipioOptions"
                 :disable="!estadoFilter" map-options emit-value />
             </div>
@@ -261,7 +271,8 @@
               <q-spinner-dots size="30px" color="primary" />
             </q-inner-loading>
 
-            <q-table v-model:pagination="municipioPagination" :rows="municipioTableRows"
+            <q-table
+v-model:pagination="municipioPagination" :rows="municipioTableRows"
               :columns="municipioTableColumns" :row-key="row => `${row.estado}__${row.municipio}`" flat dense />
           </q-card-section>
         </q-card>
