@@ -122,9 +122,9 @@ export default defineComponent({
         // Calcula la cantidad de puntos a generar basado en registros
         const getPointCount = (registros) => {
             if (!registros || registros <= 0) return 0;
-            // Escalar: 1 punto por cada 50 registros, mínimo 5, máximo 200
-            const points = Math.floor(registros / 50);
-            return Math.max(5, Math.min(points, 200));
+            // Escalar: 1 punto por cada 1000 registros, máximo 200
+            const points = Math.floor(registros / 1000);
+            return Math.min(points, 200);
         };
 
         // Verifica si un punto está dentro de un polígono usando ray-casting
@@ -255,7 +255,7 @@ export default defineComponent({
                 }
                 // Agregar leyenda de registros
                 d.innerHTML += '<br><strong>Registros</strong><br>';
-                d.innerHTML += '<i style="background:#9c27b0; width:6px;height:6px;float:left;margin-right:8px;margin-top:6px;opacity:0.7;border-radius:50%;"></i> Densidad de puntos';
+                d.innerHTML += '<i style="background:#9c27b0; width:6px;height:6px;float:left;margin-right:8px;margin-top:6px;opacity:0.7;border-radius:50%;"></i> 1 punto por cada 1.000 registros';
                 return d;
             };
             legend.addTo(map);
@@ -263,7 +263,15 @@ export default defineComponent({
 
         const initMap = async () => {
             map = L.map(mapContainer.value, { center: [8, -66], zoom: 6, zoomControl: true });
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap', maxZoom: 10, minZoom: 5 }).addTo(map);
+            // IMPORTANTE: Base cartográfica - debe estar siempre visible
+            const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap',
+                maxZoom: 10,
+                minZoom: 5,
+                zIndex: 1
+            });
+            tileLayer.addTo(map);
+            tileLayer.bringToBack();
 
             // Cargar ambos conjuntos de datos en paralelo
             const [circulosLoaded, participantesLoaded] = await Promise.all([
