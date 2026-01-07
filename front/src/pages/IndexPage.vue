@@ -38,6 +38,16 @@
         </q-card>
       </div>
 
+      <!-- Mapa de Venezuela -->
+      <div class="col-12">
+        <q-card flat bordered>
+          <q-card-section>
+            <div class="text-h6 text-weight-bold text-primary q-mb-md">Mapa de Cumplimiento por Estado</div>
+            <mapa-venezuela />
+          </q-card-section>
+        </q-card>
+      </div>
+
       <!-- Indicadores Principales -->
       <template v-if="!manualStateFilter">
         <div v-for="indicator in indicators" :key="indicator.label" class="col-12 col-md-3">
@@ -58,15 +68,7 @@
         </div>
       </template>
 
-      <!-- Mapa de Venezuela -->
-      <div class="col-12">
-        <q-card flat bordered>
-          <q-card-section>
-            <div class="text-h6 text-weight-bold text-primary q-mb-md">Mapa de Cumplimiento por Estado</div>
-            <mapa-venezuela />
-          </q-card-section>
-        </q-card>
-      </div>
+
 
       <div class="col-12">
         <!-- <div v-if="showStateIndicators" class="col-12"> -->
