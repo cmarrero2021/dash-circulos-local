@@ -11,21 +11,36 @@ v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close"
                 {{ selectedState.nombre }} - {{ selectedState.porcentaje }}%
             </q-chip>
         </div>
+        <!-- Botones de exportacion -->
+        <div class="export-buttons">
+            <q-btn round color="secondary" icon="image" size="sm" @click="exportToPNG">
+                <q-tooltip>Exportar a PNG</q-tooltip>
+            </q-btn>
+            <q-btn round color="accent" icon="picture_as_pdf" size="sm" @click="exportToPDF">
+                <q-tooltip>Exportar a PDF</q-tooltip>
+            </q-btn>
+        </div>
     </div>
 </template>
 <script>
 import { defineComponent, ref, onMounted, onBeforeUnmount } from 'vue';
+import { useQuasar } from 'quasar';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useDashboardStore } from 'stores/dashboard-store';
 import { api } from 'boot/axios';
+import html2canvas from 'html2canvas';
+import domtoimage from 'dom-to-image-more';
+import { jsPDF } from 'jspdf';
 export default defineComponent({
     name: 'MapaVenezuela',
     setup() {
         const dashboardStore = useDashboardStore();
+        const $q = useQuasar();
         const mapContainer = ref(null);
         let map = null;
         let estadosLayer = null;
+        let tileLayer = null;
         let participantesLayer = null;
         const selectedState = ref(null);
         const estadosData = ref([]);
@@ -264,7 +279,7 @@ export default defineComponent({
         const initMap = async () => {
             map = L.map(mapContainer.value, { center: [8, -66], zoom: 6, zoomControl: true });
             // IMPORTANTE: Base cartográfica - debe estar siempre visible
-            const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap',
                 maxZoom: 10,
                 minZoom: 5,
@@ -318,10 +333,84 @@ export default defineComponent({
             addLegend();
         };
 
+        // Función para exportar el mapa a PNG
+        const exportToPNG = async () => {
+            if (!mapContainer.value || !map) return;
+            $q.loading.show({ message: 'Exportando a PNG...' });
+            try {
+                // Ocultar base cartográfica y centrar mapa
+                if (tileLayer) map.removeLayer(tileLayer);
+                map.setView([8, -66], 6);
+                map.invalidateSize();
+                await new Promise(resolve => setTimeout(resolve, 600));
+
+                // Usar dom-to-image-more que maneja mejor las transformaciones CSS
+                const dataUrl = await domtoimage.toPng(mapContainer.value, {
+                    bgcolor: '#e8e8e8'
+                });
+                // Convertir dataUrl a canvas para compatibilidad con el resto del c�digo
+                const img = new Image();
+                await new Promise(resolve => { img.onload = resolve; img.src = dataUrl; });
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                canvas.getContext('2d').drawImage(img, 0, 0);
+                const link = document.createElement('a');
+                link.download = `mapa-venezuela-${new Date().toISOString().slice(0, 10)}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            } catch (error) {
+                console.error('[Mapa] Error exportando a PNG:', error);
+            } finally {
+                // Restaurar base cartográfica
+                if (tileLayer) { tileLayer.addTo(map); tileLayer.bringToBack(); }
+                $q.loading.hide();
+            }
+        };
+
+        // Función para exportar el mapa a PDF
+        const exportToPDF = async () => {
+            if (!mapContainer.value || !map) return;
+            $q.loading.show({ message: 'Exportando a PDF...' });
+            try {
+                // Ocultar base cartográfica y centrar mapa
+                if (tileLayer) map.removeLayer(tileLayer);
+                map.setView([8, -66], 6);
+                map.invalidateSize();
+                await new Promise(resolve => setTimeout(resolve, 600));
+
+                // Usar dom-to-image-more que maneja mejor las transformaciones CSS
+                const dataUrl = await domtoimage.toPng(mapContainer.value, {
+                    bgcolor: '#e8e8e8'
+                });
+                // Convertir dataUrl a canvas para compatibilidad con el resto del c�digo
+                const img = new Image();
+                await new Promise(resolve => { img.onload = resolve; img.src = dataUrl; });
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                canvas.getContext('2d').drawImage(img, 0, 0);
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF({
+                    orientation: 'landscape',
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                pdf.save(`mapa-venezuela-${new Date().toISOString().slice(0, 10)}.pdf`);
+            } catch (error) {
+                console.error('[Mapa] Error exportando a PDF:', error);
+            } finally {
+                // Restaurar base cartográfica
+                if (tileLayer) { tileLayer.addTo(map); tileLayer.bringToBack(); }
+                $q.loading.hide();
+            }
+        };
+
         const cleanupMap = () => { if (map) { map.remove(); map = null; } };
         onMounted(initMap);
         onBeforeUnmount(cleanupMap);
-        return { mapContainer, selectedState, clearStateFilter };
+        return { mapContainer, selectedState, clearStateFilter, exportToPNG, exportToPDF };
     }
 });
 </script>
@@ -351,6 +440,15 @@ export default defineComponent({
     top: 10px;
     left: 60px;
     z-index: 1000;
+}
+
+.export-buttons {
+    position: absolute;
+    bottom: 20px;
+    right: 10px;
+    z-index: 1000;
+    display: flex;
+    gap: 8px;
 }
 
 :deep(.legend) {
