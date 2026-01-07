@@ -3,7 +3,8 @@
         <div ref="mapContainer" class="map-container"></div>
 
         <!-- Botón para limpiar filtro (solo si hay estado seleccionado) -->
-        <q-btn v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close" size="md"
+        <q-btn
+v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close" size="md"
             @click="clearStateFilter">
             <q-tooltip>Limpiar filtro y ver vista nacional</q-tooltip>
         </q-btn>
