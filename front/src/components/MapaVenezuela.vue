@@ -1,8 +1,7 @@
 <template>
     <div class="mapa-venezuela-container">
         <div ref="mapContainer" class="map-container"></div>
-        <q-btn
-v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close" size="md"
+        <q-btn v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close" size="md"
             @click="clearStateFilter">
             <q-tooltip>Limpiar filtro y ver vista nacional</q-tooltip>
         </q-btn>
@@ -317,11 +316,13 @@ export default defineComponent({
 
                 // Crear control de capas con ambas capas
                 const overlayMaps = {
-                    'CÃ­rculos - Estados': estadosLayer
+                    'CÃ­rculos': estadosLayer
+                    // 'CÃ­rculos - Estados': estadosLayer
                 };
 
                 if (participantesLayer) {
-                    overlayMaps['Registros - Estados'] = participantesLayer;
+                    overlayMaps['Registros'] = participantesLayer;
+                    // overlayMaps['Registros - Estados'] = participantesLayer;
                 }
 
                 L.control.layers(null, overlayMaps, { position: 'topright', collapsed: false }).addTo(map);
@@ -348,7 +349,7 @@ export default defineComponent({
                 const dataUrl = await domtoimage.toPng(mapContainer.value, {
                     bgcolor: '#e8e8e8'
                 });
-                // Convertir dataUrl a canvas para compatibilidad con el resto del código
+                // Convertir dataUrl a canvas para compatibilidad con el resto del cï¿½digo
                 const img = new Image();
                 await new Promise(resolve => { img.onload = resolve; img.src = dataUrl; });
                 const canvas = document.createElement('canvas');
@@ -383,7 +384,7 @@ export default defineComponent({
                 const dataUrl = await domtoimage.toPng(mapContainer.value, {
                     bgcolor: '#e8e8e8'
                 });
-                // Convertir dataUrl a canvas para compatibilidad con el resto del código
+                // Convertir dataUrl a canvas para compatibilidad con el resto del cï¿½digo
                 const img = new Image();
                 await new Promise(resolve => { img.onload = resolve; img.src = dataUrl; });
                 const canvas = document.createElement('canvas');
