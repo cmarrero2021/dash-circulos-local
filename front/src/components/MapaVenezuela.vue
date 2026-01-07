@@ -1,7 +1,8 @@
 <template>
     <div class="mapa-venezuela-container">
         <div ref="mapContainer" class="map-container"></div>
-        <q-btn v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close" size="md"
+        <q-btn
+v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close" size="md"
             @click="clearStateFilter">
             <q-tooltip>Limpiar filtro y ver vista nacional</q-tooltip>
         </q-btn>
@@ -28,7 +29,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useDashboardStore } from 'stores/dashboard-store';
 import { api } from 'boot/axios';
-import html2canvas from 'html2canvas';
+// import html2canvas from 'html2canvas';
 import domtoimage from 'dom-to-image-more';
 import { jsPDF } from 'jspdf';
 export default defineComponent({
@@ -504,5 +505,50 @@ export default defineComponent({
 /* Ocultar elemento de atribución de Leaflet */
 :deep(.leaflet-bottom.leaflet-right) {
     display: none !important;
+}
+
+/* Estilos para control de capas (mejora exportación) */
+:deep(.leaflet-control-layers) {
+    font-family: Arial, sans-serif;
+}
+
+:deep(.leaflet-control-layers-overlays) {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+:deep(.leaflet-control-layers-overlays label) {
+    display: flex !important;
+    align-items: center;
+    gap: 8px;
+    margin: 2px 0;
+    white-space: nowrap;
+}
+
+:deep(.leaflet-control-layers-overlays input[type="checkbox"]) {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #666;
+    border-radius: 3px;
+    background: white;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+:deep(.leaflet-control-layers-overlays input[type="checkbox"]:checked) {
+    background: #2196f3;
+    border-color: #2196f3;
+}
+
+:deep(.leaflet-control-layers-overlays input[type="checkbox"]:checked::after) {
+    content: '✓';
+    display: block;
+    color: white;
+    font-size: 12px;
+    text-align: center;
+    line-height: 12px;
 }
 </style>
