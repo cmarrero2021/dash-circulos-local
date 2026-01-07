@@ -3,8 +3,7 @@
         <div ref="mapContainer" class="map-container"></div>
 
         <!-- Botón para limpiar filtro (solo si hay estado seleccionado) -->
-        <q-btn
-v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close" size="md"
+        <q-btn v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close" size="md"
             @click="clearStateFilter">
             <q-tooltip>Limpiar filtro y ver vista nacional</q-tooltip>
         </q-btn>
@@ -144,7 +143,14 @@ export default defineComponent({
             `;
             layer.bindPopup(popupContent);
 
-            layer.bindTooltip(nom, {
+            const tooltipContent = `
+                <div style="text-align:center;">
+                    <span style="font-weight:bold;">${nom.toUpperCase()}</span><br>
+                    CÍRCULOS: ${circulos.toLocaleString('de-DE')}
+                </div>
+            `;
+
+            layer.bindTooltip(tooltipContent, {
                 permanent: false,
                 direction: 'center',
                 className: 'state-tooltip'
@@ -239,7 +245,8 @@ export default defineComponent({
             const markers = [];
             const outlineLayer = L.geoJSON(geojsonData, {
                 style: {
-                    fill: false,
+                    fill: true,
+                    fillOpacity: 0, // Área interactiva pero transparente
                     color: '#333333',
                     weight: 1.5,
                     opacity: 0.6
@@ -258,6 +265,25 @@ export default defineComponent({
                         </div>
                     `;
                     layer.bindPopup(popupContent);
+
+                    const tooltipContent = `
+                        <div style="text-align:center;">
+                            <span style="font-weight:bold;">${estadoNombre.toUpperCase()}</span><br>
+                            REGISTROS: ${registros.toLocaleString('de-DE')}
+                        </div>
+                    `;
+
+                    layer.bindTooltip(tooltipContent, {
+                        permanent: false,
+                        direction: 'center',
+                        className: 'state-tooltip'
+                    });
+
+                    layer.on({
+                        mouseover: highlightFeature,
+                        mouseout: resetHighlight,
+                        click: clickState
+                    });
                 }
             });
             markers.push(outlineLayer);
@@ -377,7 +403,7 @@ export default defineComponent({
                 canvas.getContext('2d').drawImage(img, 0, 0);
 
                 const link = document.createElement('a');
-                link.download = `mapa-venezuela-${new Date().toISOString().slice(0, 10)}.png`;
+                link.download = `mapa - venezuela - ${new Date().toISOString().slice(0, 10)}.png`;
                 link.href = canvas.toDataURL('image/png');
                 link.click();
             } catch (error) {
@@ -415,7 +441,7 @@ export default defineComponent({
                     format: [canvas.width, canvas.height]
                 });
                 pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-                pdf.save(`mapa-venezuela-${new Date().toISOString().slice(0, 10)}.pdf`);
+                pdf.save(`mapa- venezuela - ${new Date().toISOString().slice(0, 10)}.pdf`);
             } catch (error) {
                 console.error('[Mapa] Error exportando a PDF:', error);
             } finally {
