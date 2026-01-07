@@ -1,18 +1,26 @@
 <template>
     <div class="mapa-venezuela-container">
         <div ref="mapContainer" class="map-container"></div>
+
+        <!-- Botón para limpiar filtro (solo si hay estado seleccionado) -->
         <q-btn
 v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close" size="md"
             @click="clearStateFilter">
             <q-tooltip>Limpiar filtro y ver vista nacional</q-tooltip>
         </q-btn>
+
+        <!-- Badge del estado seleccionado -->
         <div v-if="selectedState" class="selected-state-badge">
             <q-chip removable color="primary" text-color="white" icon="place" @remove="clearStateFilter">
                 {{ selectedState.nombre }} - {{ selectedState.porcentaje }}%
             </q-chip>
         </div>
-        <!-- Botones de exportacion -->
+
+        <!-- Botones de herramientas (Recentrar, Exportar) -->
         <div class="export-buttons">
+            <q-btn round color="primary" icon="my_location" size="sm" @click="recenterMap">
+                <q-tooltip>Recentrar mapa</q-tooltip>
+            </q-btn>
             <q-btn round color="secondary" icon="image" size="sm" @click="exportToPNG">
                 <q-tooltip>Exportar a PNG</q-tooltip>
             </q-btn>
@@ -22,6 +30,7 @@ v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close"
         </div>
     </div>
 </template>
+
 <script>
 import { defineComponent, ref, onMounted, onBeforeUnmount } from 'vue';
 import { useQuasar } from 'quasar';
@@ -29,9 +38,9 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useDashboardStore } from 'stores/dashboard-store';
 import { api } from 'boot/axios';
-// import html2canvas from 'html2canvas';
 import domtoimage from 'dom-to-image-more';
 import { jsPDF } from 'jspdf';
+
 export default defineComponent({
     name: 'MapaVenezuela',
     setup() {
@@ -61,21 +70,44 @@ export default defineComponent({
 
         const stateStyle = (f) => {
             const est = findEstadoById(f.properties.state_id);
-            return { fillColor: getColor(est ? parseFloat(est.porcentaje) : null), weight: 2, opacity: 1, color: 'white', dashArray: '3', fillOpacity: 0.7 };
+            return {
+                fillColor: getColor(est ? parseFloat(est.porcentaje) : null),
+                weight: 2,
+                opacity: 1,
+                color: 'white',
+                dashArray: '3',
+                fillOpacity: 0.7
+            };
         };
 
         const highlightFeature = (e) => {
-            e.target.setStyle({ weight: 3, color: '#666', dashArray: '', fillOpacity: 0.9 });
-            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) e.target.bringToFront();
+            const layer = e.target;
+            layer.setStyle({
+                weight: 3,
+                color: '#666',
+                dashArray: '',
+                fillOpacity: 0.9
+            });
+            if (!L.Browser.ie && !L.Browser.opera && !L.Browser.edge) {
+                layer.bringToFront();
+            }
         };
 
-        const resetHighlight = (e) => estadosLayer.resetStyle(e.target);
+        const resetHighlight = (e) => {
+            estadosLayer.resetStyle(e.target);
+        };
 
         const clickState = (e) => {
             const sid = e.target.feature.properties.state_id;
             const est = findEstadoById(sid);
             const nom = est ? (est.estado || est.estado_nombre || (e.target.feature.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '')) : (e.target.feature.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
-            selectedState.value = { id: sid, nombre: nom, porcentaje: est ? parseFloat(est.porcentaje).toFixed(2) : '0.00' };
+
+            selectedState.value = {
+                id: sid,
+                nombre: nom,
+                porcentaje: est ? parseFloat(est.porcentaje).toFixed(2) : '0.00'
+            };
+
             dashboardStore.setManualStateFilter(Number(sid));
             map.fitBounds(e.target.getBounds());
         };
@@ -86,10 +118,17 @@ export default defineComponent({
             if (map) map.setView([8, -66], 6);
         };
 
+        const recenterMap = () => {
+            if (map) {
+                map.setView([8, -66], 6);
+            }
+        };
+
         const onEachFeature = (f, layer) => {
             const sid = f.properties.state_id;
             const est = findEstadoById(sid);
             const nom = est ? (est.estado || est.estado_nombre || (f.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '')) : (f.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
+
             const meta = est ? (est.meta_circulo || 0) : 0;
             const circulos = est ? (est.circulos || 0) : 0;
             const pct = est ? parseFloat(est.porcentaje) : 0;
@@ -104,12 +143,18 @@ export default defineComponent({
                 </div>
             `;
             layer.bindPopup(popupContent);
+
             layer.bindTooltip(nom, {
                 permanent: false,
                 direction: 'center',
                 className: 'state-tooltip'
             });
-            layer.on({ mouseover: highlightFeature, mouseout: resetHighlight, click: clickState });
+
+            layer.on({
+                mouseover: highlightFeature,
+                mouseout: resetHighlight,
+                click: clickState
+            });
         };
 
         const loadMapaData = async () => {
@@ -134,15 +179,12 @@ export default defineComponent({
             }
         };
 
-        // Calcula la cantidad de puntos a generar basado en registros
         const getPointCount = (registros) => {
             if (!registros || registros <= 0) return 0;
-            // Escalar: 1 punto por cada 1000 registros, máximo 200
             const points = Math.floor(registros / 1000);
             return Math.min(points, 200);
         };
 
-        // Verifica si un punto está dentro de un polígono usando ray-casting
         const isPointInPolygon = (point, polygon) => {
             const [x, y] = point;
             let inside = false;
@@ -156,41 +198,33 @@ export default defineComponent({
             return inside;
         };
 
-        // Genera puntos aleatorios dentro de un feature GeoJSON
         const generateRandomPointsInFeature = (feature, count) => {
             const points = [];
             if (count <= 0) return points;
 
-            // Obtener el bounding box del feature
             const bounds = L.geoJSON(feature).getBounds();
             const minLat = bounds.getSouth();
             const maxLat = bounds.getNorth();
             const minLng = bounds.getWest();
             const maxLng = bounds.getEast();
 
-            // Obtener los anillos del polígono
             const geometry = feature.geometry;
             let rings = [];
-
             if (geometry.type === 'Polygon') {
-                rings = [geometry.coordinates[0]]; // Solo el anillo exterior
+                rings = [geometry.coordinates[0]];
             } else if (geometry.type === 'MultiPolygon') {
-                // Para MultiPolygon, usar todos los anillos exteriores
                 rings = geometry.coordinates.map(poly => poly[0]);
             }
 
-            // Generar puntos aleatorios dentro del polígono
             let attempts = 0;
-            const maxAttempts = count * 20; // Evitar bucle infinito
+            const maxAttempts = count * 20;
 
             while (points.length < count && attempts < maxAttempts) {
                 attempts++;
                 const lat = minLat + Math.random() * (maxLat - minLat);
                 const lng = minLng + Math.random() * (maxLng - minLng);
 
-                // Verificar si el punto está dentro de alguno de los polígonos
                 for (const ring of rings) {
-                    // GeoJSON usa [lng, lat], convertir para la comprobación
                     const polygonCoords = ring.map(coord => [coord[0], coord[1]]);
                     if (isPointInPolygon([lng, lat], polygonCoords)) {
                         points.push([lat, lng]);
@@ -198,18 +232,14 @@ export default defineComponent({
                     }
                 }
             }
-
             return points;
         };
 
-        // Crea la capa de registros como dot-density (solo puntos)
         const createRegistrosLayer = (geojsonData) => {
             const markers = [];
-
-            // Crear contorno de estados (una sola capa GeoJSON para todos)
             const outlineLayer = L.geoJSON(geojsonData, {
                 style: {
-                    fill: false, // Sin relleno
+                    fill: false,
                     color: '#333333',
                     weight: 1.5,
                     opacity: 0.6
@@ -232,7 +262,6 @@ export default defineComponent({
             });
             markers.push(outlineLayer);
 
-            // Generar puntos aleatorios dentro de cada estado
             geojsonData.features.forEach(feature => {
                 const sid = feature.properties.state_id;
                 const partData = findParticipantesByStateId(sid);
@@ -262,23 +291,25 @@ export default defineComponent({
         const addLegend = () => {
             const legend = L.control({ position: 'bottomleft' });
             legend.onAdd = function () {
-                const d = L.DomUtil.create('div', 'info legend');
-                const g = [0, 20, 40, 60, 80];
-                d.innerHTML = '<strong>Cumplimiento (%)</strong><br>';
-                for (let i = 0; i < g.length; i++) {
-                    d.innerHTML += '<i style="background:' + getColor(g[i] + 1) + '; width:18px;height:18px;float:left;margin-right:8px;opacity:0.7;"></i> ' + g[i] + (g[i + 1] ? '&ndash;' + g[i + 1] + '<br>' : '+');
+                const div = L.DomUtil.create('div', 'info legend');
+                const grades = [0, 20, 40, 60, 80];
+                div.innerHTML = '<strong>Cumplimiento (%)</strong><br>';
+
+                for (let i = 0; i < grades.length; i++) {
+                    div.innerHTML += '<i style="background:' + getColor(grades[i] + 1) + '"></i> ' +
+                        grades[i] + (grades[i + 1] ? '&ndash;' + grades[i + 1] + '<br>' : '+');
                 }
-                // Agregar leyenda de registros
-                d.innerHTML += '<br><strong>Registros</strong><br>';
-                d.innerHTML += '<i style="background:#9c27b0; width:6px;height:6px;float:left;margin-right:8px;margin-top:6px;opacity:0.7;border-radius:50%;"></i> 1 punto por cada 1.000 registros';
-                return d;
+
+                div.innerHTML += '<br><strong>Registros</strong><br>';
+                div.innerHTML += '<i style="background:#9c27b0; border-radius:50%; width:10px; height:10px; margin-top:6px;"></i> 1 punto por cada 1.000 registros';
+                return div;
             };
             legend.addTo(map);
         };
 
         const initMap = async () => {
             map = L.map(mapContainer.value, { center: [8, -66], zoom: 6, zoomControl: true });
-            // IMPORTANTE: Base cartográfica - debe estar siempre visible
+
             tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap',
                 maxZoom: 10,
@@ -288,46 +319,36 @@ export default defineComponent({
             tileLayer.addTo(map);
             tileLayer.bringToBack();
 
-            // Cargar ambos conjuntos de datos en paralelo
-            const [circulosLoaded, participantesLoaded] = await Promise.all([
+            const [, participantesLoaded] = await Promise.all([
                 loadMapaData(),
                 loadParticipantesData()
             ]);
-
-            if (!circulosLoaded) {
-                console.error('[Mapa] No se pudieron cargar datos de círculos');
-            }
-            if (!participantesLoaded) {
-                console.error('[Mapa] No se pudieron cargar datos de participantes');
-            }
+            // const [circulosLoaded, participantesLoaded] = await Promise.all([
+            //     loadMapaData(),
+            //     loadParticipantesData()
+            // ]);
 
             try {
                 const geojsonResponse = await fetch('/geojson/estados_final.geojson');
                 const geojsonData = await geojsonResponse.json();
 
-                // Crear capa de círculos (estados coloreados)
                 estadosLayer = L.geoJSON(geojsonData, { style: stateStyle, onEachFeature });
                 estadosLayer.addTo(map);
 
-                // Crear capa de registros (dot-density)
                 if (participantesLoaded && participantesData.value.length > 0) {
                     participantesLayer = createRegistrosLayer(geojsonData);
                     participantesLayer.addTo(map);
                 }
 
-                // Crear control de capas con ambas capas
                 const overlayMaps = {
                     'Círculos': estadosLayer
-                    // 'Círculos - Estados': estadosLayer
                 };
 
                 if (participantesLayer) {
                     overlayMaps['Registros'] = participantesLayer;
-                    // overlayMaps['Registros - Estados'] = participantesLayer;
                 }
 
                 L.control.layers(null, overlayMaps, { position: 'topright', collapsed: false }).addTo(map);
-
             } catch (e) {
                 console.error('[Mapa] Error GeoJSON:', e);
             }
@@ -335,28 +356,26 @@ export default defineComponent({
             addLegend();
         };
 
-        // Función para exportar el mapa a PNG
         const exportToPNG = async () => {
             if (!mapContainer.value || !map) return;
             $q.loading.show({ message: 'Exportando a PNG...' });
             try {
-                // Ocultar base cartográfica y centrar mapa
                 if (tileLayer) map.removeLayer(tileLayer);
                 map.setView([8, -66], 6);
                 map.invalidateSize();
                 await new Promise(resolve => setTimeout(resolve, 600));
 
-                // Usar dom-to-image-more que maneja mejor las transformaciones CSS
                 const dataUrl = await domtoimage.toPng(mapContainer.value, {
                     bgcolor: '#e8e8e8'
                 });
-                // Convertir dataUrl a canvas para compatibilidad con el resto del c�digo
+
                 const img = new Image();
                 await new Promise(resolve => { img.onload = resolve; img.src = dataUrl; });
                 const canvas = document.createElement('canvas');
                 canvas.width = img.width;
                 canvas.height = img.height;
                 canvas.getContext('2d').drawImage(img, 0, 0);
+
                 const link = document.createElement('a');
                 link.download = `mapa-venezuela-${new Date().toISOString().slice(0, 10)}.png`;
                 link.href = canvas.toDataURL('image/png');
@@ -364,34 +383,31 @@ export default defineComponent({
             } catch (error) {
                 console.error('[Mapa] Error exportando a PNG:', error);
             } finally {
-                // Restaurar base cartográfica
                 if (tileLayer) { tileLayer.addTo(map); tileLayer.bringToBack(); }
                 $q.loading.hide();
             }
         };
 
-        // Función para exportar el mapa a PDF
         const exportToPDF = async () => {
             if (!mapContainer.value || !map) return;
             $q.loading.show({ message: 'Exportando a PDF...' });
             try {
-                // Ocultar base cartográfica y centrar mapa
                 if (tileLayer) map.removeLayer(tileLayer);
                 map.setView([8, -66], 6);
                 map.invalidateSize();
                 await new Promise(resolve => setTimeout(resolve, 600));
 
-                // Usar dom-to-image-more que maneja mejor las transformaciones CSS
                 const dataUrl = await domtoimage.toPng(mapContainer.value, {
                     bgcolor: '#e8e8e8'
                 });
-                // Convertir dataUrl a canvas para compatibilidad con el resto del c�digo
+
                 const img = new Image();
                 await new Promise(resolve => { img.onload = resolve; img.src = dataUrl; });
                 const canvas = document.createElement('canvas');
                 canvas.width = img.width;
                 canvas.height = img.height;
                 canvas.getContext('2d').drawImage(img, 0, 0);
+
                 const imgData = canvas.toDataURL('image/png');
                 const pdf = new jsPDF({
                     orientation: 'landscape',
@@ -403,19 +419,33 @@ export default defineComponent({
             } catch (error) {
                 console.error('[Mapa] Error exportando a PDF:', error);
             } finally {
-                // Restaurar base cartográfica
                 if (tileLayer) { tileLayer.addTo(map); tileLayer.bringToBack(); }
                 $q.loading.hide();
             }
         };
 
-        const cleanupMap = () => { if (map) { map.remove(); map = null; } };
+        const cleanupMap = () => {
+            if (map) {
+                map.remove();
+                map = null;
+            }
+        };
+
         onMounted(initMap);
         onBeforeUnmount(cleanupMap);
-        return { mapContainer, selectedState, clearStateFilter, exportToPNG, exportToPDF };
+
+        return {
+            mapContainer,
+            selectedState,
+            clearStateFilter,
+            recenterMap,
+            exportToPNG,
+            exportToPDF
+        };
     }
 });
 </script>
+
 <style scoped>
 .mapa-venezuela-container {
     position: relative;
@@ -460,6 +490,7 @@ export default defineComponent({
     border-radius: 5px;
     line-height: 24px;
     color: #555;
+    font-size: 12px;
 }
 
 :deep(.legend i) {
@@ -470,7 +501,6 @@ export default defineComponent({
     opacity: 0.7;
 }
 
-/* Tooltip personalizado para estados */
 :deep(.state-tooltip) {
     background: rgba(0, 0, 0, 0.8);
     border: none;
@@ -486,23 +516,6 @@ export default defineComponent({
     border-top-color: rgba(0, 0, 0, 0.8);
 }
 
-/* Tooltip para registros */
-:deep(.registros-tooltip) {
-    background: rgba(156, 39, 176, 0.9);
-    border: none;
-    border-radius: 4px;
-    color: white;
-    font-weight: bold;
-    font-size: 12px;
-    padding: 6px 10px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-}
-
-:deep(.registros-tooltip::before) {
-    border-top-color: rgba(156, 39, 176, 0.9);
-}
-
-/* Ocultar elemento de atribución de Leaflet */
 :deep(.leaflet-bottom.leaflet-right) {
     display: none !important;
 }
