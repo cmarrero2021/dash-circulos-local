@@ -14,6 +14,7 @@ console.log(`[INFO] NODE_ENV: ${process.env.NODE_ENV}`);
 
 const { startListening } = require('./services/notificationListener');
 const websocketService = require('./services/websocketService');
+const { startMaterializedViewScheduler } = require('./services/materializedViewScheduler');
 
 // --- Importar rutas ---
 const authRoutes = require('./routes/auth');
@@ -102,4 +103,5 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   // Server started
   startListening();
+  startMaterializedViewScheduler();
 });

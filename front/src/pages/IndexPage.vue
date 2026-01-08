@@ -48,246 +48,281 @@
         </q-card>
       </div>
 
-      <!-- Indicadores Principales -->
-      <template v-if="!manualStateFilter">
-        <div v-for="indicator in indicators" :key="indicator.label" class="col-12 col-md-3">
-          <q-card flat bordered>
-            <q-card-section>
-              <div class="row items-center no-wrap">
-                <div class="col">
-                  <div class="text-subtitle2 text-grey-8">{{ indicator.label }}</div>
-                  <div class="text-h5 text-weight-bold">
-                    {{ indicator.value }}
-                    <q-icon :name="indicator.icon" :color="indicator.color" size="sm" />
-                  </div>
-                </div>
-              </div>
-            </q-card-section>
-
-          </q-card>
-        </div>
-      </template>
-
-
-
+      <!-- Indicadores Principales y Otros Contenidos en Pestañas -->
       <div class="col-12">
-        <!-- <div v-if="showStateIndicators" class="col-12"> -->
-        <q-card flat bordered class="state-indicators-card">
-          <!-- <q-card-section class="row items-center justify-between q-col-gutter-sm">
-            <div class="text-h6">DASHBOARD CERTIFICACIONES MINAAMP</div>
-          </q-card-section> -->
-          <!-- <q-separator /> -->
-          <q-card-section>
-            <q-inner-loading :showing="isStateIndicatorsLoading">
-              <q-spinner-dots size="40px" color="primary" />
-            </q-inner-loading>
-            <DataVisualizer
-v-show="!isStateIndicatorsLoading" title="Indicadores por Estado" type="table"
-              :data="filteredStateIndicators" row-key="estado_id" :column-map="stateIndicatorColumnMap"
-              :height="stateIndicatorsHeight" class="state-indicators-table"
-              @update:height="val => stateIndicatorsHeight = val" />
-          </q-card-section>
-        </q-card>
-      </div>
-
-      <!-- Indicador: Círculos por Estado (Gráfico) -->
-      <!-- Par inicial: Certificaciones Diarias (Gráfico) -->
-      <div class="col-12 col-md-6">
-        <q-card flat bordered style="min-height: 425px;">
-          <q-inner-loading :showing="dashboardStore.isLoading">
-            <q-spinner-dots size="50px" color="primary" />
-          </q-inner-loading>
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="CERTIFICACIONES DIARIAS"
-            :data="dashboardStore.dailyCertifications" type="line" row-key="fecha"
-            :column-map="{ label: 'fecha', value: 'certificaciones' }" :height="dailyCertificationsHeight" />
-        </q-card>
-      </div>
-
-      <!-- Par inicial: Certificaciones Diarias (Tabla) -->
-      <div class="col-12 col-md-6">
-        <q-card flat bordered style="min-height: 425px;">
-          <q-inner-loading :showing="dashboardStore.isLoading">
-            <q-spinner-dots size="50px" color="primary" />
-          </q-inner-loading>
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="Certificaciones Diarias"
-            :data="dashboardStore.dailyCertifications" type="table" row-key="fecha"
-            :column-map="{ label: 'fecha', labelHeader: 'Fecha', value: 'certificaciones' }"
-            :pagination="{ rowsPerPage: 13 }" />
-        </q-card>
-      </div>
-
-
-      <!-- Gráfica de Anillo: Círculos (cuando hay filtro de estado) -->
-      <div v-if="showDonutCharts" class="col-12 col-md-6">
-        <q-card flat bordered style="min-height: 425px;">
-          <q-inner-loading :showing="dashboardStore.isLoading">
-            <q-spinner-dots size="50px" color="primary" />
-          </q-inner-loading>
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="CÍRCULOS - Certificados vs Faltante" :data="[
-            { label: 'Certificados', value: circlesDonutData[0] },
-            { label: 'Faltante', value: circlesDonutData[1] }
-          ]" type="donut" row-key="label" :column-map="{ label: 'label', value: 'value' }" />
-        </q-card>
-      </div>
-
-      <div v-if="!showDonutCharts" class="col-12 col-md-6">
-        <q-card flat bordered style="min-height: 425px;">
-          <!-- El spinner ahora se muestra SOBRE el contenido -->
-          <q-inner-loading :showing="dashboardStore.isLoading">
-            <q-spinner-dots size="50px" color="primary" />
-          </q-inner-loading>
-          <!-- v-show mantiene el componente en el DOM pero oculto -->
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="CÍRCULOS CUMPLIMIENTO vs META"
-            :data="dashboardStore.circlesByState" type="bar" row-key="estado" :column-map="{
-              label: 'estado',
-              value: [
-                { name: 'Círculos Certificados', key: 'circulos_certificados' },
-                { name: 'Meta de Círculos', key: 'meta_circulos' }
-              ]
-            }" stacked />
-        </q-card>
-      </div>
-
-
-
-      <!-- Gráfica de Anillo: Participantes (cuando hay filtro de estado) -->
-      <div v-if="showDonutCharts" class="col-12 col-md-6">
-        <q-card flat bordered style="min-height: 425px;">
-          <q-inner-loading :showing="dashboardStore.isLoading">
-            <q-spinner-dots size="50px" color="primary" />
-          </q-inner-loading>
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="PARTICIPANTES - Certificados vs Faltante" :data="[
-            { label: 'Certificados', value: participantsDonutData[0] },
-            { label: 'Faltante', value: participantsDonutData[1] }
-          ]" type="donut" row-key="label" :column-map="{ label: 'label', value: 'value' }" />
-        </q-card>
-      </div>
-
-      <!-- Nuevo par: Participantes por Estado (Gráfico) -->
-      <div v-if="!showDonutCharts" class="col-12 col-md-6">
-        <q-card flat bordered style="min-height: 425px;">
-          <q-inner-loading :showing="dashboardStore.isLoading">
-            <q-spinner-dots size="50px" color="primary" />
-          </q-inner-loading>
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="PARTICIPANTES CUMPLIMIENTO vs META"
-            :data="dashboardStore.circlesByState" type="bar" row-key="estado" :column-map="{
-              label: 'estado',
-              value: [
-                { name: 'Participantes Certificados', key: 'participantes_certificados' },
-                { name: 'Meta de Participantes', key: 'meta_participantes' }
-              ]
-            }" stacked />
-        </q-card>
-      </div>
-
-      <!-- Nuevo par: Participantes por Estado (Tabla) -->
-      <div class="col-12 col-md-6">
-        <q-card flat bordered style="min-height: 425px;">
-          <q-inner-loading :showing="dashboardStore.isLoading">
-            <q-spinner-dots size="50px" color="primary" />
-          </q-inner-loading>
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="Participantes por Estado"
-            :data="dashboardStore.circlesByState" type="table" row-key="estado" :column-map="{
-              label: 'estado',
-              labelHeader: 'Estado',
-              value: [
-                { name: 'Participantes Certificados', key: 'participantes_certificados' },
-                { name: 'Meta de Participantes', key: 'meta_participantes' }
-              ]
-            }" />
-        </q-card>
-      </div>
-
-
-
-
-
-      <!-- Indicador: Círculos por Estado (Tabla) -->
-      <div class="col-12 col-md-6">
-        <q-card flat bordered style="min-height: 425px;">
-          <q-inner-loading :showing="dashboardStore.isLoading">
-            <q-spinner-dots size="50px" color="primary" />
-          </q-inner-loading>
-          <DataVisualizer
-v-show="!dashboardStore.isLoading" title="Círculos por Estado"
-            :data="dashboardStore.circlesByState" type="table" row-key="estado" :column-map="{
-              label: 'estado',
-              labelHeader: 'Estado',
-              value: [
-                { name: 'Círculos Certificados', key: 'circulos_certificados' },
-                { name: 'Meta de Círculos', key: 'meta_circulos' }
-              ]
-            }" />
-        </q-card>
-      </div>
-      <!-- Tabla: Círculos por Estado / Municipio -->
-      <div class="col-12">
-        <q-card flat bordered style="min-height: 250px;">
-          <q-card-section class="row items-center q-col-gutter-md">
-            <div class="col">
-              <div class="text-h6">CÍRCULOS POR ESTADO Y MUNICIPIO</div>
-              <div class="text-subtitle2">Fecha: {{ currentDate }}</div>
-            </div>
-            <div class="col-12 col-md-3">
-              <q-select v-model="estadoFilter" clearable outlined dense label="Estado" :options="estadoOptions" />
-            </div>
-            <div class="col-12 col-md-4">
-              <q-select
-v-model="municipioFilter" v-model:input-value="municipioInput" multiple clearable outlined dense
-                use-input input-debounce="300" label="Municipio (autocompletar)" :options="municipioOptions"
-                :disable="!estadoFilter" map-options emit-value />
-            </div>
-            <div class="col-auto">
-              <q-btn color="grey-7" round flat icon="more_vert">
-                <q-menu cover auto-close>
-                  <q-list style="min-width: 150px">
-                    <q-item clickable @click="exportMunicipios('xlsx')">
-                      <q-item-section avatar><q-icon name="description" /></q-item-section>
-                      <q-item-section>Exportar a XLSX</q-item-section>
-                    </q-item>
-                    <q-item clickable @click="exportMunicipios('csv')">
-                      <q-item-section avatar><q-icon name="toc" /></q-item-section>
-                      <q-item-section>Exportar a CSV</q-item-section>
-                    </q-item>
-                    <q-item clickable @click="exportMunicipios('json')">
-                      <q-item-section avatar><q-icon name="code" /></q-item-section>
-                      <q-item-section>Exportar a JSON</q-item-section>
-                    </q-item>
-                  </q-list>
-                </q-menu>
-              </q-btn>
-            </div>
-          </q-card-section>
-
+        <q-card flat bordered>
+          <q-tabs
+            v-model="tab"
+            class="text-grey-8 bg-grey-1"
+            active-color="primary"
+            active-bg-color="white"
+            indicator-color="primary"
+            align="justify"
+            narrow-indicator
+            style="border-radius: 8px 8px 0 0;"
+          >
+            <q-tab name="circulos" icon="trip_origin" label="Círculos" class="q-py-md" />
+            <q-tab name="registros" icon="how_to_reg" label="Registros" class="q-py-md" />
+          </q-tabs>
           <q-separator />
 
-          <q-card-section>
-            <q-inner-loading :showing="dashboardStore.isLoading">
-              <q-spinner-dots size="30px" color="primary" />
-            </q-inner-loading>
+          <q-tab-panels v-model="tab" animated>
+            <q-tab-panel name="circulos" class="q-pa-none">
+              <div class="row q-col-gutter-md">
+                <!-- Indicadores Principales -->
+                <template v-if="!manualStateFilter">
+                  <div v-for="indicator in indicators" :key="indicator.label" class="col-12 col-md-3">
+                    <q-card flat bordered>
+                      <q-card-section>
+                        <div class="row items-center no-wrap">
+                          <div class="col">
+                            <div class="text-subtitle2 text-grey-8">{{ indicator.label }}</div>
+                            <div class="text-h5 text-weight-bold">
+                              {{ indicator.value }}
+                              <q-icon :name="indicator.icon" :color="indicator.color" size="sm" />
+                            </div>
+                          </div>
+                        </div>
+                      </q-card-section>
 
-            <q-table
+                    </q-card>
+                  </div>
+                </template>
+
+
+
+                <div class="col-12">
+                  <!-- <div v-if="showStateIndicators" class="col-12"> -->
+                  <q-card flat bordered class="state-indicators-card">
+                    <!-- <q-card-section class="row items-center justify-between q-col-gutter-sm">
+            <div class="text-h6">DASHBOARD CERTIFICACIONES MINAAMP</div>
+          </q-card-section> -->
+                    <!-- <q-separator /> -->
+                    <q-card-section>
+                      <q-inner-loading :showing="isStateIndicatorsLoading">
+                        <q-spinner-dots size="40px" color="primary" />
+                      </q-inner-loading>
+                      <DataVisualizer
+v-show="!isStateIndicatorsLoading" title="Indicadores por Estado" type="table"
+                        :data="filteredStateIndicators" row-key="estado_id" :column-map="stateIndicatorColumnMap"
+                        :height="stateIndicatorsHeight" class="state-indicators-table"
+                        @update:height="val => stateIndicatorsHeight = val" />
+                    </q-card-section>
+                  </q-card>
+                </div>
+
+                <!-- Indicador: Círculos por Estado (Gráfico) -->
+                <!-- Par inicial: Certificaciones Diarias (Gráfico) -->
+                <div class="col-12 col-md-6">
+                  <q-card flat bordered style="min-height: 425px;">
+                    <q-inner-loading :showing="dashboardStore.isLoading">
+                      <q-spinner-dots size="50px" color="primary" />
+                    </q-inner-loading>
+                    <DataVisualizer
+v-show="!dashboardStore.isLoading" title="CERTIFICACIONES DIARIAS"
+                      :data="dashboardStore.dailyCertifications" type="line" row-key="fecha"
+                      :column-map="{ label: 'fecha', value: 'certificaciones' }" :height="dailyCertificationsHeight" />
+                  </q-card>
+                </div>
+
+                <!-- Par inicial: Certificaciones Diarias (Tabla) -->
+                <div class="col-12 col-md-6">
+                  <q-card flat bordered style="min-height: 425px;">
+                    <q-inner-loading :showing="dashboardStore.isLoading">
+                      <q-spinner-dots size="50px" color="primary" />
+                    </q-inner-loading>
+                    <DataVisualizer
+v-show="!dashboardStore.isLoading" title="Certificaciones Diarias"
+                      :data="dashboardStore.dailyCertifications" type="table" row-key="fecha"
+                      :column-map="{ label: 'fecha', labelHeader: 'Fecha', value: 'certificaciones' }"
+                      :pagination="{ rowsPerPage: 13 }" />
+                  </q-card>
+                </div>
+
+
+                <!-- Gráfica de Anillo: Círculos (cuando hay filtro de estado) -->
+                <div v-if="showDonutCharts" class="col-12 col-md-6">
+                  <q-card flat bordered style="min-height: 425px;">
+                    <q-inner-loading :showing="dashboardStore.isLoading">
+                      <q-spinner-dots size="50px" color="primary" />
+                    </q-inner-loading>
+                    <DataVisualizer
+v-show="!dashboardStore.isLoading" title="CÍRCULOS - Certificados vs Faltante"
+                      :data="[
+                        { label: 'Certificados', value: circlesDonutData[0] },
+                        { label: 'Faltante', value: circlesDonutData[1] }
+                      ]" type="donut" row-key="label" :column-map="{ label: 'label', value: 'value' }" />
+                  </q-card>
+                </div>
+
+                <div v-if="!showDonutCharts" class="col-12 col-md-6">
+                  <q-card flat bordered style="min-height: 425px;">
+                    <!-- El spinner ahora se muestra SOBRE el contenido -->
+                    <q-inner-loading :showing="dashboardStore.isLoading">
+                      <q-spinner-dots size="50px" color="primary" />
+                    </q-inner-loading>
+                    <!-- v-show mantiene el componente en el DOM pero oculto -->
+                    <DataVisualizer
+v-show="!dashboardStore.isLoading" title="CÍRCULOS CUMPLIMIENTO vs META"
+                      :data="dashboardStore.circlesByState" type="bar" row-key="estado" :column-map="{
+                        label: 'estado',
+                        value: [
+                          { name: 'Círculos Certificados', key: 'circulos_certificados' },
+                          { name: 'Meta de Círculos', key: 'meta_circulos' }
+                        ]
+                      }" stacked />
+                  </q-card>
+                </div>
+
+
+
+                <!-- Gráfica de Anillo: Participantes (cuando hay filtro de estado) -->
+                <div v-if="showDonutCharts" class="col-12 col-md-6">
+                  <q-card flat bordered style="min-height: 425px;">
+                    <q-inner-loading :showing="dashboardStore.isLoading">
+                      <q-spinner-dots size="50px" color="primary" />
+                    </q-inner-loading>
+                    <DataVisualizer
+v-show="!dashboardStore.isLoading" title="PARTICIPANTES - Certificados vs Faltante"
+                      :data="[
+                        { label: 'Certificados', value: participantsDonutData[0] },
+                        { label: 'Faltante', value: participantsDonutData[1] }
+                      ]" type="donut" row-key="label" :column-map="{ label: 'label', value: 'value' }" />
+                  </q-card>
+                </div>
+
+                <!-- Nuevo par: Participantes por Estado (Gráfico) -->
+                <div v-if="!showDonutCharts" class="col-12 col-md-6">
+                  <q-card flat bordered style="min-height: 425px;">
+                    <q-inner-loading :showing="dashboardStore.isLoading">
+                      <q-spinner-dots size="50px" color="primary" />
+                    </q-inner-loading>
+                    <DataVisualizer
+v-show="!dashboardStore.isLoading" title="PARTICIPANTES CUMPLIMIENTO vs META"
+                      :data="dashboardStore.circlesByState" type="bar" row-key="estado" :column-map="{
+                        label: 'estado',
+                        value: [
+                          { name: 'Participantes Certificados', key: 'participantes_certificados' },
+                          { name: 'Meta de Participantes', key: 'meta_participantes' }
+                        ]
+                      }" stacked />
+                  </q-card>
+                </div>
+
+                <!-- Nuevo par: Participantes por Estado (Tabla) -->
+                <div class="col-12 col-md-6">
+                  <q-card flat bordered style="min-height: 425px;">
+                    <q-inner-loading :showing="dashboardStore.isLoading">
+                      <q-spinner-dots size="50px" color="primary" />
+                    </q-inner-loading>
+                    <DataVisualizer
+v-show="!dashboardStore.isLoading" title="Participantes por Estado"
+                      :data="dashboardStore.circlesByState" type="table" row-key="estado" :column-map="{
+                        label: 'estado',
+                        labelHeader: 'Estado',
+                        value: [
+                          { name: 'Participantes Certificados', key: 'participantes_certificados' },
+                          { name: 'Meta de Participantes', key: 'meta_participantes' }
+                        ]
+                      }" />
+                  </q-card>
+                </div>
+
+
+
+
+
+                <!-- Indicador: Círculos por Estado (Tabla) -->
+                <div class="col-12 col-md-6">
+                  <q-card flat bordered style="min-height: 425px;">
+                    <q-inner-loading :showing="dashboardStore.isLoading">
+                      <q-spinner-dots size="50px" color="primary" />
+                    </q-inner-loading>
+                    <DataVisualizer
+v-show="!dashboardStore.isLoading" title="Círculos por Estado"
+                      :data="dashboardStore.circlesByState" type="table" row-key="estado" :column-map="{
+                        label: 'estado',
+                        labelHeader: 'Estado',
+                        value: [
+                          { name: 'Círculos Certificados', key: 'circulos_certificados' },
+                          { name: 'Meta de Círculos', key: 'meta_circulos' }
+                        ]
+                      }" />
+                  </q-card>
+                </div>
+                <!-- Tabla: Círculos por Estado / Municipio -->
+                <div class="col-12">
+                  <q-card flat bordered style="min-height: 250px;">
+                    <q-card-section class="row items-center q-col-gutter-md">
+                      <div class="col">
+                        <div class="text-h6">CÍRCULOS POR ESTADO Y MUNICIPIO</div>
+                        <div class="text-subtitle2">Fecha: {{ currentDate }}</div>
+                      </div>
+                      <div class="col-12 col-md-3">
+                        <q-select
+v-model="estadoFilter" clearable outlined dense label="Estado"
+                          :options="estadoOptions" />
+                      </div>
+                      <div class="col-12 col-md-4">
+                        <q-select
+v-model="municipioFilter" v-model:input-value="municipioInput" multiple clearable
+                          outlined dense use-input input-debounce="300" label="Municipio (autocompletar)"
+                          :options="municipioOptions" :disable="!estadoFilter" map-options emit-value />
+                      </div>
+                      <div class="col-auto">
+                        <q-btn color="grey-7" round flat icon="more_vert">
+                          <q-menu cover auto-close>
+                            <q-list style="min-width: 150px">
+                              <q-item clickable @click="exportMunicipios('xlsx')">
+                                <q-item-section avatar><q-icon name="description" /></q-item-section>
+                                <q-item-section>Exportar a XLSX</q-item-section>
+                              </q-item>
+                              <q-item clickable @click="exportMunicipios('csv')">
+                                <q-item-section avatar><q-icon name="toc" /></q-item-section>
+                                <q-item-section>Exportar a CSV</q-item-section>
+                              </q-item>
+                              <q-item clickable @click="exportMunicipios('json')">
+                                <q-item-section avatar><q-icon name="code" /></q-item-section>
+                                <q-item-section>Exportar a JSON</q-item-section>
+                              </q-item>
+                            </q-list>
+                          </q-menu>
+                        </q-btn>
+                      </div>
+                    </q-card-section>
+
+                    <q-separator />
+
+                    <q-card-section>
+                      <q-inner-loading :showing="dashboardStore.isLoading">
+                        <q-spinner-dots size="30px" color="primary" />
+                      </q-inner-loading>
+
+                      <q-table
 v-model:pagination="municipioPagination" :rows="municipioTableRows"
-              :columns="municipioTableColumns" :row-key="row => `${row.estado}__${row.municipio}`" flat dense />
-          </q-card-section>
+                        :columns="municipioTableColumns" :row-key="row => `${row.estado}__${row.municipio}`" flat
+                        dense />
+                    </q-card-section>
+                  </q-card>
+                </div>
+
+                <!-- Tabla: Círculos por Estado / Municipio / Parroquia -->
+                <div class="col-12">
+                  <ParroquiaDataVisualizer title="CÍRCULOS POR ESTADO, MUNICIPIO Y PARROQUIA" />
+                </div>
+
+                <!-- Tabla: Círculos por Estado / Municipio / Parroquia / Comuna -->
+                <div class="col-12">
+                  <ComunaParroquiaDataVisualizer title="CÍRCULOS POR ESTADO, MUNICIPIO, PARROQUIA Y COMUNA" />
+                </div>
+              </div>
+            </q-tab-panel>
+
+            <q-tab-panel name="registros">
+              <div class="text-h6 text-center q-pa-md">Contenido de Registros (Próximamente)</div>
+            </q-tab-panel>
+          </q-tab-panels>
         </q-card>
-      </div>
-
-      <!-- Tabla: Círculos por Estado / Municipio / Parroquia -->
-      <div class="col-12">
-        <ParroquiaDataVisualizer title="CÍRCULOS POR ESTADO, MUNICIPIO Y PARROQUIA" />
-      </div>
-
-      <!-- Tabla: Círculos por Estado / Municipio / Parroquia / Comuna -->
-      <div class="col-12">
-        <ComunaParroquiaDataVisualizer title="CÍRCULOS POR ESTADO, MUNICIPIO, PARROQUIA Y COMUNA" />
       </div>
     </div>
   </q-page>
@@ -318,6 +353,7 @@ const dailyCertificationsHeight = ref(425);
 // const circlesByStateHeight = ref(425);
 // const participantsByStateHeight = ref(425);
 const stateIndicatorsHeight = ref(425);
+const tab = ref('circulos');
 
 // Filters for municipios table
 const estadoFilter = ref(null);

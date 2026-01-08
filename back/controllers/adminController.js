@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
+const { refreshMaterializedView } = require('../services/materializedViewScheduler');
 
 const formatDbUser = (row = {}) => ({
   id: row.id,
@@ -154,3 +155,25 @@ exports.updateUserStates = async (req, res) => {
     client.release();
   }
 };
+
+/**
+ * Endpoint para refrescar manualmente la vista materializada vregistros_estados
+ * Solo accesible para administradores
+ */
+exports.refreshMaterializedView = async (_req, res) => {
+  try {
+    await refreshMaterializedView();
+    res.json({
+      success: true,
+      message: 'Vista materializada public.vregistros_estados actualizada exitosamente.'
+    });
+  } catch (error) {
+    console.error('Error al refrescar vista materializada:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al actualizar la vista materializada.',
+      error: error.message
+    });
+  }
+};
+
