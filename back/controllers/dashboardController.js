@@ -72,3 +72,14 @@ exports.getParticipantesPorEstado = async (req, res) => {
         res.status(500).send('Error del servidor');
     }
 };
+
+// Endpoint para obtener indicadores de registros básicos por estado
+exports.getRegistrosIndicadoresPorEstado = async (req, res) => {
+    try {
+        const data = await dashboardService.getRegistrosIndicadoresPorEstado(req.user.id);
+        res.json(data);
+    } catch (error) {
+        console.error('Error al obtener indicadores de registros por estado:', error.message);
+        res.status(500).send('Error del servidor');
+    }
+};

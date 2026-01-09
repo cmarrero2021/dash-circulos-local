@@ -382,3 +382,42 @@ exports.getParticipantesPorEstado = async () => {
     return rows;
 };
 
+// --- Función para obtener indicadores de registros básicos por estado ---
+exports.getRegistrosIndicadoresPorEstado = async (userId) => {
+    const hasNationalAccess = await hasNationalDashboardAccess(userId);
+    const params = [];
+    let whereClause = '';
+
+    if (!hasNationalAccess) {
+        const allowedStates = await getAllowedStatesForUser(userId);
+        if (!allowedStates.length) {
+            return [];
+        }
+        params.push(allowedStates);
+        whereClause = `WHERE estado_id = ANY($${params.length})`;
+    }
+
+    const query = `
+        SELECT 
+            estado,
+            venezolano,
+            extranjero,
+            masculino,
+            femenino,
+            promedio_edad,
+            prom_edad_masc,
+            prom_edad_fem,
+            ninguno,
+            primaria,
+            secundaria,
+            universidad,
+            postgrado
+        FROM vindicadores_registros_basicos_estados
+        ${whereClause}
+        ORDER BY estado;
+    `;
+    const { rows } = await pool.query(query, params);
+    return rows;
+};
+
+

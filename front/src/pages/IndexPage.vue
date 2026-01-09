@@ -52,15 +52,8 @@
       <div class="col-12">
         <q-card flat bordered>
           <q-tabs
-            v-model="tab"
-            class="text-grey-8 bg-grey-1"
-            active-color="primary"
-            active-bg-color="white"
-            indicator-color="primary"
-            align="justify"
-            narrow-indicator
-            style="border-radius: 8px 8px 0 0;"
-          >
+v-model="tab" class="text-grey-8 bg-grey-1" active-color="primary" active-bg-color="white"
+            indicator-color="primary" align="justify" narrow-indicator style="border-radius: 8px 8px 0 0;">
             <q-tab name="circulos" icon="trip_origin" label="Círculos" class="q-py-md" />
             <q-tab name="registros" icon="how_to_reg" label="Registros" class="q-py-md" />
           </q-tabs>
@@ -318,8 +311,8 @@ v-model:pagination="municipioPagination" :rows="municipioTableRows"
               </div>
             </q-tab-panel>
 
-            <q-tab-panel name="registros">
-              <div class="text-h6 text-center q-pa-md">Contenido de Registros (Próximamente)</div>
+            <q-tab-panel name="registros" class="q-pa-md">
+              <RegistrosIndicadoresTable />
             </q-tab-panel>
           </q-tab-panels>
         </q-card>
@@ -337,6 +330,7 @@ import DataVisualizer from 'components/DataVisualizer.vue';
 import ParroquiaDataVisualizer from 'components/ParroquiaDataVisualizer.vue';
 import ComunaParroquiaDataVisualizer from 'components/ComunaParroquiaDataVisualizer.vue';
 import MapaVenezuela from 'components/MapaVenezuela.vue';
+import RegistrosIndicadoresTable from 'components/RegistrosIndicadoresTable.vue';
 import { utils, writeFile } from 'xlsx';
 import { exportFile, Notify } from 'quasar';
 import html2canvas from 'html2canvas';

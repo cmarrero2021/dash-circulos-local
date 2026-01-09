@@ -36,8 +36,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const indicators = ref({});
   const dailyCertifications = ref([]);
   const stateIndicators = ref([]);
+  const registrosIndicadores = ref([]); // Estado de registros
   const isLoading = ref(false);
   const isStateIndicatorsLoading = ref(false);
+  const isLoadingRegistrosIndicadores = ref(false);
   const lastUpdateAt = ref(0);
   const highlightedStateId = ref(null);
   const manualStateFilter = ref(null); // Filtro manual desde el mapa
@@ -170,6 +172,22 @@ export const useDashboardStore = defineStore('dashboard', () => {
       stateIndicators.value = [];
     } finally {
       isStateIndicatorsLoading.value = false;
+    }
+  };
+
+  const fetchRegistrosIndicadores = async () => {
+    const authStore = useAuthStore();
+    if (!authStore.isAuthenticated) return;
+
+    isLoadingRegistrosIndicadores.value = true;
+    try {
+      const response = await api.get('/dashboard/registros-indicadores');
+      registrosIndicadores.value = response.data || [];
+    } catch (error) {
+      console.error('Error al obtener los indicadores de registros:', error);
+      registrosIndicadores.value = [];
+    } finally {
+      isLoadingRegistrosIndicadores.value = false;
     }
   };
 
@@ -333,8 +351,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
     indicators,
     dailyCertifications,
     stateIndicators,
+    registrosIndicadores,
     isLoading,
     isStateIndicatorsLoading,
+    isLoadingRegistrosIndicadores,
     lastUpdateAt,
     highlightedStateId,
     manualStateFilter,
@@ -350,6 +370,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     refetchAll,
     handleDBChange,
     fetchStateIndicators,
+    fetchRegistrosIndicadores,
     setManualStateFilter,
     clearManualStateFilter,
   };
