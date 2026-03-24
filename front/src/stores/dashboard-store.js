@@ -37,9 +37,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const dailyCertifications = ref([]);
   const stateIndicators = ref([]);
   const registrosIndicadores = ref([]); // Estado de registros
+  const registrosIndicadoresNacionales = ref({}); // Indicadores nacionales
   const isLoading = ref(false);
   const isStateIndicatorsLoading = ref(false);
   const isLoadingRegistrosIndicadores = ref(false);
+  const isLoadingRegistrosIndicadoresNacionales = ref(false);
   const lastUpdateAt = ref(0);
   const highlightedStateId = ref(null);
   const manualStateFilter = ref(null); // Filtro manual desde el mapa
@@ -188,6 +190,22 @@ export const useDashboardStore = defineStore('dashboard', () => {
       registrosIndicadores.value = [];
     } finally {
       isLoadingRegistrosIndicadores.value = false;
+    }
+  };
+
+  const fetchRegistrosIndicadoresNacionales = async () => {
+    const authStore = useAuthStore();
+    if (!authStore.isAuthenticated) return;
+
+    isLoadingRegistrosIndicadoresNacionales.value = true;
+    try {
+      const response = await api.get('/dashboard/registros-indicadores-nacionales');
+      registrosIndicadoresNacionales.value = response.data || {};
+    } catch (error) {
+      console.error('Error al obtener los indicadores de registros nacionales:', error);
+      registrosIndicadoresNacionales.value = {};
+    } finally {
+      isLoadingRegistrosIndicadoresNacionales.value = false;
     }
   };
 
@@ -352,9 +370,11 @@ export const useDashboardStore = defineStore('dashboard', () => {
     dailyCertifications,
     stateIndicators,
     registrosIndicadores,
+    registrosIndicadoresNacionales,
     isLoading,
     isStateIndicatorsLoading,
     isLoadingRegistrosIndicadores,
+    isLoadingRegistrosIndicadoresNacionales,
     lastUpdateAt,
     highlightedStateId,
     manualStateFilter,
@@ -371,6 +391,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     handleDBChange,
     fetchStateIndicators,
     fetchRegistrosIndicadores,
+    fetchRegistrosIndicadoresNacionales,
     setManualStateFilter,
     clearManualStateFilter,
   };

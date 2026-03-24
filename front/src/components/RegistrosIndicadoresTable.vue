@@ -37,6 +37,7 @@ v-show="!isLoading" :rows="tableData" :columns="columns" row-key="estado" flat d
                     <!-- First row: Group headers -->
                     <tr>
                         <th rowspan="2" class="text-left bg-grey-3">ESTADO</th>
+                        <th rowspan="2" class="text-right bg-grey-3">REGISTROS</th>
                         <th colspan="2" class="text-center bg-blue-2">NACIONALIDAD</th>
                         <th colspan="2" class="text-center bg-green-2">SEXO</th>
                         <th colspan="3" class="text-center bg-orange-2">PROMEDIO EDAD</th>
@@ -85,6 +86,7 @@ const formatNumber = (value) => {
 // Table columns configuration
 const columns = [
     { name: 'estado', label: 'ESTADO', field: 'estado', align: 'left', sortable: true },
+    { name: 'registros', label: 'REGISTROS', field: 'registros', align: 'right', format: formatNumber, sortable: true },
     { name: 'venezolano', label: 'VENEZOLANOS', field: 'venezolano', align: 'right', format: formatNumber },
     { name: 'extranjero', label: 'EXTRANJEROS', field: 'extranjero', align: 'right', format: formatNumber },
     { name: 'masculino', label: 'MASCULINOS', field: 'masculino', align: 'right', format: formatNumber },
@@ -109,6 +111,7 @@ const exportData = (format) => {
     const filename = `indicadores_registros_estados_${getTimestamp()}`;
     const data = tableData.value.map(row => ({
         Estado: row.estado,
+        Registros: row.registros,
         Venezolanos: row.venezolano,
         Extranjeros: row.extranjero,
         Masculinos: row.masculino,

@@ -311,8 +311,30 @@ v-model:pagination="municipioPagination" :rows="municipioTableRows"
               </div>
             </q-tab-panel>
 
-            <q-tab-panel name="registros" class="q-pa-md">
-              <RegistrosIndicadoresTable />
+            <q-tab-panel name="registros" class="q-pa-none">
+              <div class="row q-col-gutter-md">
+                <!-- Indicadores Nacionales de Registros -->
+                <div v-for="indicator in registrosIndicadoresCards" :key="indicator.label" class="col-12 col-md-3">
+                  <q-card flat bordered>
+                    <q-card-section>
+                      <div class="row items-center no-wrap">
+                        <div class="col">
+                          <div class="text-subtitle2 text-grey-8">{{ indicator.label }}</div>
+                          <div class="text-h5 text-weight-bold">
+                            {{ indicator.value }}
+                            <q-icon :name="indicator.icon" :color="indicator.color" size="sm" />
+                          </div>
+                        </div>
+                      </div>
+                    </q-card-section>
+                  </q-card>
+                </div>
+
+                <!-- Tabla de Indicadores por Estado -->
+                <div class="col-12">
+                  <RegistrosIndicadoresTable />
+                </div>
+              </div>
             </q-tab-panel>
           </q-tab-panels>
         </q-card>
@@ -341,6 +363,7 @@ const currentDate = ref(new Date().toLocaleDateString('es-ES'));
 const dashboardStore = useDashboardStore();
 const authStore = useAuthStore();
 const { indicators: rawIndicators, circlesByState, circlesByMunicipio, stateIndicators, manualStateFilter } = storeToRefs(dashboardStore);
+const { registrosIndicadoresNacionales } = storeToRefs(dashboardStore);
 const { isStateIndicatorsLoading } = storeToRefs(dashboardStore);
 
 const dailyCertificationsHeight = ref(425);
@@ -389,6 +412,62 @@ const filteredStateIndicators = computed(() => {
     return stateIndicators.value;
   }
   return stateIndicators.value.filter(row => Number(row.estado_id) === Number(manualStateFilter.value));
+});
+
+// Registros Indicators Cards
+const registrosIndicadoresCards = computed(() => {
+  const data = registrosIndicadoresNacionales.value || {};
+
+  return [
+    {
+      label: 'REGISTROS',
+      value: formatNumber(data.registros),
+      icon: 'how_to_reg',
+      color: 'primary'
+    },
+    {
+      label: 'VENEZOLANOS',
+      value: formatNumber(data.venezolanos),
+      icon: 'flag',
+      color: 'blue'
+    },
+    {
+      label: 'EXTRANJEROS',
+      value: formatNumber(data.extranjero),
+      icon: 'public',
+      color: 'green'
+    },
+    {
+      label: 'MASCULINOS',
+      value: formatNumber(data.masculino),
+      icon: 'male',
+      color: 'indigo'
+    },
+    {
+      label: 'FEMENINOS',
+      value: formatNumber(data.femenino),
+      icon: 'female',
+      color: 'pink'
+    },
+    {
+      label: 'PROMEDIO EDAD',
+      value: data.promedio_edad || '0',
+      icon: 'cake',
+      color: 'orange'
+    },
+    {
+      label: 'PROMEDIO EDAD MASCULINO',
+      value: data.prom_edad_masc || '0',
+      icon: 'cake',
+      color: 'deep-purple'
+    },
+    {
+      label: 'PROMEDIO EDAD FEMENINO',
+      value: data.prom_edad_fem || '0',
+      icon: 'cake',
+      color: 'deep-orange'
+    }
+  ];
 });
 
 // Compute unique estado options from circlesByState
@@ -678,6 +757,7 @@ onMounted(() => {
   dashboardStore.fetchIndicators();
   dashboardStore.fetchDailyCertifications();
   dashboardStore.fetchCirclesByMunicipios();
+  dashboardStore.fetchRegistrosIndicadoresNacionales();
   if (showStateIndicators.value) {
     dashboardStore.fetchStateIndicators();
   }

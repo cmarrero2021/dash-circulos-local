@@ -32,5 +32,6 @@ router.get('/mapa-participantes', dashboardController.getParticipantesPorEstado)
 
 // --- Endpoint de Indicadores de Registros ---
 router.get('/registros-indicadores', dashboardController.getRegistrosIndicadoresPorEstado);
+router.get('/registros-indicadores-nacionales', dashboardController.getRegistrosIndicadoresNacionales);
 
 module.exports = router;

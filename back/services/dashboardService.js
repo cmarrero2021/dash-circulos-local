@@ -400,6 +400,7 @@ exports.getRegistrosIndicadoresPorEstado = async (userId) => {
     const query = `
         SELECT 
             estado,
+            registros,
             venezolano,
             extranjero,
             masculino,
@@ -418,6 +419,25 @@ exports.getRegistrosIndicadoresPorEstado = async (userId) => {
     `;
     const { rows } = await pool.query(query, params);
     return rows;
+};
+
+// --- Función para obtener indicadores de registros básicos nacionales ---
+exports.getRegistrosIndicadoresNacionales = async () => {
+    const query = `
+        SELECT 
+            registros,
+            venezolanos,
+            extranjero,
+            masculino,
+            femenino,
+            promedio_edad,
+            prom_edad_masc,
+            prom_edad_fem
+        FROM vindicadores_registros_basicos_nacionales
+        LIMIT 1;
+    `;
+    const { rows } = await pool.query(query);
+    return rows[0] || {};
 };
 
 

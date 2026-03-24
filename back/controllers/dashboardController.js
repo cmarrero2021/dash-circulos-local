@@ -83,3 +83,14 @@ exports.getRegistrosIndicadoresPorEstado = async (req, res) => {
         res.status(500).send('Error del servidor');
     }
 };
+
+// Endpoint para obtener indicadores de registros básicos nacionales
+exports.getRegistrosIndicadoresNacionales = async (req, res) => {
+    try {
+        const data = await dashboardService.getRegistrosIndicadoresNacionales();
+        res.json(data);
+    } catch (error) {
+        console.error('Error al obtener indicadores de registros nacionales:', error.message);
+        res.status(500).send('Error del servidor');
+    }
+};
