@@ -353,7 +353,18 @@ exports.getStateIndicatorsView = async (userId, filters = {}) => {
 };
 
 // --- Función para obtener datos del mapa (porcentajes por estado) ---
-exports.getMapaEstados = async () => {
+exports.getMapaEstados = async (userId) => {
+    const hasNationalAccess = await hasNationalDashboardAccess(userId);
+    let whereClause = '';
+    const params = [];
+
+    if (!hasNationalAccess) {
+        const allowedStates = await getAllowedStatesForUser(userId);
+        if (!allowedStates.length) return [];
+        params.push(allowedStates);
+        whereClause = `WHERE estado_id = ANY($1)`;
+    }
+
     const query = `
         SELECT 
             estado_id, 
@@ -362,23 +373,36 @@ exports.getMapaEstados = async () => {
             circulos, 
             porcentaje
         FROM vcumplimiento_circulos_estados
+        ${whereClause}
         ORDER BY estado_id;
     `;
-    const { rows } = await pool.query(query);
+    const { rows } = await pool.query(query, params);
     return rows;
 };
 
 // --- Función para obtener participantes por estado (capa de dispersión) ---
-exports.getParticipantesPorEstado = async () => {
+exports.getParticipantesPorEstado = async (userId) => {
+    const hasNationalAccess = await hasNationalDashboardAccess(userId);
+    let whereClause = '';
+    const params = [];
+
+    if (!hasNationalAccess) {
+        const allowedStates = await getAllowedStatesForUser(userId);
+        if (!allowedStates.length) return [];
+        params.push(allowedStates);
+        whereClause = `WHERE state_id = ANY($1)`;
+    }
+
     const query = `
         SELECT 
             state_id, 
             estado, 
             registros AS participantes
         FROM vregistros_estados
+        ${whereClause}
         ORDER BY state_id;
     `;
-    const { rows } = await pool.query(query);
+    const { rows } = await pool.query(query, params);
     return rows;
 };
 
@@ -394,7 +418,9 @@ exports.getRegistrosIndicadoresPorEstado = async (userId) => {
             return [];
         }
         params.push(allowedStates);
-        whereClause = `WHERE estado_id = ANY($${params.length})`;
+        // La vista no tiene estado_id; filtra usando el nombre del estado (UPPER)
+        // via subquery a vestados para hacer la correspondencia por ID
+        whereClause = `WHERE estado = ANY(SELECT UPPER(estado) FROM vestados WHERE id = ANY($${params.length}))`;
     }
 
     const query = `
@@ -421,22 +447,48 @@ exports.getRegistrosIndicadoresPorEstado = async (userId) => {
     return rows;
 };
 
-// --- Función para obtener indicadores de registros básicos nacionales ---
-exports.getRegistrosIndicadoresNacionales = async () => {
+// --- Función para obtener indicadores de registros básicos nacionales (o del scope del usuario) ---
+exports.getRegistrosIndicadoresNacionales = async (userId) => {
+    const hasNationalAccess = await hasNationalDashboardAccess(userId);
+
+    // Usuarios con acceso nacional: consultan la vista nacional optimizada
+    if (hasNationalAccess) {
+        const query = `
+            SELECT 
+                registros,
+                venezolanos,
+                extranjero,
+                masculino,
+                femenino,
+                promedio_edad,
+                prom_edad_masc,
+                prom_edad_fem
+            FROM vindicadores_registros_basicos_nacionales
+            LIMIT 1;
+        `;
+        const { rows } = await pool.query(query);
+        return rows[0] || {};
+    }
+
+    // Usuarios con acceso restringido: agregar desde la vista por estados
+    // usando promedio ponderado para las edades (estadísticamente correcto)
+    const allowedStates = await getAllowedStatesForUser(userId);
+    if (!allowedStates.length) return {};
+
     const query = `
         SELECT 
-            registros,
-            venezolanos,
-            extranjero,
-            masculino,
-            femenino,
-            promedio_edad,
-            prom_edad_masc,
-            prom_edad_fem
-        FROM vindicadores_registros_basicos_nacionales
-        LIMIT 1;
+            SUM(registros)::bigint                                                              AS registros,
+            SUM(venezolano)::bigint                                                             AS venezolanos,
+            SUM(extranjero)::bigint                                                             AS extranjero,
+            SUM(masculino)::bigint                                                              AS masculino,
+            SUM(femenino)::bigint                                                               AS femenino,
+            ROUND(SUM(promedio_edad::numeric  * registros) / NULLIF(SUM(registros), 0))::integer AS promedio_edad,
+            ROUND(SUM(prom_edad_masc::numeric * masculino) / NULLIF(SUM(masculino), 0))::integer AS prom_edad_masc,
+            ROUND(SUM(prom_edad_fem::numeric  * femenino)  / NULLIF(SUM(femenino),  0))::integer AS prom_edad_fem
+        FROM vindicadores_registros_basicos_estados
+        WHERE estado = ANY(SELECT UPPER(estado) FROM vestados WHERE id = ANY($1))
     `;
-    const { rows } = await pool.query(query);
+    const { rows } = await pool.query(query, [allowedStates]);
     return rows[0] || {};
 };
 

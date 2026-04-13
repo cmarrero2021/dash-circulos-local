@@ -37,6 +37,7 @@ import { useQuasar } from 'quasar';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useDashboardStore } from 'stores/dashboard-store';
+import { useAuthStore } from 'stores/auth-store';
 import { api } from 'boot/axios';
 import domtoimage from 'dom-to-image-more';
 import { jsPDF } from 'jspdf';
@@ -45,6 +46,7 @@ export default defineComponent({
     name: 'MapaVenezuela',
     setup() {
         const dashboardStore = useDashboardStore();
+        const authStore = useAuthStore();
         const $q = useQuasar();
         const mapContainer = ref(null);
         let map = null;
@@ -54,6 +56,17 @@ export default defineComponent({
         const selectedState = ref(null);
         const estadosData = ref([]);
         const participantesData = ref([]);
+
+        // --- Helpers de acceso geográfico ---
+        // Un usuario es "nacional" si es Administrador o no tiene estados explícitamente asignados
+        const isNationalUser = () =>
+            authStore.user?.role === 'Administrador' || !authStore.allowedStates?.length;
+
+        // Verifica si el usuario tiene acceso a un estado concreto (por su state_id numérico)
+        const isStateAllowed = (sid) => {
+            if (isNationalUser()) return true;
+            return (authStore.allowedStates || []).includes(Number(sid));
+        };
 
         const getColor = (p) => {
             if (p == null || p === undefined || isNaN(p)) return '#808080';
@@ -69,7 +82,19 @@ export default defineComponent({
         const findParticipantesByStateId = (sid) => participantesData.value.find(p => Number(p.state_id) === Number(sid));
 
         const stateStyle = (f) => {
-            const est = findEstadoById(f.properties.state_id);
+            const sid = f.properties.state_id;
+            // Si el usuario no tiene acceso a este estado: estilo gris claro discreto
+            if (!isStateAllowed(Number(sid))) {
+                return {
+                    fillColor: '#c8c8c8',
+                    weight: 1,
+                    opacity: 0.6,
+                    color: '#aaaaaa',
+                    dashArray: '4',
+                    fillOpacity: 0.25
+                };
+            }
+            const est = findEstadoById(sid);
             return {
                 fillColor: getColor(est ? parseFloat(est.porcentaje) : null),
                 weight: 2,
@@ -115,20 +140,57 @@ export default defineComponent({
         const clearStateFilter = () => {
             selectedState.value = null;
             dashboardStore.clearManualStateFilter();
+            // Si es usuario restringido, volver al zoom de sus estados; si es nacional, zoom general
+            if (!isNationalUser() && authStore.allowedStates?.length > 0 && estadosLayer) {
+                const allowedLayers = [];
+                estadosLayer.eachLayer(l => {
+                    const sid = l.feature?.properties?.state_id;
+                    if (sid && isStateAllowed(Number(sid))) allowedLayers.push(l);
+                });
+                if (allowedLayers.length > 0) {
+                    map.fitBounds(L.featureGroup(allowedLayers).getBounds(), { padding: [40, 40] });
+                    return;
+                }
+            }
             if (map) map.setView([8, -66], 6);
         };
 
         const recenterMap = () => {
-            if (map) {
-                map.setView([8, -66], 6);
+            if (!map) return;
+            if (!isNationalUser() && authStore.allowedStates?.length > 0 && estadosLayer) {
+                const allowedLayers = [];
+                estadosLayer.eachLayer(l => {
+                    const sid = l.feature?.properties?.state_id;
+                    if (sid && isStateAllowed(Number(sid))) allowedLayers.push(l);
+                });
+                if (allowedLayers.length > 0) {
+                    map.fitBounds(L.featureGroup(allowedLayers).getBounds(), { padding: [40, 40] });
+                    return;
+                }
             }
+            map.setView([8, -66], 6);
         };
 
         const onEachFeature = (f, layer) => {
             const sid = f.properties.state_id;
             const est = findEstadoById(sid);
-            const nom = est ? (est.estado || est.estado_nombre || (f.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '')) : (f.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
+            const nom = est
+                ? (est.estado || est.estado_nombre || (f.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, ''))
+                : (f.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
 
+            // Estado sin acceso: solo tooltip informativo, sin interacción de click
+            if (!isStateAllowed(Number(sid))) {
+                layer.bindTooltip(
+                    `<div style="text-align:center;">
+                        <span style="font-weight:bold;">${nom.toUpperCase()}</span><br>
+                        <span style="color:#bbb; font-size:11px;">Sin acceso</span>
+                    </div>`,
+                    { permanent: false, direction: 'center', className: 'state-tooltip' }
+                );
+                return;
+            }
+
+            // Estado con acceso: comportamiento completo
             const meta = est ? (est.meta_circulo || 0) : 0;
             const circulos = est ? (est.circulos || 0) : 0;
             const pct = est ? parseFloat(est.porcentaje) : 0;
@@ -247,7 +309,7 @@ export default defineComponent({
             const outlineLayer = L.geoJSON(geojsonData, {
                 style: {
                     fill: true,
-                    fillOpacity: 0, // Área interactiva pero transparente
+                    fillOpacity: 0,
                     color: '#333333',
                     weight: 1.5,
                     opacity: 0.6
@@ -257,6 +319,9 @@ export default defineComponent({
                     const partData = findParticipantesByStateId(sid);
                     const registros = partData ? partData.participantes : 0;
                     const estadoNombre = partData ? partData.estado : (feature.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
+
+                    // Estado sin acceso: sin interacción en la capa de registros
+                    if (!isStateAllowed(Number(sid))) return;
 
                     const popupContent = `
                         <div style="text-align:center; padding: 5px;">
@@ -291,6 +356,9 @@ export default defineComponent({
 
             geojsonData.features.forEach(feature => {
                 const sid = feature.properties.state_id;
+                // Solo generar puntos para estados con acceso
+                if (!isStateAllowed(Number(sid))) return;
+
                 const partData = findParticipantesByStateId(sid);
                 const registros = partData ? partData.participantes : 0;
 
@@ -350,10 +418,6 @@ export default defineComponent({
                 loadMapaData(),
                 loadParticipantesData()
             ]);
-            // const [circulosLoaded, participantesLoaded] = await Promise.all([
-            //     loadMapaData(),
-            //     loadParticipantesData()
-            // ]);
 
             try {
                 const geojsonResponse = await fetch('/geojson/estados_final.geojson');
@@ -361,6 +425,18 @@ export default defineComponent({
 
                 estadosLayer = L.geoJSON(geojsonData, { style: stateStyle, onEachFeature });
                 estadosLayer.addTo(map);
+
+                // Si el usuario no tiene acceso nacional, hacer auto-zoom a sus estados permitidos
+                if (!isNationalUser()) {
+                    const allowedLayers = [];
+                    estadosLayer.eachLayer(l => {
+                        const sid = l.feature?.properties?.state_id;
+                        if (sid && isStateAllowed(Number(sid))) allowedLayers.push(l);
+                    });
+                    if (allowedLayers.length > 0) {
+                        map.fitBounds(L.featureGroup(allowedLayers).getBounds(), { padding: [40, 40] });
+                    }
+                }
 
                 if (participantesLoaded && participantesData.value.length > 0) {
                     participantesLayer = createRegistrosLayer(geojsonData);

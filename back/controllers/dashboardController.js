@@ -54,7 +54,7 @@ exports.getDailyCertifications = (req, res) => handleRequest(dashboardService.ge
 // Endpoint para obtener datos del mapa de Venezuela (porcentajes por estado)
 exports.getMapaEstados = async (req, res) => {
     try {
-        const data = await dashboardService.getMapaEstados();
+        const data = await dashboardService.getMapaEstados(req.user.id);
         res.json(data);
     } catch (error) {
         console.error('Error al obtener datos del mapa:', error.message);
@@ -65,7 +65,7 @@ exports.getMapaEstados = async (req, res) => {
 // Endpoint para obtener participantes por estado (capa de dispersión)
 exports.getParticipantesPorEstado = async (req, res) => {
     try {
-        const data = await dashboardService.getParticipantesPorEstado();
+        const data = await dashboardService.getParticipantesPorEstado(req.user.id);
         res.json(data);
     } catch (error) {
         console.error('Error al obtener participantes por estado:', error.message);
@@ -87,7 +87,7 @@ exports.getRegistrosIndicadoresPorEstado = async (req, res) => {
 // Endpoint para obtener indicadores de registros básicos nacionales
 exports.getRegistrosIndicadoresNacionales = async (req, res) => {
     try {
-        const data = await dashboardService.getRegistrosIndicadoresNacionales();
+        const data = await dashboardService.getRegistrosIndicadoresNacionales(req.user.id);
         res.json(data);
     } catch (error) {
         console.error('Error al obtener indicadores de registros nacionales:', error.message);

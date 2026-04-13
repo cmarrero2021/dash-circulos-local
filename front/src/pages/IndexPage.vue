@@ -758,6 +758,7 @@ onMounted(() => {
   dashboardStore.fetchDailyCertifications();
   dashboardStore.fetchCirclesByMunicipios();
   dashboardStore.fetchRegistrosIndicadoresNacionales();
+  dashboardStore.fetchRegistrosIndicadores();
   if (showStateIndicators.value) {
     dashboardStore.fetchStateIndicators();
   }

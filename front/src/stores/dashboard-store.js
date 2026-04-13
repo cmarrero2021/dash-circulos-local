@@ -249,6 +249,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
       fetchCirclesByParroquias(filters),
       fetchCirclesByComunas(filters),
       fetchCirclesByComunasParroquias(filters),
+      fetchRegistrosIndicadores(),
+      fetchRegistrosIndicadoresNacionales(),
     ]);
     // if (userHasNationalAccess() && !manualStateFilter.value) {
     if (!manualStateFilter.value) {
