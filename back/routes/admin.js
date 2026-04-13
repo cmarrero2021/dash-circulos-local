@@ -19,6 +19,7 @@ router.get('/roles', adminController.getRoles);
 router.get('/states', adminController.getStates);
 router.get('/users/:id/states', adminController.getUserStates);
 router.put('/users/:id/states', adminController.updateUserStates);
+router.put('/users/:id/password', adminController.changePassword);
 router.post('/refresh-materialized-view', adminController.refreshMaterializedView);
 
 module.exports = router;

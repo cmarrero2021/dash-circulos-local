@@ -177,3 +177,27 @@ exports.refreshMaterializedView = async (_req, res) => {
   }
 };
 
+exports.changePassword = async (req, res) => {
+  const { id } = req.params;
+  const { password } = req.body;
+
+  if (!password) {
+    return res.status(400).json({ message: 'La contraseña es requerida.' });
+  }
+
+  try {
+    const passwordHash = await bcrypt.hash(password, 10);
+    const query = 'UPDATE usuarios SET password_hash = $1 WHERE id = $2 RETURNING id;';
+    const { rows } = await pool.query(query, [passwordHash, id]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado.' });
+    }
+
+    res.json({ message: 'Contraseña actualizada correctamente.' });
+  } catch (error) {
+    console.error(`Error al cambiar contraseña del usuario ${id}:`, error);
+    res.status(500).json({ message: 'Error del servidor' });
+  }
+};
+

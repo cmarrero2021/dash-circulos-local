@@ -26,7 +26,12 @@
 
       <template #body-cell-actions="props">
         <q-td :props="props">
-          <q-btn flat round icon="edit" @click="openEditDialog(props.row)" />
+          <q-btn flat round icon="edit" color="primary" @click="openEditDialog(props.row)">
+            <q-tooltip>Editar Usuario</q-tooltip>
+          </q-btn>
+          <q-btn flat round icon="vpn_key" color="orange" @click="openPasswordDialog(props.row)">
+            <q-tooltip>Cambiar Contraseña</q-tooltip>
+          </q-btn>
         </q-td>
       </template>
     </q-table>
@@ -94,6 +99,61 @@
       </q-card>
     </q-dialog>
 
+    <!-- Diálogo de Cambio de Contraseña -->
+    <q-dialog v-model="passwordDialog.show" persistent>
+      <q-card style="width: 400px; max-width: 90vw;">
+        <q-card-section>
+          <div class="text-h6">Cambiar Contraseña</div>
+          <div class="text-subtitle2">{{ passwordDialog.user.nombre }}</div>
+        </q-card-section>
+
+        <q-card-section class="q-gutter-md">
+          <q-input
+            v-model="passwordDialog.newPassword"
+            label="Nueva Contraseña"
+            :type="passwordDialog.showNewPassword ? 'text' : 'password'"
+            outlined
+            dense
+            autofocus
+          >
+            <template #append>
+              <q-icon
+                :name="passwordDialog.showNewPassword ? 'visibility' : 'visibility_off'"
+                class="cursor-pointer"
+                @click="passwordDialog.showNewPassword = !passwordDialog.showNewPassword"
+              />
+            </template>
+          </q-input>
+          <q-input
+            v-model="passwordDialog.confirmPassword"
+            label="Confirmar Contraseña"
+            :type="passwordDialog.showConfirmPassword ? 'text' : 'password'"
+            outlined
+            dense
+          >
+            <template #append>
+              <q-icon
+                :name="passwordDialog.showConfirmPassword ? 'visibility' : 'visibility_off'"
+                class="cursor-pointer"
+                @click="passwordDialog.showConfirmPassword = !passwordDialog.showConfirmPassword"
+              />
+            </template>
+          </q-input>
+        </q-card-section>
+
+        <q-card-actions align="right">
+          <q-btn v-close-popup flat label="Cancelar" @click="resetPasswordDialog" />
+          <q-btn
+            color="primary"
+            label="Confirmar"
+            :loading="savingPassword"
+            :disable="!canSavePassword"
+            @click="savePasswordChange"
+          />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
+
   </q-page>
 </template>
 
@@ -115,6 +175,23 @@ const editDialog = ref({
   mode: 'edit',
   user: {},
   permittedStates: []
+});
+
+const passwordDialog = ref({
+  show: false,
+  user: {},
+  newPassword: '',
+  confirmPassword: '',
+  showNewPassword: false,
+  showConfirmPassword: false
+});
+
+const savingPassword = ref(false);
+
+const canSavePassword = computed(() => {
+  return passwordDialog.value.newPassword &&
+         passwordDialog.value.newPassword.length >= 6 &&
+         passwordDialog.value.newPassword === passwordDialog.value.confirmPassword;
 });
 
 const isCreateMode = computed(() => editDialog.value.mode === 'create');
@@ -190,6 +267,52 @@ async function openEditDialog(user) {
     } finally {
       loadingStates.value = false;
     }
+  }
+}
+
+function openPasswordDialog(user) {
+  passwordDialog.value = {
+    show: true,
+    user: { ...user },
+    newPassword: '',
+    confirmPassword: '',
+    showNewPassword: false,
+    showConfirmPassword: false
+  };
+}
+
+function resetPasswordDialog() {
+  passwordDialog.value = {
+    show: false,
+    user: {},
+    newPassword: '',
+    confirmPassword: '',
+    showNewPassword: false,
+    showConfirmPassword: false
+  };
+}
+
+async function savePasswordChange() {
+  if (!canSavePassword.value) return;
+
+  savingPassword.value = true;
+  try {
+    await api.put(`/admin/users/${passwordDialog.value.user.id}/password`, {
+      password: passwordDialog.value.newPassword
+    });
+    $q.notify({
+      color: 'positive',
+      message: 'Contraseña actualizada correctamente para ' + passwordDialog.value.user.nombre
+    });
+    resetPasswordDialog();
+  } catch (error) {
+    console.error('Error al cambiar contraseña:', error);
+    $q.notify({
+      color: 'negative',
+      message: 'Error al cambiar la contraseña. Revise la consola.'
+    });
+  } finally {
+    savingPassword.value = false;
   }
 }
 
