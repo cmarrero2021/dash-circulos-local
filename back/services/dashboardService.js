@@ -220,21 +220,61 @@ exports.getCirclesByStateMunicipios = async (userId, filters = {}) => {
 
 exports.getCirclesByStateMunicipiosParroquias = async (userId, filters = {}) => {
     const { whereClause, params } = await buildFilterClause(userId, filters);
+
+    /**
+     * La query usa el mismo whereClause ($1, $2…) en dos CTEs distintos.
+     * PostgreSQL reutiliza correctamente los parámetros posicionales, por lo que
+     * no es necesario duplicar el array de params.
+     *
+     * Dos problemas resueltos:
+     *  1. El JOIN ahora incluye estado_id (evita contar círculos de otro estado
+     *     que comparten el mismo parroquia_id).
+     *  2. El CTE "huerfanos" captura círculos cuya parroquia_id NO existe en
+     *     rm_comunas para ese estado (garantiza que el total siempre cuadre).
+     */
     const query = `
-        WITH parroquias_filtradas AS (
+        WITH parroquias_catalogo AS (
             SELECT DISTINCT estado_id, estado, municipio_id, municipio, parroquia_id, parroquia
             FROM rm_comunas
             ${whereClause}
+        ),
+        circulos_usuario AS (
+            SELECT id, estado_id, estado, municipio_id, municipio, parroquia_id, parroquia
+            FROM rm_circulos_remoto
+            ${whereClause}
+        ),
+        result_catalogo AS (
+            SELECT
+                p.estado_id, p.estado,
+                p.municipio_id, p.municipio,
+                p.parroquia_id, p.parroquia,
+                COUNT(r.id) AS avance
+            FROM parroquias_catalogo p
+            LEFT JOIN circulos_usuario r
+                   ON p.parroquia_id = r.parroquia_id
+                  AND p.estado_id    = r.estado_id
+            GROUP BY p.estado_id, p.estado, p.municipio_id, p.municipio, p.parroquia_id, p.parroquia
+        ),
+        result_huerfanos AS (
+            -- Círculos cuya parroquia_id no existe en rm_comunas para ese estado
+            SELECT
+                c.estado_id, c.estado,
+                c.municipio_id,
+                COALESCE(c.municipio,  'Sin municipio')   AS municipio,
+                c.parroquia_id,
+                COALESCE(c.parroquia,  'Sin clasificar')  AS parroquia,
+                COUNT(c.id) AS avance
+            FROM circulos_usuario c
+            LEFT JOIN parroquias_catalogo p
+                   ON c.parroquia_id = p.parroquia_id
+                  AND c.estado_id    = p.estado_id
+            WHERE p.parroquia_id IS NULL
+            GROUP BY c.estado_id, c.estado, c.municipio_id, c.municipio, c.parroquia_id, c.parroquia
         )
-        SELECT 
-            p.estado_id, p.estado, 
-            p.municipio_id, p.municipio, 
-            p.parroquia_id, p.parroquia, 
-            COUNT(r.id) as avance
-        FROM parroquias_filtradas p
-        LEFT JOIN rm_circulos_remoto r ON p.parroquia_id = r.parroquia_id
-        GROUP BY p.estado_id, p.estado, p.municipio_id, p.municipio, p.parroquia_id, p.parroquia
-        ORDER BY p.estado, p.municipio, p.parroquia;
+        SELECT * FROM result_catalogo
+        UNION ALL
+        SELECT * FROM result_huerfanos WHERE avance > 0
+        ORDER BY estado, municipio, parroquia;
     `;
     const result = await pool.query(query, params);
     return result.rows;
