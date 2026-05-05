@@ -446,6 +446,33 @@ exports.getParticipantesPorEstado = async (userId) => {
     return rows;
 };
 
+// --- Función para obtener priorizados por estado (capa de dispersión triángulos) ---
+exports.getPriorizadosPorEstado = async (userId) => {
+    const hasNationalAccess = await hasNationalDashboardAccess(userId);
+    let whereClause = '';
+    const params = [];
+
+    if (!hasNationalAccess) {
+        const allowedStates = await getAllowedStatesForUser(userId);
+        if (!allowedStates.length) return [];
+        params.push(allowedStates);
+        whereClause = `WHERE estado_id = ANY($1)`;
+    }
+
+    const query = `
+        SELECT
+            estado_id AS state_id,
+            estado,
+            COUNT(*) AS priorizados
+        FROM vpriorizados
+        ${whereClause}
+        GROUP BY estado_id, estado
+        ORDER BY estado_id;
+    `;
+    const { rows } = await pool.query(query, params);
+    return rows;
+};
+
 // --- Función para obtener indicadores de registros básicos por estado ---
 exports.getRegistrosIndicadoresPorEstado = async (userId) => {
     const hasNationalAccess = await hasNationalDashboardAccess(userId);
