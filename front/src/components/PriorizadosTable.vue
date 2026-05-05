@@ -630,3 +630,10 @@ watch(() => props.active, (isActive) => {
   }
 }, { immediate: true });
 </script>
+
+<style scoped>
+.q-btn-toggle {
+  border: 1px solid #bdbdbd;
+  border-radius: 4px;
+}
+</style>
