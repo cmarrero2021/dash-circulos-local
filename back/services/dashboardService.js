@@ -698,26 +698,90 @@ exports.getPriorizados = async (userId, query = {}) => {
 
 /**
  * Obtiene los valores únicos para los filtros desplegables de vpriorizados,
- * respetando los permisos del usuario.
+ * respetando los permisos del usuario y cascada geográfica.
+ * @param {number} userId
+ * @param {object} query - { estados, municipios, parroquias } (comma-separated strings)
  */
-exports.getPriorizadosFilterOptions = async (userId) => {
+exports.getPriorizadosFilterOptions = async (userId, query = {}) => {
     const { permClause, permParams } = await buildPriorizadosPermissionClause(userId);
+    const baseParamCount = permParams.length;
 
-    const query = `
-        SELECT
-            COALESCE(json_agg(DISTINCT estado)    FILTER (WHERE estado IS NOT NULL),    '[]') AS estados,
-            COALESCE(json_agg(DISTINCT municipio)  FILTER (WHERE municipio IS NOT NULL),  '[]') AS municipios,
-            COALESCE(json_agg(DISTINCT parroquia)  FILTER (WHERE parroquia IS NOT NULL),  '[]') AS parroquias,
-            COALESCE(json_agg(DISTINCT comunidad)  FILTER (WHERE comunidad IS NOT NULL),  '[]') AS comunidades
-        FROM vpriorizados
-        ${permClause};
-    `;
-    const { rows } = await pool.query(query, permParams);
-    const row = rows[0] || {};
+    // Helper: builds a WHERE string appending extra conditions to the permission clause
+    const buildWhere = (extraConditions) => {
+        if (!extraConditions.length) return permClause;
+        const extra = extraConditions.join(' AND ');
+        return permClause ? `${permClause} AND ${extra}` : `WHERE ${extra}`;
+    };
+
+    const distinctQuery = (col, where, params) =>
+        pool.query(
+            `SELECT COALESCE(json_agg(DISTINCT ${col}) FILTER (WHERE ${col} IS NOT NULL), '[]') AS vals FROM vpriorizados ${where}`,
+            params,
+        );
+
+    // --- Estados: solo permisos ---
+    const estRes = await distinctQuery('estado', permClause, permParams);
+
+    // --- Municipios: filtrados por estados seleccionados ---
+    let munVals = [];
+    if (query.estados) {
+        const arr = Array.isArray(query.estados) ? query.estados : query.estados.split(',');
+        const pi = baseParamCount + 1;
+        const where = buildWhere([`estado = ANY($${pi})`]);
+        const res = await distinctQuery('municipio', where, [...permParams, arr]);
+        munVals = res.rows[0]?.vals || [];
+    }
+
+    // --- Parroquias: filtradas por estados + municipios seleccionados ---
+    let parVals = [];
+    if (query.municipios) {
+        const conditions = [];
+        const params = [...permParams];
+        let pi = baseParamCount + 1;
+        if (query.estados) {
+            const arr = Array.isArray(query.estados) ? query.estados : query.estados.split(',');
+            conditions.push(`estado = ANY($${pi})`);
+            params.push(arr);
+            pi++;
+        }
+        const munArr = Array.isArray(query.municipios) ? query.municipios : query.municipios.split(',');
+        conditions.push(`municipio = ANY($${pi})`);
+        params.push(munArr);
+        const where = buildWhere(conditions);
+        const res = await distinctQuery('parroquia', where, params);
+        parVals = res.rows[0]?.vals || [];
+    }
+
+    // --- Comunidades: filtradas por estados + municipios + parroquias seleccionados ---
+    let comVals = [];
+    if (query.parroquias) {
+        const conditions = [];
+        const params = [...permParams];
+        let pi = baseParamCount + 1;
+        if (query.estados) {
+            const arr = Array.isArray(query.estados) ? query.estados : query.estados.split(',');
+            conditions.push(`estado = ANY($${pi})`);
+            params.push(arr);
+            pi++;
+        }
+        if (query.municipios) {
+            const munArr = Array.isArray(query.municipios) ? query.municipios : query.municipios.split(',');
+            conditions.push(`municipio = ANY($${pi})`);
+            params.push(munArr);
+            pi++;
+        }
+        const parArr = Array.isArray(query.parroquias) ? query.parroquias : query.parroquias.split(',');
+        conditions.push(`parroquia = ANY($${pi})`);
+        params.push(parArr);
+        const where = buildWhere(conditions);
+        const res = await distinctQuery('comunidad', where, params);
+        comVals = res.rows[0]?.vals || [];
+    }
+
     return {
-        estados: (row.estados || []).sort(),
-        municipios: (row.municipios || []).sort(),
-        parroquias: (row.parroquias || []).sort(),
-        comunidades: (row.comunidades || []).sort(),
+        estados: (estRes.rows[0]?.vals || []).sort(),
+        municipios: munVals.sort(),
+        parroquias: parVals.sort(),
+        comunidades: comVals.sort(),
     };
 };

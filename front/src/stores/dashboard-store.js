@@ -389,13 +389,14 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
   /**
    * Obtiene las opciones únicas para los filtros desplegables de priorizados.
+   * @param {object} queryParams - Parámetros de cascada opcionales: { estados, municipios, parroquias }
    */
-  const fetchPriorizadosFilterOptions = async () => {
+  const fetchPriorizadosFilterOptions = async (queryParams = {}) => {
     const authStore = useAuthStore();
     if (!authStore.isAuthenticated) return;
 
     try {
-      const response = await api.get('/dashboard/priorizados/filter-options');
+      const response = await api.get('/dashboard/priorizados/filter-options', { params: queryParams });
       priorizadosFilterOptions.value = response.data || { estados: [], municipios: [], parroquias: [], comunidades: [] };
     } catch (error) {
       console.error('Error al obtener opciones de filtro de priorizados:', error);

@@ -28,14 +28,7 @@
 
       <!-- Clear Filters -->
       <div class="col-auto">
-        <q-btn
-          flat
-          dense
-          round
-          icon="filter_list_off"
-          color="grey-7"
-          @click="clearAllFilters"
-        >
+        <q-btn flat dense round icon="filter_list_off" color="grey-7" @click="clearAllFilters">
           <q-tooltip>Limpiar todos los filtros y orden</q-tooltip>
         </q-btn>
       </div>
@@ -114,7 +107,7 @@
           emit-value
           map-options
           @filter="(val, update) => filterSelectOptions(val, update, 'estados')"
-          @update:model-value="onFiltersChanged"
+          @update:model-value="onEstadosChanged"
         >
           <template #no-option>
             <q-item><q-item-section class="text-grey">Sin resultados</q-item-section></q-item>
@@ -126,6 +119,7 @@
         <q-select
           v-model="filterMunicipios"
           :options="filteredMunicipioOptions"
+          :disable="!filterEstados.length"
           multiple
           clearable
           outlined
@@ -137,7 +131,7 @@
           emit-value
           map-options
           @filter="(val, update) => filterSelectOptions(val, update, 'municipios')"
-          @update:model-value="onFiltersChanged"
+          @update:model-value="onMunicipiosChanged"
         >
           <template #no-option>
             <q-item><q-item-section class="text-grey">Sin resultados</q-item-section></q-item>
@@ -149,6 +143,7 @@
         <q-select
           v-model="filterParroquias"
           :options="filteredParroquiaOptions"
+          :disable="!filterMunicipios.length"
           multiple
           clearable
           outlined
@@ -160,7 +155,7 @@
           emit-value
           map-options
           @filter="(val, update) => filterSelectOptions(val, update, 'parroquias')"
-          @update:model-value="onFiltersChanged"
+          @update:model-value="onParroquiasChanged"
         >
           <template #no-option>
             <q-item><q-item-section class="text-grey">Sin resultados</q-item-section></q-item>
@@ -172,6 +167,7 @@
         <q-select
           v-model="filterComunidades"
           :options="filteredComunidadOptions"
+          :disable="!filterParroquias.length"
           multiple
           clearable
           outlined
@@ -192,45 +188,48 @@
       </div>
 
       <!-- Toggle filters row -->
-      <div class="col-12 col-md-3">
+      <div class="col-12 col-md-1">
         <div class="text-caption text-grey-7 q-mb-xs">Registro</div>
         <q-btn-toggle
           v-model="filterRegistro"
           dense
           no-caps
-          rounded
+          spread
+          no-wrap
           unelevated
           toggle-color="primary"
           :options="toggleOptions"
-          class="full-width"
+          class="bg-transparent"
           @update:model-value="onFiltersChanged"
         />
       </div>
-      <div class="col-12 col-md-3">
+      <div class="col-12 col-md-1">
         <div class="text-caption text-grey-7 q-mb-xs">Círculo</div>
         <q-btn-toggle
           v-model="filterCirculo"
           dense
           no-caps
-          rounded
+          spread
+          no-wrap
           unelevated
           toggle-color="primary"
           :options="toggleOptions"
-          class="full-width"
+          class="bg-transparent"
           @update:model-value="onFiltersChanged"
         />
       </div>
-      <div class="col-12 col-md-3">
+      <div class="col-12 col-md-1">
         <div class="text-caption text-grey-7 q-mb-xs">Sexo</div>
         <q-btn-toggle
           v-model="filterSexo"
           dense
           no-caps
-          rounded
+          spread
+          no-wrap
           unelevated
           toggle-color="primary"
           :options="sexoOptions"
-          class="full-width"
+          class="bg-transparent"
           @update:model-value="onFiltersChanged"
         />
       </div>
@@ -413,7 +412,7 @@ const onFiltersChanged = () => {
 };
 
 // --- Clear all filters ---
-const clearAllFilters = () => {
+const clearAllFilters = async () => {
   search.value = '';
   filterEstados.value = [];
   filterMunicipios.value = [];
@@ -425,10 +424,80 @@ const clearAllFilters = () => {
   pagination.value.sortBy = null;
   pagination.value.descending = false;
   pagination.value.page = 1;
+
+  // Reset downstream options
+  filteredMunicipioOptions.value = [];
+  filteredParroquiaOptions.value = [];
+  filteredComunidadOptions.value = [];
+
   onRequest({ pagination: pagination.value });
 };
 
-// --- Filter q-select options (autocomplete) ---
+// --- Cascade filter helpers ---
+const buildCascadeParams = () => {
+  const params = {};
+  if (filterEstados.value?.length) params.estados = filterEstados.value.join(',');
+  if (filterMunicipios.value?.length) params.municipios = filterMunicipios.value.join(',');
+  if (filterParroquias.value?.length) params.parroquias = filterParroquias.value.join(',');
+  return params;
+};
+
+const refreshFilterOptions = async () => {
+  await dashboardStore.fetchPriorizadosFilterOptions(buildCascadeParams());
+  // Sync the autocomplete refs with the freshly loaded store data
+  filteredEstadoOptions.value = priorizadosFilterOptions.value.estados;
+  filteredMunicipioOptions.value = priorizadosFilterOptions.value.municipios;
+  filteredParroquiaOptions.value = priorizadosFilterOptions.value.parroquias;
+  filteredComunidadOptions.value = priorizadosFilterOptions.value.comunidades;
+};
+
+// --- Cascade handlers ---
+const onEstadosChanged = async () => {
+  // Clear downstream selections
+  filterMunicipios.value = [];
+  filterParroquias.value = [];
+  filterComunidades.value = [];
+  filteredParroquiaOptions.value = [];
+  filteredComunidadOptions.value = [];
+
+  // Fetch municipios for selected estados (or clear if none)
+  if (filterEstados.value?.length) {
+    await refreshFilterOptions();
+  } else {
+    filteredMunicipioOptions.value = [];
+  }
+  onFiltersChanged();
+};
+
+const onMunicipiosChanged = async () => {
+  // Clear downstream selections
+  filterParroquias.value = [];
+  filterComunidades.value = [];
+  filteredComunidadOptions.value = [];
+
+  // Fetch parroquias for selected municipios (or clear if none)
+  if (filterMunicipios.value?.length) {
+    await refreshFilterOptions();
+  } else {
+    filteredParroquiaOptions.value = [];
+  }
+  onFiltersChanged();
+};
+
+const onParroquiasChanged = async () => {
+  // Clear downstream selections
+  filterComunidades.value = [];
+
+  // Fetch comunidades for selected parroquias (or clear if none)
+  if (filterParroquias.value?.length) {
+    await refreshFilterOptions();
+  } else {
+    filteredComunidadOptions.value = [];
+  }
+  onFiltersChanged();
+};
+
+// --- Filter q-select options (autocomplete typing) ---
 const filterSelectOptions = (val, update, key) => {
   const sourceMap = {
     estados: priorizadosFilterOptions.value.estados,
@@ -546,15 +615,11 @@ const exportData = async (scope, format) => {
 const loaded = ref(false);
 
 const loadInitialData = async () => {
+  // Fetch only estados initially (no cascade params = empty municipios/parroquias/comunidades)
   await dashboardStore.fetchPriorizadosFilterOptions();
-
-  // Initialize autocomplete options
   filteredEstadoOptions.value = priorizadosFilterOptions.value.estados;
-  filteredMunicipioOptions.value = priorizadosFilterOptions.value.municipios;
-  filteredParroquiaOptions.value = priorizadosFilterOptions.value.parroquias;
-  filteredComunidadOptions.value = priorizadosFilterOptions.value.comunidades;
 
-  // Fetch first page
+  // Fetch first page of data
   await onRequest({ pagination: pagination.value });
 };
 
@@ -565,9 +630,3 @@ watch(() => props.active, (isActive) => {
   }
 }, { immediate: true });
 </script>
-
-<style scoped>
-.q-btn-toggle {
-  border: 1px solid #e0e0e0;
-}
-</style>

@@ -109,7 +109,7 @@ exports.getPriorizados = async (req, res) => {
 // Endpoint para obtener opciones de filtro de priorizados
 exports.getPriorizadosFilterOptions = async (req, res) => {
     try {
-        const data = await dashboardService.getPriorizadosFilterOptions(req.user.id);
+        const data = await dashboardService.getPriorizadosFilterOptions(req.user.id, req.query);
         res.json(data);
     } catch (error) {
         console.error('Error al obtener opciones de filtro:', error.message);
