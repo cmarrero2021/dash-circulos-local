@@ -94,3 +94,25 @@ exports.getRegistrosIndicadoresNacionales = async (req, res) => {
         res.status(500).send('Error del servidor');
     }
 };
+
+// Endpoint para obtener datos paginados de priorizados
+exports.getPriorizados = async (req, res) => {
+    try {
+        const data = await dashboardService.getPriorizados(req.user.id, req.query);
+        res.json(data);
+    } catch (error) {
+        console.error('Error al obtener priorizados:', error.message);
+        res.status(500).send('Error del servidor');
+    }
+};
+
+// Endpoint para obtener opciones de filtro de priorizados
+exports.getPriorizadosFilterOptions = async (req, res) => {
+    try {
+        const data = await dashboardService.getPriorizadosFilterOptions(req.user.id);
+        res.json(data);
+    } catch (error) {
+        console.error('Error al obtener opciones de filtro:', error.message);
+        res.status(500).send('Error del servidor');
+    }
+};

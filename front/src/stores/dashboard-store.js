@@ -38,6 +38,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
   const stateIndicators = ref([]);
   const registrosIndicadores = ref([]); // Estado de registros
   const registrosIndicadoresNacionales = ref({}); // Indicadores nacionales
+  const priorizados = ref([]);
+  const priorizadosTotalRows = ref(0);
+  const priorizadosFilterOptions = ref({ estados: [], municipios: [], parroquias: [], comunidades: [] });
+  const isLoadingPriorizados = ref(false);
   const isLoading = ref(false);
   const isStateIndicatorsLoading = ref(false);
   const isLoadingRegistrosIndicadores = ref(false);
@@ -361,6 +365,43 @@ export const useDashboardStore = defineStore('dashboard', () => {
     await refetchAll();
   };
 
+  /**
+   * Obtiene datos paginados de priorizados con filtros server-side.
+   * @param {object} queryParams - Parámetros de consulta para filtrar, paginar y ordenar.
+   */
+  const fetchPriorizados = async (queryParams = {}) => {
+    const authStore = useAuthStore();
+    if (!authStore.isAuthenticated) return;
+
+    isLoadingPriorizados.value = true;
+    try {
+      const response = await api.get('/dashboard/priorizados', { params: queryParams });
+      priorizados.value = response.data.rows || [];
+      priorizadosTotalRows.value = response.data.totalRows || 0;
+    } catch (error) {
+      console.error('Error al obtener priorizados:', error);
+      priorizados.value = [];
+      priorizadosTotalRows.value = 0;
+    } finally {
+      isLoadingPriorizados.value = false;
+    }
+  };
+
+  /**
+   * Obtiene las opciones únicas para los filtros desplegables de priorizados.
+   */
+  const fetchPriorizadosFilterOptions = async () => {
+    const authStore = useAuthStore();
+    if (!authStore.isAuthenticated) return;
+
+    try {
+      const response = await api.get('/dashboard/priorizados/filter-options');
+      priorizadosFilterOptions.value = response.data || { estados: [], municipios: [], parroquias: [], comunidades: [] };
+    } catch (error) {
+      console.error('Error al obtener opciones de filtro de priorizados:', error);
+    }
+  };
+
   return {
     // State
     circlesByState,
@@ -373,6 +414,10 @@ export const useDashboardStore = defineStore('dashboard', () => {
     stateIndicators,
     registrosIndicadores,
     registrosIndicadoresNacionales,
+    priorizados,
+    priorizadosTotalRows,
+    priorizadosFilterOptions,
+    isLoadingPriorizados,
     isLoading,
     isStateIndicatorsLoading,
     isLoadingRegistrosIndicadores,
@@ -394,6 +439,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
     fetchStateIndicators,
     fetchRegistrosIndicadores,
     fetchRegistrosIndicadoresNacionales,
+    fetchPriorizados,
+    fetchPriorizadosFilterOptions,
     setManualStateFilter,
     clearManualStateFilter,
   };

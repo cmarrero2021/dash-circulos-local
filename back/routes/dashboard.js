@@ -34,4 +34,8 @@ router.get('/mapa-participantes', dashboardController.getParticipantesPorEstado)
 router.get('/registros-indicadores', dashboardController.getRegistrosIndicadoresPorEstado);
 router.get('/registros-indicadores-nacionales', dashboardController.getRegistrosIndicadoresNacionales);
 
+// --- Endpoints de Priorizados ---
+router.get('/priorizados', dashboardController.getPriorizados);
+router.get('/priorizados/filter-options', dashboardController.getPriorizadosFilterOptions);
+
 module.exports = router;

@@ -532,4 +532,192 @@ exports.getRegistrosIndicadoresNacionales = async (userId) => {
     return rows[0] || {};
 };
 
+// --- Funciones para Priorizados (server-side pagination + filtering) ---
 
+/**
+ * Construye la cláusula de permisos geográficos para vpriorizados.
+ * Retorna { permClause, permParams, nextParamIndex }.
+ */
+const buildPriorizadosPermissionClause = async (userId) => {
+    const hasNationalAccess = await hasNationalDashboardAccess(userId);
+    if (hasNationalAccess) {
+        return { permClause: '', permParams: [], nextParamIndex: 1 };
+    }
+    const allowedStates = await getAllowedStatesForUser(userId);
+    if (!allowedStates.length) {
+        return { permClause: 'WHERE 1 = 0', permParams: [], nextParamIndex: 1 };
+    }
+    return {
+        permClause: 'WHERE estado_id = ANY($1)',
+        permParams: [allowedStates],
+        nextParamIndex: 2,
+    };
+};
+
+/**
+ * Obtiene datos paginados de vpriorizados con filtrado server-side.
+ * @param {number} userId
+ * @param {object} query - Query params del request HTTP
+ * @returns {Promise<{ rows: object[], totalRows: number }>}
+ */
+exports.getPriorizados = async (userId, query = {}) => {
+    const { permClause, permParams, nextParamIndex } = await buildPriorizadosPermissionClause(userId);
+
+    const conditions = [];
+    const params = [...permParams];
+    let pi = nextParamIndex; // param index
+
+    // --- Búsqueda global ---
+    if (query.search && query.search.trim()) {
+        const searchTerm = query.search.trim();
+        conditions.push(`(
+            nombre ILIKE $${pi}
+            OR cedula::text ILIKE $${pi}
+            OR telefono ILIKE $${pi}
+            OR comunidad ILIKE $${pi}
+            OR estado ILIKE $${pi}
+            OR municipio ILIKE $${pi}
+            OR parroquia ILIKE $${pi}
+            OR registro ILIKE $${pi}
+            OR circulo ILIKE $${pi}
+        )`);
+        params.push(`%${searchTerm}%`);
+        pi++;
+    }
+
+    // --- Filtros multi-select ---
+    if (query.estados) {
+        const arr = Array.isArray(query.estados) ? query.estados : query.estados.split(',');
+        if (arr.length > 0) {
+            conditions.push(`estado = ANY($${pi})`);
+            params.push(arr);
+            pi++;
+        }
+    }
+    if (query.municipios) {
+        const arr = Array.isArray(query.municipios) ? query.municipios : query.municipios.split(',');
+        if (arr.length > 0) {
+            conditions.push(`municipio = ANY($${pi})`);
+            params.push(arr);
+            pi++;
+        }
+    }
+    if (query.parroquias) {
+        const arr = Array.isArray(query.parroquias) ? query.parroquias : query.parroquias.split(',');
+        if (arr.length > 0) {
+            conditions.push(`parroquia = ANY($${pi})`);
+            params.push(arr);
+            pi++;
+        }
+    }
+    if (query.comunidades) {
+        const arr = Array.isArray(query.comunidades) ? query.comunidades : query.comunidades.split(',');
+        if (arr.length > 0) {
+            conditions.push(`comunidad = ANY($${pi})`);
+            params.push(arr);
+            pi++;
+        }
+    }
+
+    // --- Filtros toggle (slider) ---
+    if (query.sexo && query.sexo !== 'Todos') {
+        conditions.push(`sexo = $${pi}`);
+        params.push(query.sexo);
+        pi++;
+    }
+    if (query.registro && query.registro !== 'Todos') {
+        conditions.push(`registro = $${pi}`);
+        params.push(query.registro);
+        pi++;
+    }
+    if (query.circulo && query.circulo !== 'Todos') {
+        conditions.push(`circulo = $${pi}`);
+        params.push(query.circulo);
+        pi++;
+    }
+
+    // --- Construir WHERE completo ---
+    let whereClause = permClause;
+    if (conditions.length > 0) {
+        const filterSql = conditions.join(' AND ');
+        if (whereClause) {
+            whereClause += ' AND ' + filterSql;
+        } else {
+            whereClause = 'WHERE ' + filterSql;
+        }
+    }
+
+    // --- Ordenación ---
+    const allowedSortCols = [
+        'id', 'estado_id', 'estado', 'municipio_id', 'municipio',
+        'parroquia_id', 'parroquia', 'nac', 'cedula', 'nombre',
+        'telefono', 'fecha_nac', 'sexo', 'comunidad', 'integrantes',
+        'menores', 'registro', 'circulo',
+    ];
+    let orderClause = 'ORDER BY estado, municipio, parroquia, nombre';
+    if (query.sortBy && allowedSortCols.includes(query.sortBy)) {
+        const dir = query.descending === 'true' ? 'DESC' : 'ASC';
+        orderClause = `ORDER BY ${query.sortBy} ${dir}`;
+    }
+
+    // --- Paginación ---
+    const limit = Math.min(Math.max(parseInt(query.limit, 10) || 50, 1), 500);
+    const page = Math.max(parseInt(query.page, 10) || 1, 1);
+    const offset = (page - 1) * limit;
+
+    // Modo exportación: sin paginación
+    const isExport = query.export === 'true';
+
+    let sql;
+    if (isExport) {
+        sql = `SELECT * FROM vpriorizados ${whereClause} ${orderClause}`;
+    } else {
+        // COUNT(*) OVER() evita un segundo query de conteo
+        sql = `
+            SELECT *, COUNT(*) OVER() AS total_rows
+            FROM vpriorizados
+            ${whereClause}
+            ${orderClause}
+            LIMIT $${pi} OFFSET $${pi + 1}
+        `;
+        params.push(limit, offset);
+    }
+
+    const { rows } = await pool.query(sql, params);
+
+    if (isExport) {
+        return { rows, totalRows: rows.length };
+    }
+
+    const totalRows = rows.length > 0 ? parseInt(rows[0].total_rows, 10) : 0;
+    // Eliminar el campo auxiliar total_rows de cada fila
+    rows.forEach(r => delete r.total_rows);
+
+    return { rows, totalRows };
+};
+
+/**
+ * Obtiene los valores únicos para los filtros desplegables de vpriorizados,
+ * respetando los permisos del usuario.
+ */
+exports.getPriorizadosFilterOptions = async (userId) => {
+    const { permClause, permParams } = await buildPriorizadosPermissionClause(userId);
+
+    const query = `
+        SELECT
+            COALESCE(json_agg(DISTINCT estado)    FILTER (WHERE estado IS NOT NULL),    '[]') AS estados,
+            COALESCE(json_agg(DISTINCT municipio)  FILTER (WHERE municipio IS NOT NULL),  '[]') AS municipios,
+            COALESCE(json_agg(DISTINCT parroquia)  FILTER (WHERE parroquia IS NOT NULL),  '[]') AS parroquias,
+            COALESCE(json_agg(DISTINCT comunidad)  FILTER (WHERE comunidad IS NOT NULL),  '[]') AS comunidades
+        FROM vpriorizados
+        ${permClause};
+    `;
+    const { rows } = await pool.query(query, permParams);
+    const row = rows[0] || {};
+    return {
+        estados: (row.estados || []).sort(),
+        municipios: (row.municipios || []).sort(),
+        parroquias: (row.parroquias || []).sort(),
+        comunidades: (row.comunidades || []).sort(),
+    };
+};

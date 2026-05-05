@@ -56,6 +56,7 @@ v-model="tab" class="text-grey-8 bg-grey-1" active-color="primary" active-bg-col
             indicator-color="primary" align="justify" narrow-indicator style="border-radius: 8px 8px 0 0;">
             <q-tab name="circulos" icon="trip_origin" label="Círculos" class="q-py-md" />
             <q-tab name="registros" icon="how_to_reg" label="Registros" class="q-py-md" />
+            <q-tab name="priorizados" icon="priority_high" label="Priorizados" class="q-py-md" />
           </q-tabs>
           <q-separator />
 
@@ -336,6 +337,10 @@ v-model:pagination="municipioPagination" :rows="municipioTableRows"
                 </div>
               </div>
             </q-tab-panel>
+
+            <q-tab-panel name="priorizados" class="q-pa-none">
+              <PriorizadosTable :active="tab === 'priorizados'" />
+            </q-tab-panel>
           </q-tab-panels>
         </q-card>
       </div>
@@ -353,6 +358,7 @@ import ParroquiaDataVisualizer from 'components/ParroquiaDataVisualizer.vue';
 import ComunaParroquiaDataVisualizer from 'components/ComunaParroquiaDataVisualizer.vue';
 import MapaVenezuela from 'components/MapaVenezuela.vue';
 import RegistrosIndicadoresTable from 'components/RegistrosIndicadoresTable.vue';
+import PriorizadosTable from 'components/PriorizadosTable.vue';
 import { utils, writeFile } from 'xlsx';
 import { exportFile, Notify } from 'quasar';
 import html2canvas from 'html2canvas';
@@ -769,6 +775,8 @@ watch(showStateIndicators, (val) => {
     dashboardStore.fetchStateIndicators();
   }
 });
+
+
 
 // (debug logs removed)
 // (debug logs removed)
