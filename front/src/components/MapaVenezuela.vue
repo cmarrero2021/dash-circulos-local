@@ -53,9 +53,11 @@ export default defineComponent({
         let estadosLayer = null;
         let tileLayer = null;
         let participantesLayer = null;
+        let priorizadosLayer = null;
         const selectedState = ref(null);
         const estadosData = ref([]);
         const participantesData = ref([]);
+        const priorizadosData = ref([]);
 
         // --- Helpers de acceso geográfico ---
         // Un usuario es "nacional" si es Administrador o no tiene estados explícitamente asignados
@@ -80,6 +82,7 @@ export default defineComponent({
 
         const findEstadoById = (sid) => estadosData.value.find(e => Number(e.estado_id) === Number(sid));
         const findParticipantesByStateId = (sid) => participantesData.value.find(p => Number(p.state_id) === Number(sid));
+        const findPriorizadosByStateId = (sid) => priorizadosData.value.find(p => Number(p.state_id) === Number(sid));
 
         const stateStyle = (f) => {
             const sid = f.properties.state_id;
@@ -248,6 +251,17 @@ export default defineComponent({
             }
         };
 
+        const loadPriorizadosData = async () => {
+            try {
+                const response = await api.get('/dashboard/mapa-priorizados');
+                priorizadosData.value = response.data;
+                return true;
+            } catch (error) {
+                console.error('[Mapa] Error cargando priorizados:', error.message);
+                return false;
+            }
+        };
+
         const getPointCount = (registros) => {
             if (!registros || registros <= 0) return 0;
             const points = Math.floor(registros / 1000);
@@ -383,6 +397,39 @@ export default defineComponent({
             return L.layerGroup(markers);
         };
 
+        // --- Capa de Priorizados (triángulos rojos) ---
+        const triangleIcon = L.divIcon({
+            className: '',
+            html: '<svg width="10" height="10" viewBox="0 0 10 10"><polygon points="5,0 10,10 0,10" fill="#d32f2f" stroke="#b71c1c" stroke-width="0.5" opacity="0.75"/></svg>',
+            iconSize: [10, 10],
+            iconAnchor: [5, 5],
+        });
+
+        const createPriorizadosLayer = (geojsonData) => {
+            const markers = [];
+
+            geojsonData.features.forEach(feature => {
+                const sid = feature.properties.state_id;
+                if (!isStateAllowed(Number(sid))) return;
+
+                const prioData = findPriorizadosByStateId(sid);
+                const priorizados = prioData ? Number(prioData.priorizados) : 0;
+
+                if (priorizados > 0) {
+                    // 1 punto por cada 1000 priorizados, max 200
+                    const pointCount = Math.min(Math.floor(priorizados / 1000), 200);
+                    const randomPoints = generateRandomPointsInFeature(feature, Math.max(pointCount, 1));
+
+                    randomPoints.forEach(([lat, lng]) => {
+                        const marker = L.marker([lat, lng], { icon: triangleIcon, interactive: false });
+                        markers.push(marker);
+                    });
+                }
+            });
+
+            return L.layerGroup(markers);
+        };
+
         const addLegend = () => {
             const legend = L.control({ position: 'bottomleft' });
             legend.onAdd = function () {
@@ -397,6 +444,9 @@ export default defineComponent({
 
                 div.innerHTML += '<br><strong>Registros</strong><br>';
                 div.innerHTML += '<i style="background:#9c27b0; border-radius:50%; width:10px; height:10px; margin-top:6px;"></i> 1 punto por cada 1.000 registros';
+
+                div.innerHTML += '<br><strong>Priorizados</strong><br>';
+                div.innerHTML += '<span style="display:inline-block; width:18px; height:18px; margin-right:8px; vertical-align:middle;"><svg width="12" height="12" viewBox="0 0 10 10"><polygon points="5,0 10,10 0,10" fill="#d32f2f" stroke="#b71c1c" stroke-width="0.5"/></svg></span> 1 punto por cada 1.000 priorizados';
                 return div;
             };
             legend.addTo(map);
@@ -414,9 +464,10 @@ export default defineComponent({
             tileLayer.addTo(map);
             tileLayer.bringToBack();
 
-            const [, participantesLoaded] = await Promise.all([
+            const [, participantesLoaded, priorizadosLoaded] = await Promise.all([
                 loadMapaData(),
-                loadParticipantesData()
+                loadParticipantesData(),
+                loadPriorizadosData()
             ]);
 
             try {
@@ -443,12 +494,21 @@ export default defineComponent({
                     participantesLayer.addTo(map);
                 }
 
+                if (priorizadosLoaded && priorizadosData.value.length > 0) {
+                    priorizadosLayer = createPriorizadosLayer(geojsonData);
+                    // No se agrega al mapa por defecto, solo al control de capas
+                }
+
                 const overlayMaps = {
                     'Círculos': estadosLayer
                 };
 
                 if (participantesLayer) {
                     overlayMaps['Registros'] = participantesLayer;
+                }
+
+                if (priorizadosLayer) {
+                    overlayMaps['Priorizados'] = priorizadosLayer;
                 }
 
                 L.control.layers(null, overlayMaps, { position: 'topright', collapsed: false }).addTo(map);
