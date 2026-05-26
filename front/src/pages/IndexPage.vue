@@ -43,7 +43,11 @@
         <q-card flat bordered>
           <q-card-section>
             <div class="text-h6 text-weight-bold text-primary q-mb-md">Mapa de Cumplimiento por Estado</div>
-            <mapa-venezuela />
+            <mapa-venezuela
+                :active-tab="tab"
+                @filter-priorizados="onMapFilterPriorizados"
+                @clear-priorizados-filter="onMapClearPriorizadosFilter"
+            />
           </q-card-section>
         </q-card>
       </div>
@@ -339,7 +343,7 @@ v-model:pagination="municipioPagination" :rows="municipioTableRows"
             </q-tab-panel>
 
             <q-tab-panel name="priorizados" class="q-pa-none">
-              <PriorizadosTable :active="tab === 'priorizados'" />
+              <PriorizadosTable ref="priorizadosTableRef" :active="tab === 'priorizados'" />
             </q-tab-panel>
           </q-tab-panels>
         </q-card>
@@ -377,6 +381,17 @@ const dailyCertificationsHeight = ref(425);
 // const participantsByStateHeight = ref(425);
 const stateIndicatorsHeight = ref(425);
 const tab = ref('circulos');
+const priorizadosTableRef = ref(null);
+
+// --- Handlers para eventos del mapa cuando el tab activo es priorizados ---
+const onMapFilterPriorizados = ({ stateName }) => {
+  priorizadosTableRef.value?.setStateFilter(stateName);
+};
+
+const onMapClearPriorizadosFilter = () => {
+  priorizadosTableRef.value?.clearStateFilter();
+};
+
 
 // Filters for municipios table
 const estadoFilter = ref(null);

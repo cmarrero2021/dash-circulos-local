@@ -12,7 +12,13 @@ v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close"
         <!-- Badge del estado seleccionado -->
         <div v-if="selectedState" class="selected-state-badge">
             <q-chip removable color="primary" text-color="white" icon="place" @remove="clearStateFilter">
-                {{ selectedState.nombre }} - {{ selectedState.porcentaje }}%
+                {{ selectedState.nombre }} -
+                <template v-if="activeTab === 'priorizados'">
+                    {{ selectedState.priorizados.toLocaleString('de-DE') }} priorizados
+                </template>
+                <template v-else>
+                    {{ selectedState.porcentaje }}%
+                </template>
             </q-chip>
         </div>
 
@@ -32,7 +38,7 @@ v-if="selectedState" round class="clear-filter-btn" color="primary" icon="close"
 </template>
 
 <script>
-import { defineComponent, ref, onMounted, onBeforeUnmount } from 'vue';
+import { defineComponent, ref, onMounted, onBeforeUnmount, watch, computed } from 'vue';
 import { useQuasar } from 'quasar';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -44,7 +50,14 @@ import { jsPDF } from 'jspdf';
 
 export default defineComponent({
     name: 'MapaVenezuela',
-    setup() {
+    props: {
+        activeTab: {
+            type: String,
+            default: 'circulos'
+        }
+    },
+    emits: ['filter-priorizados', 'clear-priorizados-filter'],
+    setup(props, { emit }) {
         const dashboardStore = useDashboardStore();
         const authStore = useAuthStore();
         const $q = useQuasar();
@@ -129,21 +142,36 @@ export default defineComponent({
         const clickState = (e) => {
             const sid = e.target.feature.properties.state_id;
             const est = findEstadoById(sid);
+            const prioData = findPriorizadosByStateId(sid);
             const nom = est ? (est.estado || est.estado_nombre || (e.target.feature.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '')) : (e.target.feature.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
 
             selectedState.value = {
                 id: sid,
                 nombre: nom,
-                porcentaje: est ? parseFloat(est.porcentaje).toFixed(2) : '0.00'
+                porcentaje: est ? parseFloat(est.porcentaje).toFixed(2) : '0.00',
+                priorizados: prioData ? Number(prioData.priorizados) : 0,
+                estadoNombre: prioData ? prioData.estado : nom
             };
 
-            dashboardStore.setManualStateFilter(Number(sid));
+            if (props.activeTab === 'priorizados') {
+                emit('filter-priorizados', {
+                    stateId: Number(sid),
+                    stateName: prioData ? prioData.estado : nom
+                });
+            } else {
+                dashboardStore.setManualStateFilter(Number(sid));
+            }
             map.fitBounds(e.target.getBounds());
         };
 
         const clearStateFilter = () => {
+            if (map) map.closePopup();
             selectedState.value = null;
-            dashboardStore.clearManualStateFilter();
+            if (props.activeTab === 'priorizados') {
+                emit('clear-priorizados-filter');
+            } else {
+                dashboardStore.clearManualStateFilter();
+            }
             // Si es usuario restringido, volver al zoom de sus estados; si es nacional, zoom general
             if (!isNationalUser() && authStore.allowedStates?.length > 0 && estadosLayer) {
                 const allowedLayers = [];
@@ -199,23 +227,50 @@ export default defineComponent({
             const circulos = est ? (est.circulos || 0) : 0;
             const pct = est ? parseFloat(est.porcentaje) : 0;
 
-            const popupContent = `
-                <div style="text-align:center; padding: 5px;">
-                    <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #1976d2;">CÍRCULOS</div>
-                    <div style="margin: 3px 0;"><strong>ESTADO:</strong> ${nom}</div>
-                    <div style="margin: 3px 0;"><strong>META:</strong> ${meta.toLocaleString('de-DE')}</div>
-                    <div style="margin: 3px 0;"><strong>CUMPLIMIENTO:</strong> ${circulos.toLocaleString('de-DE')}</div>
-                    <div style="margin: 3px 0;"><strong>PORCENTAJE:</strong> ${pct.toFixed(2)}%</div>
-                </div>
-            `;
-            layer.bindPopup(popupContent);
+            let popupContent = '';
+            let tooltipContent = '';
 
-            const tooltipContent = `
-                <div style="text-align:center;">
-                    <span style="font-weight:bold;">${nom.toUpperCase()}</span><br>
-                    CÍRCULOS: ${circulos.toLocaleString('de-DE')}
-                </div>
-            `;
+            if (props.activeTab === 'priorizados') {
+                const prioData = findPriorizadosByStateId(sid);
+                const count = prioData ? Number(prioData.priorizados) : 0;
+                popupContent = `
+                    <div style="text-align:center; padding: 5px;">
+                        <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #d32f2f;">PRIORIZADOS</div>
+                        <div style="margin: 3px 0;"><strong>ESTADO:</strong> ${nom}</div>
+                        <div style="margin: 3px 0;"><strong>PRIORIZADOS:</strong> ${count.toLocaleString('de-DE')}</div>
+                    </div>
+                `;
+                tooltipContent = `<div style="text-align:center;"><span style="font-weight:bold;">${nom.toUpperCase()}</span><br>PRIORIZADOS: ${count.toLocaleString('de-DE')}</div>`;
+            } else if (props.activeTab === 'registros') {
+                const partData = findParticipantesByStateId(sid);
+                const count = partData ? Number(partData.participantes) : 0;
+                popupContent = `
+                    <div style="text-align:center; padding: 5px;">
+                        <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #9c27b0;">REGISTROS</div>
+                        <div style="margin: 3px 0;"><strong>ESTADO:</strong> ${nom}</div>
+                        <div style="margin: 3px 0;"><strong>REGISTROS:</strong> ${count.toLocaleString('de-DE')}</div>
+                    </div>
+                `;
+                tooltipContent = `<div style="text-align:center;"><span style="font-weight:bold;">${nom.toUpperCase()}</span><br>REGISTROS: ${count.toLocaleString('de-DE')}</div>`;
+            } else {
+                popupContent = `
+                    <div style="text-align:center; padding: 5px;">
+                        <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #1976d2;">CÍRCULOS</div>
+                        <div style="margin: 3px 0;"><strong>ESTADO:</strong> ${nom}</div>
+                        <div style="margin: 3px 0;"><strong>META:</strong> ${meta.toLocaleString('de-DE')}</div>
+                        <div style="margin: 3px 0;"><strong>CUMPLIMIENTO:</strong> ${circulos.toLocaleString('de-DE')}</div>
+                        <div style="margin: 3px 0;"><strong>PORCENTAJE:</strong> ${pct.toFixed(2)}%</div>
+                    </div>
+                `;
+                tooltipContent = `
+                    <div style="text-align:center;">
+                        <span style="font-weight:bold;">${nom.toUpperCase()}</span><br>
+                        CÍRCULOS: ${circulos.toLocaleString('de-DE')}
+                    </div>
+                `;
+            }
+
+            layer.bindPopup(popupContent);
 
             layer.bindTooltip(tooltipContent, {
                 permanent: false,
@@ -321,53 +376,6 @@ export default defineComponent({
 
         const createRegistrosLayer = (geojsonData) => {
             const markers = [];
-            const outlineLayer = L.geoJSON(geojsonData, {
-                style: {
-                    fill: true,
-                    fillOpacity: 0,
-                    color: '#333333',
-                    weight: 1.5,
-                    opacity: 0.6
-                },
-                onEachFeature: (feature, layer) => {
-                    const sid = feature.properties.state_id;
-                    const partData = findParticipantesByStateId(sid);
-                    const registros = partData ? partData.participantes : 0;
-                    const estadoNombre = partData ? partData.estado : (feature.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
-
-                    // Estado sin acceso: sin interacción en la capa de registros
-                    if (!isStateAllowed(Number(sid))) return;
-
-                    const popupContent = `
-                        <div style="text-align:center; padding: 5px;">
-                            <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #9c27b0;">REGISTROS</div>
-                            <div style="margin: 3px 0;"><strong>ESTADO:</strong> ${estadoNombre}</div>
-                            <div style="margin: 3px 0;"><strong>REGISTROS:</strong> ${registros.toLocaleString('de-DE')}</div>
-                        </div>
-                    `;
-                    layer.bindPopup(popupContent);
-
-                    const tooltipContent = `
-                        <div style="text-align:center;">
-                            <span style="font-weight:bold;">${estadoNombre.toUpperCase()}</span><br>
-                            REGISTROS: ${registros.toLocaleString('de-DE')}
-                        </div>
-                    `;
-
-                    layer.bindTooltip(tooltipContent, {
-                        permanent: false,
-                        direction: 'center',
-                        className: 'state-tooltip'
-                    });
-
-                    layer.on({
-                        mouseover: highlightFeature,
-                        mouseout: resetHighlight,
-                        click: clickState
-                    });
-                }
-            });
-            markers.push(outlineLayer);
 
             geojsonData.features.forEach(feature => {
                 const sid = feature.properties.state_id;
@@ -388,7 +396,8 @@ export default defineComponent({
                             color: '#7b1fa2',
                             weight: 1,
                             opacity: 0.8,
-                            fillOpacity: 0.6
+                            fillOpacity: 0.6,
+                            interactive: false
                         });
                         markers.push(dotMarker);
                     });
@@ -607,6 +616,66 @@ export default defineComponent({
                 map = null;
             }
         };
+
+        // --- Watch activeTab para actualizar tooltips y popups del mapa dinámicamente ---
+        const activeTabRef = computed(() => props.activeTab);
+        watch(activeTabRef, (newTab) => {
+            if (!estadosLayer) return;
+            estadosLayer.eachLayer(layer => {
+                const feature = layer.feature;
+                if (!feature) return;
+                const sid = feature.properties.state_id;
+                if (!sid || !isStateAllowed(Number(sid))) return;
+                const est = findEstadoById(sid);
+                const nom = est
+                    ? (est.estado || est.estado_nombre || (feature.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, ''))
+                    : (feature.properties.NAM || '').replace(/^ESTADO\s+(BOLIVARIANO\s+)?/i, '');
+
+                let content;
+                let popupContent;
+
+                if (newTab === 'priorizados') {
+                    const prioData = findPriorizadosByStateId(sid);
+                    const count = prioData ? Number(prioData.priorizados) : 0;
+                    content = `<div style="text-align:center;"><span style="font-weight:bold;">${nom.toUpperCase()}</span><br>PRIORIZADOS: ${count.toLocaleString('de-DE')}</div>`;
+                    popupContent = `
+                        <div style="text-align:center; padding: 5px;">
+                            <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #d32f2f;">PRIORIZADOS</div>
+                            <div style="margin: 3px 0;"><strong>ESTADO:</strong> ${nom}</div>
+                            <div style="margin: 3px 0;"><strong>PRIORIZADOS:</strong> ${count.toLocaleString('de-DE')}</div>
+                        </div>
+                    `;
+                } else if (newTab === 'registros') {
+                    const partData = findParticipantesByStateId(sid);
+                    const count = partData ? Number(partData.participantes) : 0;
+                    content = `<div style="text-align:center;"><span style="font-weight:bold;">${nom.toUpperCase()}</span><br>REGISTROS: ${count.toLocaleString('de-DE')}</div>`;
+                    popupContent = `
+                        <div style="text-align:center; padding: 5px;">
+                            <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #9c27b0;">REGISTROS</div>
+                            <div style="margin: 3px 0;"><strong>ESTADO:</strong> ${nom}</div>
+                            <div style="margin: 3px 0;"><strong>REGISTROS:</strong> ${count.toLocaleString('de-DE')}</div>
+                        </div>
+                    `;
+                } else {
+                    const meta = est ? (est.meta_circulo || 0) : 0;
+                    const circulos = est ? (est.circulos || 0) : 0;
+                    const pct = est ? parseFloat(est.porcentaje) : 0;
+                    content = `<div style="text-align:center;"><span style="font-weight:bold;">${nom.toUpperCase()}</span><br>CÍRCULOS: ${circulos.toLocaleString('de-DE')}</div>`;
+                    popupContent = `
+                        <div style="text-align:center; padding: 5px;">
+                            <div style="font-weight: bold; font-size: 14px; margin-bottom: 8px; color: #1976d2;">CÍRCULOS</div>
+                            <div style="margin: 3px 0;"><strong>ESTADO:</strong> ${nom}</div>
+                            <div style="margin: 3px 0;"><strong>META:</strong> ${meta.toLocaleString('de-DE')}</div>
+                            <div style="margin: 3px 0;"><strong>CUMPLIMIENTO:</strong> ${circulos.toLocaleString('de-DE')}</div>
+                            <div style="margin: 3px 0;"><strong>PORCENTAJE:</strong> ${pct.toFixed(2)}%</div>
+                        </div>
+                    `;
+                }
+
+                if (layer.getTooltip()) layer.setTooltipContent(content);
+                if (layer.getPopup()) layer.setPopupContent(popupContent);
+            });
+        });
 
         onMounted(initMap);
         onBeforeUnmount(cleanupMap);

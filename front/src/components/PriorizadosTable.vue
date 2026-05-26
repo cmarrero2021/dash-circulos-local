@@ -722,6 +722,25 @@ watch(() => props.active, (isActive) => {
     loadInitialData();
   }
 }, { immediate: true });
+
+// --- Expuesto para IndexPage: filtrar por estado desde el mapa ---
+const setStateFilter = async (stateName) => {
+  filterEstados.value = stateName ? [stateName] : [];
+  filterMunicipios.value = [];
+  filterParroquias.value = [];
+  filterComunidades.value = [];
+  filteredMunicipioOptions.value = [];
+  filteredParroquiaOptions.value = [];
+  filteredComunidadOptions.value = [];
+  if (filterEstados.value.length) {
+    await refreshFilterOptions();
+  }
+  onFiltersChanged();
+};
+
+const clearStateFilter = () => setStateFilter(null);
+
+defineExpose({ setStateFilter, clearStateFilter });
 </script>
 
 <style scoped>
