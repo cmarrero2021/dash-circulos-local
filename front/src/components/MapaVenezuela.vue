@@ -54,6 +54,7 @@ export default defineComponent({
         let tileLayer = null;
         let participantesLayer = null;
         let priorizadosLayer = null;
+        let baseOutlineLayer = null;
         const selectedState = ref(null);
         const estadosData = ref([]);
         const participantesData = ref([]);
@@ -474,6 +475,19 @@ export default defineComponent({
                 const geojsonResponse = await fetch('/geojson/estados_final.geojson');
                 const geojsonData = await geojsonResponse.json();
 
+                // 1. Capa base permanente de contornos (siempre visible, se añade primero)
+                baseOutlineLayer = L.geoJSON(geojsonData, {
+                    style: {
+                        fill: false,
+                        color: '#444444',
+                        weight: 1.5,
+                        opacity: 0.8
+                    },
+                    interactive: false
+                });
+                baseOutlineLayer.addTo(map);
+
+                // 2. Capa de Círculos (choropleth coloreado, encima de la base)
                 estadosLayer = L.geoJSON(geojsonData, { style: stateStyle, onEachFeature });
                 estadosLayer.addTo(map);
 
@@ -496,7 +510,7 @@ export default defineComponent({
 
                 if (priorizadosLoaded && priorizadosData.value.length > 0) {
                     priorizadosLayer = createPriorizadosLayer(geojsonData);
-                    // No se agrega al mapa por defecto, solo al control de capas
+                    priorizadosLayer.addTo(map);
                 }
 
                 const overlayMaps = {

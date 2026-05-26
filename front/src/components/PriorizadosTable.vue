@@ -1,5 +1,5 @@
 <template>
-  <q-card flat bordered>
+  <q-card flat bordered style="position: relative">
     <!-- Header -->
     <q-card-section class="row items-center q-col-gutter-sm q-pb-none">
       <div class="col">
@@ -187,8 +187,68 @@
         </q-select>
       </div>
 
-      <!-- Toggle filters row -->
-      <div class="col-12 col-md-1">
+      <!-- Toggle filters row - Orden: Nacionalidad, Sexo, Patria, Mayor 60, Registro, Círculo, Nuevo -->
+      <div class="col-6 col-md-1">
+        <div class="text-caption text-grey-7 q-mb-xs">Nacionalidad</div>
+        <q-btn-toggle
+          v-model="filterNac"
+          dense
+          no-caps
+          spread
+          no-wrap
+          unelevated
+          toggle-color="primary"
+          :options="nacOptions"
+          class="bg-transparent"
+          @update:model-value="onFiltersChanged"
+        />
+      </div>
+      <div class="col-6 col-md-1">
+        <div class="text-caption text-grey-7 q-mb-xs">Sexo</div>
+        <q-btn-toggle
+          v-model="filterSexo"
+          dense
+          no-caps
+          spread
+          no-wrap
+          unelevated
+          toggle-color="primary"
+          :options="sexoOptions"
+          class="bg-transparent"
+          @update:model-value="onFiltersChanged"
+        />
+      </div>
+      <div class="col-6 col-md-1">
+        <div class="text-caption text-grey-7 q-mb-xs">Patria</div>
+        <q-btn-toggle
+          v-model="filterPatria"
+          dense
+          no-caps
+          spread
+          no-wrap
+          unelevated
+          toggle-color="primary"
+          :options="toggleOptions"
+          class="bg-transparent"
+          @update:model-value="onFiltersChanged"
+        />
+      </div>
+      <div class="col-6 col-md-1">
+        <div class="text-caption text-grey-7 q-mb-xs">Mayor 60</div>
+        <q-btn-toggle
+          v-model="filterMayor60"
+          dense
+          no-caps
+          spread
+          no-wrap
+          unelevated
+          toggle-color="primary"
+          :options="toggleOptions"
+          class="bg-transparent"
+          @update:model-value="onFiltersChanged"
+        />
+      </div>
+      <div class="col-6 col-md-1">
         <div class="text-caption text-grey-7 q-mb-xs">Registro</div>
         <q-btn-toggle
           v-model="filterRegistro"
@@ -203,7 +263,7 @@
           @update:model-value="onFiltersChanged"
         />
       </div>
-      <div class="col-12 col-md-1">
+      <div class="col-6 col-md-1">
         <div class="text-caption text-grey-7 q-mb-xs">Círculo</div>
         <q-btn-toggle
           v-model="filterCirculo"
@@ -218,17 +278,17 @@
           @update:model-value="onFiltersChanged"
         />
       </div>
-      <div class="col-12 col-md-1">
-        <div class="text-caption text-grey-7 q-mb-xs">Sexo</div>
+      <div class="col-6 col-md-1">
+        <div class="text-caption text-grey-7 q-mb-xs">Nuevo</div>
         <q-btn-toggle
-          v-model="filterSexo"
+          v-model="filterNuevos"
           dense
           no-caps
           spread
           no-wrap
           unelevated
           toggle-color="primary"
-          :options="sexoOptions"
+          :options="toggleOptions"
           class="bg-transparent"
           @update:model-value="onFiltersChanged"
         />
@@ -274,6 +334,16 @@
         </template>
       </q-table>
     </q-card-section>
+
+    <!-- Backdrop overlay mientras carga -->
+    <q-inner-loading
+      :showing="dashboardStore.isLoadingPriorizados"
+      dark
+      style="z-index: 10"
+    >
+      <q-spinner-gears size="60px" color="primary" />
+      <div class="text-primary text-weight-medium q-mt-md">Cargando priorizados…</div>
+    </q-inner-loading>
   </q-card>
 </template>
 
@@ -301,9 +371,13 @@ const filterEstados = ref([]);
 const filterMunicipios = ref([]);
 const filterParroquias = ref([]);
 const filterComunidades = ref([]);
+const filterNac = ref('Todos');
+const filterSexo = ref('Todos');
+const filterPatria = ref('Todos');
+const filterMayor60 = ref('Todos');
 const filterRegistro = ref('Todos');
 const filterCirculo = ref('Todos');
-const filterSexo = ref('Todos');
+const filterNuevos = ref('Todos');
 const isExporting = ref(false);
 
 // Options for autocomplete filtering in q-selects
@@ -322,6 +396,12 @@ const sexoOptions = [
   { label: 'Todos', value: 'Todos' },
   { label: 'M', value: 'M' },
   { label: 'F', value: 'F' },
+];
+
+const nacOptions = [
+  { label: 'Todos', value: 'Todos' },
+  { label: 'V', value: 'V' },
+  { label: 'E', value: 'E' },
 ];
 
 // --- Pagination (server-side) ---
@@ -345,10 +425,11 @@ const columns = [
   { name: 'telefono', label: 'Teléfono', field: 'telefono', align: 'left', sortable: true },
   { name: 'fecha_nac', label: 'Fecha Nac.', field: 'fecha_nac', align: 'center', sortable: true },
   { name: 'sexo', label: 'Sexo', field: 'sexo', align: 'center', sortable: true },
-  { name: 'integrantes', label: 'Integrantes', field: 'integrantes', align: 'right', sortable: true },
-  { name: 'menores', label: 'Menores', field: 'menores', align: 'right', sortable: true },
-  { name: 'registro', label: 'Registro', field: 'registro', align: 'left', sortable: true },
-  { name: 'circulo', label: 'Círculo', field: 'circulo', align: 'left', sortable: true },
+  { name: 'patria', label: 'Patria', field: 'patria', align: 'center', sortable: true },
+  { name: 'mayor60', label: 'Mayor 60', field: 'mayor60', align: 'center', sortable: true },
+  { name: 'registro', label: 'Registro', field: 'registro', align: 'center', sortable: true },
+  { name: 'circulo', label: 'Círculo', field: 'circulo', align: 'center', sortable: true },
+  { name: 'nuevos', label: 'Nuevo', field: 'nuevos', align: 'center', sortable: true },
 ];
 
 // --- Helpers ---
@@ -376,9 +457,13 @@ const buildQueryParams = (pag) => {
   if (filterMunicipios.value?.length) params.municipios = filterMunicipios.value.join(',');
   if (filterParroquias.value?.length) params.parroquias = filterParroquias.value.join(',');
   if (filterComunidades.value?.length) params.comunidades = filterComunidades.value.join(',');
+  if (filterNac.value !== 'Todos') params.nac = filterNac.value;
+  if (filterSexo.value !== 'Todos') params.sexo = filterSexo.value;
+  if (filterPatria.value !== 'Todos') params.patria = filterPatria.value;
+  if (filterMayor60.value !== 'Todos') params.mayor60 = filterMayor60.value;
   if (filterRegistro.value !== 'Todos') params.registro = filterRegistro.value;
   if (filterCirculo.value !== 'Todos') params.circulo = filterCirculo.value;
-  if (filterSexo.value !== 'Todos') params.sexo = filterSexo.value;
+  if (filterNuevos.value !== 'Todos') params.nuevos = filterNuevos.value;
   if (pag.sortBy) {
     params.sortBy = pag.sortBy;
     params.descending = String(pag.descending);
@@ -418,9 +503,13 @@ const clearAllFilters = async () => {
   filterMunicipios.value = [];
   filterParroquias.value = [];
   filterComunidades.value = [];
+  filterNac.value = 'Todos';
+  filterSexo.value = 'Todos';
+  filterPatria.value = 'Todos';
+  filterMayor60.value = 'Todos';
   filterRegistro.value = 'Todos';
   filterCirculo.value = 'Todos';
-  filterSexo.value = 'Todos';
+  filterNuevos.value = 'Todos';
   pagination.value.sortBy = null;
   pagination.value.descending = false;
   pagination.value.page = 1;
@@ -429,6 +518,9 @@ const clearAllFilters = async () => {
   filteredMunicipioOptions.value = [];
   filteredParroquiaOptions.value = [];
   filteredComunidadOptions.value = [];
+
+  // Limpiar caché de opciones de filtro para forzar re-consulta fresca
+  dashboardStore.clearPriorizadosFilterCache();
 
   onRequest({ pagination: pagination.value });
 };
@@ -569,10 +661,11 @@ const exportData = async (scope, format) => {
       Teléfono: r.telefono,
       'Fecha Nac.': r.fecha_nac ? formatDate(r.fecha_nac) : '',
       Sexo: r.sexo,
-      Integrantes: r.integrantes,
-      Menores: r.menores,
+      Patria: r.patria,
+      'Mayor 60': r.mayor60,
       Registro: r.registro,
       Círculo: r.circulo,
+      Nuevo: r.nuevos,
     }));
 
     if (format === 'xlsx') {

@@ -1,5 +1,6 @@
 // services/dashboardService.js
 const pool = require('../config/db');
+const cache = require('./cacheService');
 const {
     hasNationalDashboardAccess,
     getAllowedStatesForUser,
@@ -7,6 +8,21 @@ const {
 } = require('./geoPermissionsService');
 
 const DASHBOARD_DEADLINE = process.env.DASHBOARD_DEADLINE || '2025-11-30';
+
+// TTL en segundos para caché de priorizados
+const PRIORIZADOS_CACHE_TTL = 30;       // datos paginados
+const FILTER_OPTIONS_CACHE_TTL = 60;    // opciones de filtros desplegables
+
+/**
+ * Genera una clave de caché determinista a partir de un prefijo y un objeto de parámetros.
+ */
+const buildCacheKey = (prefix, userId, params) => {
+    const sorted = Object.keys(params).sort().reduce((acc, k) => {
+        acc[k] = params[k];
+        return acc;
+    }, {});
+    return `${prefix}:${userId}:${JSON.stringify(sorted)}`;
+};
 
 const getDaysRemaining = async () => {
     const { rows } = await pool.query(
@@ -588,6 +604,14 @@ const buildPriorizadosPermissionClause = async (userId) => {
  * @returns {Promise<{ rows: object[], totalRows: number }>}
  */
 exports.getPriorizados = async (userId, query = {}) => {
+    // Exportaciones no se cachean (son operaciones puntuales)
+    const isExport = query.export === 'true';
+    if (!isExport) {
+        const cacheKey = buildCacheKey('priz', userId, query);
+        const cached = cache.get(cacheKey);
+        if (cached) return cached;
+    }
+
     const { permClause, permParams, nextParamIndex } = await buildPriorizadosPermissionClause(userId);
 
     const conditions = [];
@@ -607,6 +631,9 @@ exports.getPriorizados = async (userId, query = {}) => {
             OR parroquia ILIKE $${pi}
             OR registro ILIKE $${pi}
             OR circulo ILIKE $${pi}
+            OR patria ILIKE $${pi}
+            OR mayor60 ILIKE $${pi}
+            OR nuevos ILIKE $${pi}
         )`);
         params.push(`%${searchTerm}%`);
         pi++;
@@ -647,9 +674,24 @@ exports.getPriorizados = async (userId, query = {}) => {
     }
 
     // --- Filtros toggle (slider) ---
+    if (query.nac && query.nac !== 'Todos') {
+        conditions.push(`nac = $${pi}`);
+        params.push(query.nac);
+        pi++;
+    }
     if (query.sexo && query.sexo !== 'Todos') {
         conditions.push(`sexo = $${pi}`);
         params.push(query.sexo);
+        pi++;
+    }
+    if (query.patria && query.patria !== 'Todos') {
+        conditions.push(`patria = $${pi}`);
+        params.push(query.patria);
+        pi++;
+    }
+    if (query.mayor60 && query.mayor60 !== 'Todos') {
+        conditions.push(`mayor60 = $${pi}`);
+        params.push(query.mayor60);
         pi++;
     }
     if (query.registro && query.registro !== 'Todos') {
@@ -660,6 +702,11 @@ exports.getPriorizados = async (userId, query = {}) => {
     if (query.circulo && query.circulo !== 'Todos') {
         conditions.push(`circulo = $${pi}`);
         params.push(query.circulo);
+        pi++;
+    }
+    if (query.nuevos && query.nuevos !== 'Todos') {
+        conditions.push(`nuevos = $${pi}`);
+        params.push(query.nuevos);
         pi++;
     }
 
@@ -678,8 +725,8 @@ exports.getPriorizados = async (userId, query = {}) => {
     const allowedSortCols = [
         'id', 'estado_id', 'estado', 'municipio_id', 'municipio',
         'parroquia_id', 'parroquia', 'nac', 'cedula', 'nombre',
-        'telefono', 'fecha_nac', 'sexo', 'comunidad', 'integrantes',
-        'menores', 'registro', 'circulo',
+        'telefono', 'fecha_nac', 'sexo', 'comunidad', 'patria',
+        'mayor60', 'registro', 'circulo', 'nuevos',
     ];
     let orderClause = 'ORDER BY estado, municipio, parroquia, nombre';
     if (query.sortBy && allowedSortCols.includes(query.sortBy)) {
@@ -692,8 +739,7 @@ exports.getPriorizados = async (userId, query = {}) => {
     const page = Math.max(parseInt(query.page, 10) || 1, 1);
     const offset = (page - 1) * limit;
 
-    // Modo exportación: sin paginación
-    const isExport = query.export === 'true';
+    // Modo exportación: sin paginación (isExport ya declarado arriba)
 
     let sql;
     if (isExport) {
@@ -720,7 +766,15 @@ exports.getPriorizados = async (userId, query = {}) => {
     // Eliminar el campo auxiliar total_rows de cada fila
     rows.forEach(r => delete r.total_rows);
 
-    return { rows, totalRows };
+    const result = { rows, totalRows };
+
+    // Guardar en caché (solo consultas paginadas, no exportaciones)
+    if (!isExport) {
+        const cacheKey = buildCacheKey('priz', userId, query);
+        cache.set(cacheKey, result, PRIORIZADOS_CACHE_TTL);
+    }
+
+    return result;
 };
 
 /**
@@ -730,6 +784,11 @@ exports.getPriorizados = async (userId, query = {}) => {
  * @param {object} query - { estados, municipios, parroquias } (comma-separated strings)
  */
 exports.getPriorizadosFilterOptions = async (userId, query = {}) => {
+    // Verificar caché
+    const cacheKey = buildCacheKey('priz-fo', userId, query);
+    const cached = cache.get(cacheKey);
+    if (cached) return cached;
+
     const { permClause, permParams } = await buildPriorizadosPermissionClause(userId);
     const baseParamCount = permParams.length;
 
@@ -805,10 +864,15 @@ exports.getPriorizadosFilterOptions = async (userId, query = {}) => {
         comVals = res.rows[0]?.vals || [];
     }
 
-    return {
+    const result = {
         estados: (estRes.rows[0]?.vals || []).sort(),
         municipios: munVals.sort(),
         parroquias: parVals.sort(),
         comunidades: comVals.sort(),
     };
+
+    // Guardar en caché
+    cache.set(cacheKey, result, FILTER_OPTIONS_CACHE_TTL);
+
+    return result;
 };

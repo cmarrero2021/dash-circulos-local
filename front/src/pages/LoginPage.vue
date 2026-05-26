@@ -1,5 +1,5 @@
 <template>
-  <q-page class="flex flex-center bg-grey-2">
+  <q-page class="flex flex-center login-bg">
     <q-card class="q-pa-md shadow-2 my_card" bordered>
       <q-card-section class="text-center">
         <div class="text-grey-9 text-h5 text-weight-bold">Iniciar Sesión</div>
@@ -10,13 +10,25 @@
         <q-form class="q-gutter-md" @submit="handleLogin">
           <!-- Atributos reordenados -->
           <q-input
-ref="emailRef" v-model="form.email" filled label="Email" type="email" lazy-rules
-            :rules="[val => !!val || 'El email es requerido', val => /.+@.+\..+/.test(val) || 'Email inválido']" />
+            ref="emailRef"
+            v-model="form.email"
+            filled
+            label="Email"
+            type="email"
+            lazy-rules
+            :rules="[val => !!val || 'El email es requerido', val => /.+@.+\..+/.test(val) || 'Email inválido']"
+          />
 
           <!-- Atributos reordenados -->
           <q-input
-ref="passwordRef" v-model="form.password" filled label="Contraseña"
-            :type="isPwd ? 'password' : 'text'" lazy-rules :rules="[val => !!val || 'La contraseña es requerida']">
+            ref="passwordRef"
+            v-model="form.password"
+            filled
+            label="Contraseña"
+            :type="isPwd ? 'password' : 'text'"
+            lazy-rules
+            :rules="[val => !!val || 'La contraseña es requerida']"
+          >
             <template #append>
               <q-icon :name="isPwd ? 'visibility_off' : 'visibility'" class="cursor-pointer" @click="isPwd = !isPwd" />
             </template>
@@ -95,8 +107,31 @@ const handleLogin = async () => {
 
 
 <style scoped>
+.login-bg {
+  background-image: url('/images/fondo.jpg');
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
 .my_card {
   width: 400px;
-  border-radius: 8px;
+  max-width: 90vw;
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+
+/* Pantallas pequeñas (móviles) */
+@media (max-width: 480px) {
+  .my_card {
+    width: 100%;
+    max-width: 95vw;
+    border-radius: 8px;
+    margin: 0 8px;
+  }
 }
 </style>

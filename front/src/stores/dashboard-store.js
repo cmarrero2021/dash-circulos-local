@@ -389,18 +389,33 @@ export const useDashboardStore = defineStore('dashboard', () => {
 
   /**
    * Obtiene las opciones únicas para los filtros desplegables de priorizados.
+   * Usa caché en memoria para evitar re-consultas de cascadas ya resueltas.
    * @param {object} queryParams - Parámetros de cascada opcionales: { estados, municipios, parroquias }
    */
+  const _filterOptionsCache = new Map();
+
   const fetchPriorizadosFilterOptions = async (queryParams = {}) => {
     const authStore = useAuthStore();
     if (!authStore.isAuthenticated) return;
 
+    const cacheKey = JSON.stringify(queryParams);
+    if (_filterOptionsCache.has(cacheKey)) {
+      priorizadosFilterOptions.value = _filterOptionsCache.get(cacheKey);
+      return;
+    }
+
     try {
       const response = await api.get('/dashboard/priorizados/filter-options', { params: queryParams });
-      priorizadosFilterOptions.value = response.data || { estados: [], municipios: [], parroquias: [], comunidades: [] };
+      const data = response.data || { estados: [], municipios: [], parroquias: [], comunidades: [] };
+      _filterOptionsCache.set(cacheKey, data);
+      priorizadosFilterOptions.value = data;
     } catch (error) {
       console.error('Error al obtener opciones de filtro de priorizados:', error);
     }
+  };
+
+  const clearPriorizadosFilterCache = () => {
+    _filterOptionsCache.clear();
   };
 
   return {
@@ -442,6 +457,7 @@ export const useDashboardStore = defineStore('dashboard', () => {
     fetchRegistrosIndicadoresNacionales,
     fetchPriorizados,
     fetchPriorizadosFilterOptions,
+    clearPriorizadosFilterCache,
     setManualStateFilter,
     clearManualStateFilter,
   };
