@@ -497,6 +497,7 @@ export default defineComponent({
                 baseOutlineLayer.addTo(map);
 
                 // 2. Capa de Círculos (choropleth coloreado, encima de la base)
+                // Se añade al mapa ahora; syncLayersToTab ajustará su visibilidad según el tab
                 estadosLayer = L.geoJSON(geojsonData, { style: stateStyle, onEachFeature });
                 estadosLayer.addTo(map);
 
@@ -514,13 +515,16 @@ export default defineComponent({
 
                 if (participantesLoaded && participantesData.value.length > 0) {
                     participantesLayer = createRegistrosLayer(geojsonData);
-                    participantesLayer.addTo(map);
+                    // No se añade al mapa aquí: syncLayersToTab lo gestionará
                 }
 
                 if (priorizadosLoaded && priorizadosData.value.length > 0) {
                     priorizadosLayer = createPriorizadosLayer(geojsonData);
-                    priorizadosLayer.addTo(map);
+                    // No se añade al mapa aquí: syncLayersToTab lo gestionará
                 }
+
+                // Aplicar visibilidad inicial según el tab activo al montar el mapa
+                syncLayersToTab(props.activeTab);
 
                 const overlayMaps = {
                     'Círculos': estadosLayer
@@ -617,9 +621,40 @@ export default defineComponent({
             }
         };
 
-        // --- Watch activeTab para actualizar tooltips y popups del mapa dinámicamente ---
+        // --- Sincroniza visibilidad de capas según el tab activo ---
+        // Al cambiar de tab, activa sólo la capa correspondiente (las demás se desactivan).
+        // Después el usuario puede activar capas adicionales manualmente desde el control.
+        const syncLayersToTab = (tab) => {
+            if (!map) return;
+
+            // Determina qué capa debe estar activa para cada tab
+            const showCirculos    = tab === 'circulos';
+            const showRegistros   = tab === 'registros';
+            const showPriorizados = tab === 'priorizados';
+
+            if (estadosLayer) {
+                if (showCirculos && !map.hasLayer(estadosLayer))       estadosLayer.addTo(map);
+                else if (!showCirculos && map.hasLayer(estadosLayer))  map.removeLayer(estadosLayer);
+            }
+
+            if (participantesLayer) {
+                if (showRegistros && !map.hasLayer(participantesLayer))       participantesLayer.addTo(map);
+                else if (!showRegistros && map.hasLayer(participantesLayer))  map.removeLayer(participantesLayer);
+            }
+
+            if (priorizadosLayer) {
+                if (showPriorizados && !map.hasLayer(priorizadosLayer))       priorizadosLayer.addTo(map);
+                else if (!showPriorizados && map.hasLayer(priorizadosLayer))  map.removeLayer(priorizadosLayer);
+            }
+        };
+
+        // --- Watch activeTab para actualizar tooltips, popups y visibilidad de capas ---
         const activeTabRef = computed(() => props.activeTab);
         watch(activeTabRef, (newTab) => {
+            // 1. Sincronizar capas visibles
+            syncLayersToTab(newTab);
+
+            // 2. Actualizar tooltips y popups de la capa de círculos
             if (!estadosLayer) return;
             estadosLayer.eachLayer(layer => {
                 const feature = layer.feature;

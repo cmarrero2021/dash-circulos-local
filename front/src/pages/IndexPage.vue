@@ -343,7 +343,40 @@ v-model:pagination="municipioPagination" :rows="municipioTableRows"
             </q-tab-panel>
 
             <q-tab-panel name="priorizados" class="q-pa-none">
-              <PriorizadosTable ref="priorizadosTableRef" :active="tab === 'priorizados'" />
+              <!-- View toggle bar for traditional table vs dynamic pivot engine -->
+              <div class="row items-center justify-between q-pa-sm bg-grey-1 border-bottom" style="border-bottom: 1px solid #e2e8f0;">
+                <div class="row items-center q-gutter-x-sm q-pl-sm">
+                  <q-icon :name="priorizadosView === 'traditional' ? 'table_chart' : 'dashboard_customize'" size="20px" color="primary" />
+                  <span class="text-subtitle2 text-weight-bold text-grey-8">
+                    {{ priorizadosView === 'traditional' ? 'Listado de Registros Priorizados' : 'Consultas y Análisis Dinámicos' }}
+                  </span>
+                </div>
+                <q-btn-toggle
+                  v-model="priorizadosView"
+                  dense
+                  flat
+                  toggle-color="primary"
+                  color="grey-6"
+                  class="rounded-borders bg-white text-xs"
+                  style="border: 1px solid #e2e8f0; font-size: 11px;"
+                  :options="[
+                    { label: 'Vista Tradicional', value: 'traditional', icon: 'table_chart' },
+                    { label: 'Análisis Dinámico (Pivot)', value: 'dynamic', icon: 'dashboard_customize' }
+                  ]"
+                />
+              </div>
+
+              <!-- Main Content Areas -->
+              <div class="priorizados-tab-content">
+                <PriorizadosTable
+                  v-if="priorizadosView === 'traditional'"
+                  ref="priorizadosTableRef"
+                  :active="tab === 'priorizados'"
+                />
+                <DynamicQueryPanel
+                  v-else
+                />
+              </div>
             </q-tab-panel>
           </q-tab-panels>
         </q-card>
@@ -363,12 +396,14 @@ import ComunaParroquiaDataVisualizer from 'components/ComunaParroquiaDataVisuali
 import MapaVenezuela from 'components/MapaVenezuela.vue';
 import RegistrosIndicadoresTable from 'components/RegistrosIndicadoresTable.vue';
 import PriorizadosTable from 'components/PriorizadosTable.vue';
+import DynamicQueryPanel from 'components/dashboard/DynamicQueryPanel.vue';
 import { utils, writeFile } from 'xlsx';
 import { exportFile, Notify } from 'quasar';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 // New ref for current date
 const currentDate = ref(new Date().toLocaleDateString('es-ES'));
+const priorizadosView = ref('traditional');
 
 const dashboardStore = useDashboardStore();
 const authStore = useAuthStore();

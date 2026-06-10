@@ -234,6 +234,21 @@
         />
       </div>
       <div class="col-6 col-md-1">
+        <div class="text-caption text-grey-7 q-mb-xs">Validado</div>
+        <q-btn-toggle
+          v-model="filterValidado"
+          dense
+          no-caps
+          spread
+          no-wrap
+          unelevated
+          toggle-color="primary"
+          :options="toggleOptions"
+          class="bg-transparent"
+          @update:model-value="onFiltersChanged"
+        />
+      </div>
+      <div class="col-6 col-md-1">
         <div class="text-caption text-grey-7 q-mb-xs">Mayor 60</div>
         <q-btn-toggle
           v-model="filterMayor60"
@@ -374,6 +389,7 @@ const filterComunidades = ref([]);
 const filterNac = ref('Todos');
 const filterSexo = ref('Todos');
 const filterPatria = ref('Todos');
+const filterValidado = ref('Todos');
 const filterMayor60 = ref('Todos');
 const filterRegistro = ref('Todos');
 const filterCirculo = ref('Todos');
@@ -426,6 +442,7 @@ const columns = [
   { name: 'fecha_nac', label: 'Fecha Nac.', field: 'fecha_nac', align: 'center', sortable: true },
   { name: 'sexo', label: 'Sexo', field: 'sexo', align: 'center', sortable: true },
   { name: 'patria', label: 'Patria', field: 'patria', align: 'center', sortable: true },
+  { name: 'validado', label: 'Validado', field: 'validado', align: 'center', sortable: true },
   { name: 'mayor60', label: 'Mayor 60', field: 'mayor60', align: 'center', sortable: true },
   { name: 'registro', label: 'Registro', field: 'registro', align: 'center', sortable: true },
   { name: 'circulo', label: 'Círculo', field: 'circulo', align: 'center', sortable: true },
@@ -460,6 +477,7 @@ const buildQueryParams = (pag) => {
   if (filterNac.value !== 'Todos') params.nac = filterNac.value;
   if (filterSexo.value !== 'Todos') params.sexo = filterSexo.value;
   if (filterPatria.value !== 'Todos') params.patria = filterPatria.value;
+  if (filterValidado.value !== 'Todos') params.validado = filterValidado.value;
   if (filterMayor60.value !== 'Todos') params.mayor60 = filterMayor60.value;
   if (filterRegistro.value !== 'Todos') params.registro = filterRegistro.value;
   if (filterCirculo.value !== 'Todos') params.circulo = filterCirculo.value;
@@ -506,6 +524,7 @@ const clearAllFilters = async () => {
   filterNac.value = 'Todos';
   filterSexo.value = 'Todos';
   filterPatria.value = 'Todos';
+  filterValidado.value = 'Todos';
   filterMayor60.value = 'Todos';
   filterRegistro.value = 'Todos';
   filterCirculo.value = 'Todos';
@@ -662,6 +681,7 @@ const exportData = async (scope, format) => {
       'Fecha Nac.': r.fecha_nac ? formatDate(r.fecha_nac) : '',
       Sexo: r.sexo,
       Patria: r.patria,
+      Validado: r.validado,
       'Mayor 60': r.mayor60,
       Registro: r.registro,
       Círculo: r.circulo,
