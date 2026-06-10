@@ -79,6 +79,19 @@ app.use('/api/email', emailRoutes);
 if (process.env.NODE_ENV !== 'production') {
   app.use('/api/utility', utilityRoutes); // <-- Añadir
 }
+
+// --- GraphQL Dynamic Queries Endpoint ---
+const { createHandler } = require('graphql-http/lib/use/express');
+const { schema } = require('./graphql/schema');
+const authMiddleware = require('./middleware/authMiddleware');
+
+app.all(['/graphql', '/api/graphql'], authMiddleware, (req, res, next) => {
+  createHandler({
+    schema,
+    context: () => ({ userId: req.user.id })
+  })(req, res, next);
+});
+
 // --- Configuración del Servidor HTTP y WebSocket ---
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });

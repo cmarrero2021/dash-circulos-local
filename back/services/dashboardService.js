@@ -597,6 +597,8 @@ const buildPriorizadosPermissionClause = async (userId) => {
     };
 };
 
+exports.buildPriorizadosPermissionClause = buildPriorizadosPermissionClause;
+
 /**
  * Obtiene datos paginados de vpriorizados con filtrado server-side.
  * @param {number} userId
@@ -632,6 +634,7 @@ exports.getPriorizados = async (userId, query = {}) => {
             OR registro ILIKE $${pi}
             OR circulo ILIKE $${pi}
             OR patria ILIKE $${pi}
+            OR validado ILIKE $${pi}
             OR mayor60 ILIKE $${pi}
             OR nuevos ILIKE $${pi}
         )`);
@@ -689,6 +692,11 @@ exports.getPriorizados = async (userId, query = {}) => {
         params.push(query.patria);
         pi++;
     }
+    if (query.validado && query.validado !== 'Todos') {
+        conditions.push(`validado = $${pi}`);
+        params.push(query.validado);
+        pi++;
+    }
     if (query.mayor60 && query.mayor60 !== 'Todos') {
         conditions.push(`mayor60 = $${pi}`);
         params.push(query.mayor60);
@@ -726,7 +734,7 @@ exports.getPriorizados = async (userId, query = {}) => {
         'id', 'estado_id', 'estado', 'municipio_id', 'municipio',
         'parroquia_id', 'parroquia', 'nac', 'cedula', 'nombre',
         'telefono', 'fecha_nac', 'sexo', 'comunidad', 'patria',
-        'mayor60', 'registro', 'circulo', 'nuevos',
+        'validado', 'mayor60', 'registro', 'circulo', 'nuevos',
     ];
     let orderClause = 'ORDER BY estado, municipio, parroquia, nombre';
     if (query.sortBy && allowedSortCols.includes(query.sortBy)) {

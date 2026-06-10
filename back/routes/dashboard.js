@@ -39,4 +39,13 @@ router.get('/registros-indicadores-nacionales', dashboardController.getRegistros
 router.get('/priorizados', dashboardController.getPriorizados);
 router.get('/priorizados/filter-options', dashboardController.getPriorizadosFilterOptions);
 
+// --- Endpoints de Consultas Guardadas (REST) ---
+router.get('/saved-queries', dashboardController.listSavedQueries);
+router.get('/saved-queries/:id', dashboardController.getSavedQuery);
+router.post('/saved-queries', dashboardController.createSavedQuery);
+router.put('/saved-queries/:id', dashboardController.updateSavedQuery);
+router.delete('/saved-queries/:id', dashboardController.deleteSavedQuery);
+router.post('/saved-queries/:id/grant', dashboardController.grantQueryAccess);
+router.delete('/saved-queries/:id/grant', dashboardController.revokeQueryAccess);
+
 module.exports = router;
