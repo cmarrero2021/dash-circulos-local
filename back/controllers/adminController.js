@@ -177,6 +177,80 @@ exports.refreshMaterializedView = async (_req, res) => {
   }
 };
 
+/**
+ * GET /admin/users/:id/email-permission
+ * Devuelve si el usuario tiene asignado directamente el permiso 'editar_email_sin_registro'.
+ */
+exports.getUserEmailPermission = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const { rows } = await pool.query(
+      `SELECT 1
+       FROM usuarios_permisos up
+       JOIN permisos p ON up.permiso_id = p.id
+       WHERE up.usuario_id = $1 AND p.nombre = 'editar_email_sin_registro'
+       LIMIT 1`,
+      [id]
+    );
+    res.json({ tienePermiso: rows.length > 0 });
+  } catch (error) {
+    console.error(`Error al obtener permiso email para usuario ${id}:`, error);
+    res.status(500).json({ message: 'Error del servidor' });
+  }
+};
+
+/**
+ * PUT /admin/users/:id/email-permission
+ * Body: { activo: boolean }
+ * Activa o desactiva el permiso directo 'editar_email_sin_registro' para el usuario.
+ */
+exports.setUserEmailPermission = async (req, res) => {
+  const { id } = req.params;
+  const { activo } = req.body;
+
+  if (typeof activo !== 'boolean') {
+    return res.status(400).json({ message: 'El campo "activo" debe ser un booleano.' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Obtener el id del permiso
+    const permisoRes = await client.query(
+      `SELECT id FROM permisos WHERE nombre = 'editar_email_sin_registro' LIMIT 1`
+    );
+    if (permisoRes.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'El permiso "editar_email_sin_registro" no existe en la base de datos.' });
+    }
+    const permisoId = permisoRes.rows[0].id;
+
+    if (activo) {
+      await client.query(
+        `INSERT INTO usuarios_permisos (usuario_id, permiso_id)
+         VALUES ($1, $2)
+         ON CONFLICT (usuario_id, permiso_id) DO NOTHING`,
+        [id, permisoId]
+      );
+    } else {
+      await client.query(
+        `DELETE FROM usuarios_permisos WHERE usuario_id = $1 AND permiso_id = $2`,
+        [id, permisoId]
+      );
+    }
+
+    await client.query('COMMIT');
+    res.json({ message: `Permiso ${activo ? 'asignado' : 'revocado'} correctamente.`, tienePermiso: activo });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error(`Error al actualizar permiso email para usuario ${id}:`, error);
+    res.status(500).json({ message: 'Error del servidor' });
+  } finally {
+    client.release();
+  }
+};
+
 exports.changePassword = async (req, res) => {
   const { id } = req.params;
   const { password } = req.body;

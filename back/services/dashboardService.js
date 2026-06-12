@@ -637,6 +637,8 @@ exports.getPriorizados = async (userId, query = {}) => {
             OR validado ILIKE $${pi}
             OR mayor60 ILIKE $${pi}
             OR nuevos ILIKE $${pi}
+            OR fallecido ILIKE $${pi}
+            OR excepcional ILIKE $${pi}
         )`);
         params.push(`%${searchTerm}%`);
         pi++;
@@ -717,6 +719,16 @@ exports.getPriorizados = async (userId, query = {}) => {
         params.push(query.nuevos);
         pi++;
     }
+    if (query.fallecido && query.fallecido !== 'Todos') {
+        conditions.push(`fallecido = $${pi}`);
+        params.push(query.fallecido);
+        pi++;
+    }
+    if (query.excepcional && query.excepcional !== 'Todos') {
+        conditions.push(`excepcional = $${pi}`);
+        params.push(query.excepcional);
+        pi++;
+    }
 
     // --- Construir WHERE completo ---
     let whereClause = permClause;
@@ -735,6 +747,7 @@ exports.getPriorizados = async (userId, query = {}) => {
         'parroquia_id', 'parroquia', 'nac', 'cedula', 'nombre',
         'telefono', 'fecha_nac', 'sexo', 'comunidad', 'patria',
         'validado', 'mayor60', 'registro', 'circulo', 'nuevos',
+        'fallecido', 'excepcional',
     ];
     let orderClause = 'ORDER BY estado, municipio, parroquia, nombre';
     if (query.sortBy && allowedSortCols.includes(query.sortBy)) {

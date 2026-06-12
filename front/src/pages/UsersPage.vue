@@ -90,6 +90,19 @@
               :loading="loadingStates"
             />
           </div>
+
+          <!-- Permiso especial: editar email sin registro -->
+          <q-separator class="q-my-md" />
+          <div class="text-subtitle2 q-mb-xs text-grey-7">Permisos especiales</div>
+          <q-toggle
+            v-model="editDialog.emailPermiso"
+            label="Puede editar correo aunque el usuario no tenga registro"
+            :color="editDialog.emailPermiso ? 'deep-orange' : 'grey'"
+            :icon="editDialog.emailPermiso ? 'mark_email_read' : 'mail_lock'"
+          />
+          <div class="text-caption text-grey-6 q-ml-md">
+            Permiso directo: <em>editar_email_sin_registro</em>
+          </div>
         </q-card-section>
 
         <q-card-actions align="right">
@@ -174,7 +187,8 @@ const editDialog = ref({
   show: false,
   mode: 'edit',
   user: {},
-  permittedStates: []
+  permittedStates: [],
+  emailPermiso: false
 });
 
 const passwordDialog = ref({
@@ -246,6 +260,7 @@ function openCreateDialog() {
       activo: true,
     },
     permittedStates: [],
+    emailPermiso: false,
   };
 }
 
@@ -254,19 +269,35 @@ async function openEditDialog(user) {
   editDialog.value.user = { ...user };
   editDialog.value.show = true;
   editDialog.value.permittedStates = [];
+  editDialog.value.emailPermiso = false;
+
+  // Cargar estados y permiso especial en paralelo
+  const promises = [];
 
   if (isEstadalRole(user.rol_id)) {
-    try {
-      loadingStates.value = true;
-      const res = await api.get(`/admin/users/${user.id}/states`);
-      // El q-select con `multiple` espera el objeto completo, no solo el ID
-      editDialog.value.permittedStates = allStates.value.filter(state => res.data.includes(state.id));
-    } catch (error) {
-      console.error(`Error al cargar estados para el usuario ${user.id}:`, error);
-      $q.notify({ color: 'negative', message: 'Error al cargar los estados del usuario.' });
-    } finally {
-      loadingStates.value = false;
-    }
+    promises.push(
+      api.get(`/admin/users/${user.id}/states`)
+        .then(res => {
+          editDialog.value.permittedStates = allStates.value.filter(state => res.data.includes(state.id));
+        })
+        .catch(error => {
+          console.error(`Error al cargar estados para el usuario ${user.id}:`, error);
+          $q.notify({ color: 'negative', message: 'Error al cargar los estados del usuario.' });
+        })
+    );
+  }
+
+  promises.push(
+    api.get(`/admin/users/${user.id}/email-permission`)
+      .then(res => { editDialog.value.emailPermiso = res.data.tienePermiso; })
+      .catch(error => {
+        console.error(`Error al cargar permiso email para el usuario ${user.id}:`, error);
+      })
+  );
+
+  if (promises.length > 0) {
+    loadingStates.value = true;
+    await Promise.all(promises).finally(() => { loadingStates.value = false; });
   }
 }
 
@@ -342,10 +373,16 @@ async function updateExistingUser(userToSave) {
     activo: userToSave.activo
   });
 
+  // Guardar estados permitidos si es rol Estadal
   if (isEstadalRole(userToSave.rol_id)) {
     const stateIds = editDialog.value.permittedStates.map(state => state.id);
     await api.put(`/admin/users/${userToSave.id}/states`, { stateIds });
   }
+
+  // Guardar permiso especial de correo
+  await api.put(`/admin/users/${userToSave.id}/email-permission`, {
+    activo: editDialog.value.emailPermiso
+  });
 
   $q.notify({ color: 'positive', message: 'Usuario actualizado correctamente.' });
   editDialog.value.show = false;
@@ -368,9 +405,15 @@ async function createUser(userToSave) {
 
   const { data } = await api.post('/admin/users', payload);
 
+  // Guardar estados permitidos si es rol Estadal
   if (isEstadalRole(userToSave.rol_id) && editDialog.value.permittedStates.length > 0) {
     const stateIds = editDialog.value.permittedStates.map(state => state.id);
     await api.put(`/admin/users/${data.id}/states`, { stateIds });
+  }
+
+  // Guardar permiso especial de correo si está activo
+  if (editDialog.value.emailPermiso) {
+    await api.put(`/admin/users/${data.id}/email-permission`, { activo: true });
   }
 
   $q.notify({ color: 'positive', message: 'Usuario creado correctamente.' });

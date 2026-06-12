@@ -24,7 +24,9 @@ const FIELD_MAP = {
     'mayor60': { sql: 'p.mayor60', label: 'Adulto Mayor (+60)', category: 'Atributos' },
     'registro': { sql: 'p.registro', label: 'Registrado en el Sistema', category: 'Atributos' },
     'circulo': { sql: 'p.circulo', label: 'Pertenece a Círculo', category: 'Atributos' },
-    'nuevos': { sql: 'p.nuevos', label: 'Nuevo Registro', category: 'Atributos' }
+    'nuevos': { sql: 'p.nuevos', label: 'Nuevo Registro', category: 'Atributos' },
+    'fallecido': { sql: 'p.fallecido', label: 'Fallecido', category: 'Atributos' },
+    'excepcional': { sql: 'p.excepcional', label: 'Excepcional', category: 'Atributos' }
 };
 
 // ─── Operadores de Filtro Dinámico ──────────────────────────────────────────────

@@ -308,6 +308,36 @@
           @update:model-value="onFiltersChanged"
         />
       </div>
+      <div class="col-6 col-md-1">
+        <div class="text-caption text-grey-7 q-mb-xs">Fallecido</div>
+        <q-btn-toggle
+          v-model="filterFallecido"
+          dense
+          no-caps
+          spread
+          no-wrap
+          unelevated
+          toggle-color="primary"
+          :options="toggleOptions"
+          class="bg-transparent"
+          @update:model-value="onFiltersChanged"
+        />
+      </div>
+      <div class="col-6 col-md-1">
+        <div class="text-caption text-grey-7 q-mb-xs">Excepcional</div>
+        <q-btn-toggle
+          v-model="filterExcepcional"
+          dense
+          no-caps
+          spread
+          no-wrap
+          unelevated
+          toggle-color="primary"
+          :options="toggleOptions"
+          class="bg-transparent"
+          @update:model-value="onFiltersChanged"
+        />
+      </div>
     </q-card-section>
 
     <q-separator />
@@ -394,6 +424,8 @@ const filterMayor60 = ref('Todos');
 const filterRegistro = ref('Todos');
 const filterCirculo = ref('Todos');
 const filterNuevos = ref('Todos');
+const filterFallecido = ref('Todos');
+const filterExcepcional = ref('Todos');
 const isExporting = ref(false);
 
 // Options for autocomplete filtering in q-selects
@@ -447,6 +479,8 @@ const columns = [
   { name: 'registro', label: 'Registro', field: 'registro', align: 'center', sortable: true },
   { name: 'circulo', label: 'Círculo', field: 'circulo', align: 'center', sortable: true },
   { name: 'nuevos', label: 'Nuevo', field: 'nuevos', align: 'center', sortable: true },
+  { name: 'fallecido', label: 'Fallecido', field: 'fallecido', align: 'center', sortable: true },
+  { name: 'excepcional', label: 'Excepcional', field: 'excepcional', align: 'center', sortable: true },
 ];
 
 // --- Helpers ---
@@ -482,6 +516,8 @@ const buildQueryParams = (pag) => {
   if (filterRegistro.value !== 'Todos') params.registro = filterRegistro.value;
   if (filterCirculo.value !== 'Todos') params.circulo = filterCirculo.value;
   if (filterNuevos.value !== 'Todos') params.nuevos = filterNuevos.value;
+  if (filterFallecido.value !== 'Todos') params.fallecido = filterFallecido.value;
+  if (filterExcepcional.value !== 'Todos') params.excepcional = filterExcepcional.value;
   if (pag.sortBy) {
     params.sortBy = pag.sortBy;
     params.descending = String(pag.descending);
@@ -529,6 +565,8 @@ const clearAllFilters = async () => {
   filterRegistro.value = 'Todos';
   filterCirculo.value = 'Todos';
   filterNuevos.value = 'Todos';
+  filterFallecido.value = 'Todos';
+  filterExcepcional.value = 'Todos';
   pagination.value.sortBy = null;
   pagination.value.descending = false;
   pagination.value.page = 1;
@@ -686,6 +724,8 @@ const exportData = async (scope, format) => {
       Registro: r.registro,
       Círculo: r.circulo,
       Nuevo: r.nuevos,
+      Fallecido: r.fallecido,
+      Excepcional: r.excepcional,
     }));
 
     if (format === 'xlsx') {

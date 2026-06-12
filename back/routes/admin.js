@@ -20,6 +20,8 @@ router.get('/states', adminController.getStates);
 router.get('/users/:id/states', adminController.getUserStates);
 router.put('/users/:id/states', adminController.updateUserStates);
 router.put('/users/:id/password', adminController.changePassword);
+router.get('/users/:id/email-permission', adminController.getUserEmailPermission);
+router.put('/users/:id/email-permission', adminController.setUserEmailPermission);
 router.post('/refresh-materialized-view', adminController.refreshMaterializedView);
 
 module.exports = router;
