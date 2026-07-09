@@ -1,5 +1,11 @@
+const crypto = require('crypto');
 const pool = require('../config/db');
+const { cache } = require('../services/cacheService');
 const { buildPriorizadosPermissionClause } = require('../services/dashboardService');
+
+// TTL para consultas dinámicas (corto para preservar naturaleza dinámica)
+const GRAPHQL_DATA_TTL   = 60;    // 60 segundos — resultados de dashboardData
+const GRAPHQL_FIELDS_TTL = 3600;  // 1 hora — availableFields es estático
 
 // ─── FIELD_MAP para vpriorizados ────────────────────────────────────────────────
 
@@ -51,11 +57,30 @@ function buildFilterCondition(filter, paramIdx) {
     }
 }
 
+/**
+ * Genera un hash SHA-256 de los argumentos normalizados para usar como clave de caché.
+ * Garantiza que el mismo conjunto de argumentos en diferente orden produce la misma clave.
+ */
+function buildArgsHash(args) {
+    const normalized = JSON.stringify({
+        fields:  [...(args.fields  || [])].sort(),
+        filters: [...(args.filters || [])].sort((a, b) => a.field.localeCompare(b.field)),
+        groupBy: [...(args.groupBy || [])].sort(),
+        values:  [...(args.values  || [])].sort((a, b) => a.field.localeCompare(b.field)),
+        limit:   args.limit || 5000,
+    });
+    return crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 16);
+}
+
 // ─── Resolvers ──────────────────────────────────────────────────────────────────
 
 const resolvers = {
-    // metadata de campos disponibles
+    // metadata de campos disponibles — se cachea 1 hora (es completamente estático)
     availableFields: async () => {
+        const cacheKey = 'graphql:availableFields';
+        const cached = await cache.get(cacheKey);
+        if (cached) return cached;
+
         const fields = Object.entries(FIELD_MAP).map(([key, def]) => ({
             key,
             label: def.label,
@@ -63,15 +88,28 @@ const resolvers = {
             numeric: !!def.numeric,
             date: !!def.date,
         }));
-        return JSON.stringify(fields);
+        const result = JSON.stringify(fields);
+        await cache.set(cacheKey, result, GRAPHQL_FIELDS_TTL);
+        return result;
     },
 
-    // Consulta flexible para tabla/gráfico dinámicos
+    // Consulta flexible para tabla/gráfico dinámicos —
+    // se cachea 60 segundos por combinación única de (userId + args).
+    // La naturaleza dinámica se preserva porque:
+    //   1. TTL corto: tras 60s se reconsulta la BD directamente
+    //   2. Cambiar cualquier argumento produce un hash diferente → nueva consulta
+    //   3. Un evento de BD (notificationListener) invalida TODAS las claves graphql:dashboardData:*
     dashboardData: async (_, args, context) => {
+        const userId = context.userId;
+        const argsHash = buildArgsHash(args);
+        const cacheKey = `graphql:dashboardData:${userId}:${argsHash}`;
+
+        // Verificar caché antes de conectar a la BD
+        const cached = await cache.get(cacheKey);
+        if (cached) return cached;
+
         const client = await pool.connect();
         try {
-            const userId = context.userId;
-
             const requestedFields = args.fields || ['nombre', 'cedula'];
             const filters = args.filters || [];
             const groupByFields = args.groupBy || [];
@@ -170,11 +208,16 @@ const resolvers = {
 
             const result = await client.query(sql, queryParams);
 
-            return {
+            const data = {
                 columns: columnNames,
                 rows: JSON.stringify(result.rows),
                 totalRows: result.rows.length,
             };
+
+            // Guardar en caché con TTL corto (60s)
+            await cache.set(cacheKey, data, GRAPHQL_DATA_TTL);
+
+            return data;
         } finally {
             client.release();
         }

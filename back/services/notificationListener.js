@@ -2,9 +2,9 @@
 
 require('dotenv').config({ path: `.env.${process.env.NODE_ENV || 'development'}` });
 const { Client } = require('pg');
-const cache = require('./cacheService');
+const { cache } = require('./cacheService');
 const { refreshDashboardCache } = require('./dashboardWorker');
-const websocketService = require('./websocketService'); // Importamos el servicio de broadcast
+const websocketService = require('./websocketService');
 
 // Configuración de la conexión a la base de datos de ORIGEN ('registro')
 const dbConfig = {
@@ -31,10 +31,9 @@ const startListening = () => {
     client.query('LISTEN actualizacion_dashboard');
   });
 
-  client.on('notification', (msg) => {
+  client.on('notification', async (msg) => {
     try {
       const payload = JSON.parse(msg.payload);
-
 
       // Envolvemos el payload en el formato que el frontend espera
       const message = {
@@ -42,7 +41,14 @@ const startListening = () => {
         payload: payload
       };
 
-      // Enviamos el objeto estructurado a todos los clientes
+      // Invalidar caché Redis/node-cache antes del broadcast WebSocket
+      // Esto garantiza que el próximo request siempre obtenga datos frescos
+      await Promise.allSettled([
+        cache.delPattern('dashboard:*'),
+        cache.delPattern('graphql:dashboardData:*'),
+      ]);
+
+      // Enviamos el objeto estructurado a todos los clientes (sin cambios)
       websocketService.broadcast(message);
 
     } catch (error) {

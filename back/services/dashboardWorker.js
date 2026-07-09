@@ -1,5 +1,5 @@
 const pool = require('../config/db');
-const cache = require('./cacheService');
+const { cache } = require('./cacheService');
 const websocketService = require('./websocketService');
 
 let isRefreshing = false; // Un semáforo para evitar refrescos concurrentes
@@ -63,16 +63,19 @@ async function refreshDashboardCache() {
       });
     }
 
-    // 4. Sobrescribir los datos en el caché
-    cache.set('dashboard:by-state', circulosPorEstado);
-    cache.set('dashboard:by-municipality', circulosPorMunicipio);
-    cache.set('dashboard:total', totalCirculos);
+    // 4. Sobrescribir los datos en el caché (migrado a nueva API async)
+    await Promise.all([
+      cache.set('dashboard:by-state', circulosPorEstado),
+      cache.set('dashboard:by-municipality', circulosPorMunicipio),
+      cache.set('dashboard:total', totalCirculos),
+    ]);
+
     previousStateData = { ...circulosPorEstado }; // Guardar para próxima comparación
 
   // Cache updated successfully
 
     // 5. Notificar al frontend que los datos están listos
-  websocketService.broadcast({ event: 'data_updated' });
+    websocketService.broadcast({ event: 'data_updated' });
 
   } catch (error) {
     console.error('[Worker] Error durante el refresco del caché:', error);

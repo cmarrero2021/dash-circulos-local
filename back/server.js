@@ -12,6 +12,7 @@ dotenv.config({ path: path.join(__dirname, envFile) });
 console.log(`[INFO] Loading environment: ${envFile}`);
 console.log(`[INFO] NODE_ENV: ${process.env.NODE_ENV}`);
 
+const { initCache } = require('./services/cacheService');
 const { startListening } = require('./services/notificationListener');
 const websocketService = require('./services/websocketService');
 const { startMaterializedViewScheduler } = require('./services/materializedViewScheduler');
@@ -113,8 +114,11 @@ wss.on('connection', (ws) => {
 // --- Inicialización del Servidor ---
 const PORT = process.env.PORT || 3000;
 
-server.listen(PORT, () => {
-  // Server started
-  startListening();
-  startMaterializedViewScheduler();
+// Inicializar caché (Redis o node-cache fallback) antes de arrancar el servidor
+initCache().then(() => {
+  server.listen(PORT, () => {
+    // Server started
+    startListening();
+    startMaterializedViewScheduler();
+  });
 });

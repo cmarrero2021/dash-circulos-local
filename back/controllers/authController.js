@@ -107,7 +107,7 @@ exports.login = async (req, res) => {
 };
 
 
-const cache = require('../services/cacheService');
+const { cache } = require('../services/cacheService');
 
 /**
  * Maneja el logout de un usuario.
@@ -129,7 +129,7 @@ exports.logout = async (req, res) => {
 
         if (remainingTime > 0) {
           // La clave es el token, el valor es 'invalidated', y el TTL es el tiempo que le queda al token
-          cache.set(token, 'invalidated', remainingTime);
+          await cache.set(token, 'invalidated', remainingTime);
         }
       }
     }

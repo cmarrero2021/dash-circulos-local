@@ -1,6 +1,6 @@
 // services/dashboardService.js
 const pool = require('../config/db');
-const cache = require('./cacheService');
+const { cache } = require('./cacheService');
 const {
     hasNationalDashboardAccess,
     getAllowedStatesForUser,
@@ -9,14 +9,18 @@ const {
 
 const DASHBOARD_DEADLINE = process.env.DASHBOARD_DEADLINE || '2025-11-30';
 
-// TTL en segundos para caché de priorizados
-const PRIORIZADOS_CACHE_TTL = 30;       // datos paginados
-const FILTER_OPTIONS_CACHE_TTL = 60;    // opciones de filtros desplegables
+// ─── TTL por tipo de dato ─────────────────────────────────────────────────────
+const TTL = {
+    INDICATORS:   120,  // indicadores y datos derivados
+    AGGREGATED:   300,  // datos agregados estables (mapas, estados, municipios)
+    PRIORIZADOS:   30,  // datos paginados de priorizados (alta variabilidad)
+    FILTER_OPT:    60,  // opciones de filtros desplegables
+};
 
 /**
  * Genera una clave de caché determinista a partir de un prefijo y un objeto de parámetros.
  */
-const buildCacheKey = (prefix, userId, params) => {
+const buildCacheKey = (prefix, userId, params = {}) => {
     const sorted = Object.keys(params).sort().reduce((acc, k) => {
         acc[k] = params[k];
         return acc;
@@ -119,6 +123,10 @@ const buildFilterClause = async (userId, voluntaryFilters = {}) => {
 
 // --- Funciones de Indicadores ---
 exports.getIndicators = async (userId) => {
+    const cacheKey = `dashboard:indicators:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const diasFaltantes = await getDaysRemaining();
     const hasNationalAccess = await hasNationalDashboardAccess(userId);
 
@@ -126,7 +134,7 @@ exports.getIndicators = async (userId) => {
         const query = `SELECT meta, acumulado, diferencia, dias_faltantes, promedio_necesario, promedio_diario, participantes, promedio FROM vindicadores;`;
         const result = await pool.query(query);
         const row = result.rows[0] || {};
-        return {
+        const data = {
             meta: Number(row.meta ?? 0),
             acumulado: Number(row.acumulado ?? 0),
             diferencia: Number(row.diferencia ?? 0),
@@ -136,6 +144,8 @@ exports.getIndicators = async (userId) => {
             participantes: Number(row.participantes ?? 0),
             promedio: Number(row.promedio ?? 0),
         };
+        await cache.set(cacheKey, data, TTL.INDICATORS);
+        return data;
     }
 
     const allowedStates = await getAllowedStatesForUser(userId);
@@ -184,7 +194,7 @@ exports.getIndicators = async (userId) => {
     const promedio_necesario = diasReferencia > 0 ? Math.trunc(restante / diasReferencia) : restante;
     const promedio_diario = diasConRegistro > 0 ? Math.trunc(acumulado / diasConRegistro) : 0;
 
-    return {
+    const data = {
         meta,
         acumulado,
         diferencia,
@@ -194,10 +204,16 @@ exports.getIndicators = async (userId) => {
         participantes,
         promedio,
     };
-}
+    await cache.set(cacheKey, data, TTL.INDICATORS);
+    return data;
+};
 
 // --- Funciones de Agregación ---
 exports.getCirclesByState = async (userId, filters) => {
+    const cacheKey = buildCacheKey('dashboard:by-state', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
         SELECT *
@@ -205,10 +221,15 @@ exports.getCirclesByState = async (userId, filters) => {
         ORDER BY estado;
     `;
     const result = await pool.query(query, params);
+    await cache.set(cacheKey, result.rows, TTL.AGGREGATED);
     return result.rows;
 };
 
 exports.getCirclesByStateMunicipiosComunas = async (userId, filters = {}) => {
+    const cacheKey = buildCacheKey('dashboard:by-state-mun-com', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
         SELECT estado, municipio, comuna, COUNT(*) as avance
@@ -218,10 +239,15 @@ exports.getCirclesByStateMunicipiosComunas = async (userId, filters = {}) => {
         ORDER BY estado, municipio, comuna;
     `;
     const result = await pool.query(query, params);
+    await cache.set(cacheKey, result.rows, TTL.AGGREGATED);
     return result.rows;
 };
 
 exports.getCirclesByStateMunicipios = async (userId, filters = {}) => {
+    const cacheKey = buildCacheKey('dashboard:by-state-mun', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
         SELECT estado_id, estado, municipio_id, municipio, COUNT(*) as avance
@@ -231,10 +257,15 @@ exports.getCirclesByStateMunicipios = async (userId, filters = {}) => {
         ORDER BY estado, municipio;
     `;
     const result = await pool.query(query, params);
+    await cache.set(cacheKey, result.rows, TTL.AGGREGATED);
     return result.rows;
 };
 
 exports.getCirclesByStateMunicipiosParroquias = async (userId, filters = {}) => {
+    const cacheKey = buildCacheKey('dashboard:by-state-mun-par', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
 
     /**
@@ -293,10 +324,15 @@ exports.getCirclesByStateMunicipiosParroquias = async (userId, filters = {}) => 
         ORDER BY estado, municipio, parroquia;
     `;
     const result = await pool.query(query, params);
+    await cache.set(cacheKey, result.rows, TTL.AGGREGATED);
     return result.rows;
 };
 
 exports.getCirclesByStateMunicipiosParroquiasComunas = async (userId, filters = {}) => {
+    const cacheKey = buildCacheKey('dashboard:by-state-mun-par-com', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
         WITH comunas_filtradas AS (
@@ -316,10 +352,15 @@ exports.getCirclesByStateMunicipiosParroquiasComunas = async (userId, filters = 
         ORDER BY c.estado, c.municipio, c.parroquia, c.comuna;
     `;
     const result = await pool.query(query, params);
+    await cache.set(cacheKey, result.rows, TTL.AGGREGATED);
     return result.rows;
 };
 
 exports.getCirclesByMunicipality = async (userId, filters) => {
+    const cacheKey = buildCacheKey('dashboard:by-municipality', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
         SELECT estado, municipio, COUNT(id) as total_circulos
@@ -327,17 +368,28 @@ exports.getCirclesByMunicipality = async (userId, filters) => {
         GROUP BY estado, municipio ORDER BY estado, municipio;
     `;
     const result = await pool.query(query, params);
+    await cache.set(cacheKey, result.rows, TTL.AGGREGATED);
     return result.rows;
 };
 
 exports.getTotalCircles = async (userId, filters) => {
+    const cacheKey = buildCacheKey('dashboard:total', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `SELECT COUNT(id) as total FROM rm_circulos_remoto ${whereClause}`;
     const result = await pool.query(query, params);
-    return result.rows[0] || { total: 0 };
+    const data = result.rows[0] || { total: 0 };
+    await cache.set(cacheKey, data, TTL.AGGREGATED);
+    return data;
 };
 
 exports.getDailyAverage = async (userId, filters) => {
+    const cacheKey = buildCacheKey('dashboard:daily-avg', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
         SELECT 
@@ -347,6 +399,7 @@ exports.getDailyAverage = async (userId, filters) => {
         FROM rm_circulos_remoto ${whereClause};
     `;
     const result = await pool.query(query, params);
+    await cache.set(cacheKey, result.rows[0], TTL.INDICATORS);
     return result.rows[0];
 };
 
@@ -366,6 +419,10 @@ exports.getRawData = async (userId, filters) => {
 
 // --- Función para certificaciones diarias filtradas por permisos
 exports.getDailyCertifications = async (userId, filters) => {
+    const cacheKey = buildCacheKey('dashboard:daily-cert', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
         SELECT certificacion::date AS fecha, COUNT(*)::integer AS certificaciones
@@ -375,10 +432,15 @@ exports.getDailyCertifications = async (userId, filters) => {
         ORDER BY fecha DESC;
     `;
     const result = await pool.query(query, params);
+    await cache.set(cacheKey, result.rows, TTL.INDICATORS);
     return result.rows;
 };
 
 exports.getStateIndicatorsView = async (userId, filters = {}) => {
+    const cacheKey = buildCacheKey('dashboard:state-indicators', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const hasNationalAccess = await hasNationalDashboardAccess(userId);
     const params = [];
     let whereClauses = [];
@@ -405,11 +467,16 @@ exports.getStateIndicatorsView = async (userId, filters = {}) => {
         ORDER BY estado_nombre;
     `;
     const { rows } = await pool.query(query, params);
+    await cache.set(cacheKey, rows, TTL.INDICATORS);
     return rows;
 };
 
 // --- Función para obtener datos del mapa (porcentajes por estado) ---
 exports.getMapaEstados = async (userId) => {
+    const cacheKey = `dashboard:mapa:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const hasNationalAccess = await hasNationalDashboardAccess(userId);
     let whereClause = '';
     const params = [];
@@ -433,11 +500,16 @@ exports.getMapaEstados = async (userId) => {
         ORDER BY estado_id;
     `;
     const { rows } = await pool.query(query, params);
+    await cache.set(cacheKey, rows, TTL.AGGREGATED);
     return rows;
 };
 
 // --- Función para obtener participantes por estado (capa de dispersión) ---
 exports.getParticipantesPorEstado = async (userId) => {
+    const cacheKey = `dashboard:participantes:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const hasNationalAccess = await hasNationalDashboardAccess(userId);
     let whereClause = '';
     const params = [];
@@ -459,11 +531,16 @@ exports.getParticipantesPorEstado = async (userId) => {
         ORDER BY state_id;
     `;
     const { rows } = await pool.query(query, params);
+    await cache.set(cacheKey, rows, TTL.AGGREGATED);
     return rows;
 };
 
 // --- Función para obtener priorizados por estado (capa de dispersión triángulos) ---
 exports.getPriorizadosPorEstado = async (userId) => {
+    const cacheKey = `dashboard:priorizados-estado:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const hasNationalAccess = await hasNationalDashboardAccess(userId);
     let whereClause = '';
     const params = [];
@@ -486,11 +563,16 @@ exports.getPriorizadosPorEstado = async (userId) => {
         ORDER BY estado_id;
     `;
     const { rows } = await pool.query(query, params);
+    await cache.set(cacheKey, rows, TTL.AGGREGATED);
     return rows;
 };
 
 // --- Función para obtener indicadores de registros básicos por estado ---
 exports.getRegistrosIndicadoresPorEstado = async (userId) => {
+    const cacheKey = `dashboard:registros-estados:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const hasNationalAccess = await hasNationalDashboardAccess(userId);
     const params = [];
     let whereClause = '';
@@ -527,11 +609,16 @@ exports.getRegistrosIndicadoresPorEstado = async (userId) => {
         ORDER BY estado;
     `;
     const { rows } = await pool.query(query, params);
+    await cache.set(cacheKey, rows, TTL.AGGREGATED);
     return rows;
 };
 
 // --- Función para obtener indicadores de registros básicos nacionales (o del scope del usuario) ---
 exports.getRegistrosIndicadoresNacionales = async (userId) => {
+    const cacheKey = `dashboard:registros-nacionales:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const hasNationalAccess = await hasNationalDashboardAccess(userId);
 
     // Usuarios con acceso nacional: consultan la vista nacional optimizada
@@ -550,7 +637,9 @@ exports.getRegistrosIndicadoresNacionales = async (userId) => {
             LIMIT 1;
         `;
         const { rows } = await pool.query(query);
-        return rows[0] || {};
+        const data = rows[0] || {};
+        await cache.set(cacheKey, data, TTL.AGGREGATED);
+        return data;
     }
 
     // Usuarios con acceso restringido: agregar desde la vista por estados
@@ -572,7 +661,9 @@ exports.getRegistrosIndicadoresNacionales = async (userId) => {
         WHERE estado = ANY(SELECT UPPER(estado) FROM vestados WHERE id = ANY($1))
     `;
     const { rows } = await pool.query(query, [allowedStates]);
-    return rows[0] || {};
+    const data = rows[0] || {};
+    await cache.set(cacheKey, data, TTL.AGGREGATED);
+    return data;
 };
 
 // --- Funciones para Priorizados (server-side pagination + filtering) ---
@@ -609,8 +700,8 @@ exports.getPriorizados = async (userId, query = {}) => {
     // Exportaciones no se cachean (son operaciones puntuales)
     const isExport = query.export === 'true';
     if (!isExport) {
-        const cacheKey = buildCacheKey('priz', userId, query);
-        const cached = cache.get(cacheKey);
+        const cacheKey = buildCacheKey('dashboard:priorizados', userId, query);
+        const cached = await cache.get(cacheKey);
         if (cached) return cached;
     }
 
@@ -790,10 +881,8 @@ exports.getPriorizados = async (userId, query = {}) => {
     const result = { rows, totalRows };
 
     // Guardar en caché (solo consultas paginadas, no exportaciones)
-    if (!isExport) {
-        const cacheKey = buildCacheKey('priz', userId, query);
-        cache.set(cacheKey, result, PRIORIZADOS_CACHE_TTL);
-    }
+    const cacheKey = buildCacheKey('dashboard:priorizados', userId, query);
+    await cache.set(cacheKey, result, TTL.PRIORIZADOS);
 
     return result;
 };
@@ -806,8 +895,8 @@ exports.getPriorizados = async (userId, query = {}) => {
  */
 exports.getPriorizadosFilterOptions = async (userId, query = {}) => {
     // Verificar caché
-    const cacheKey = buildCacheKey('priz-fo', userId, query);
-    const cached = cache.get(cacheKey);
+    const cacheKey = buildCacheKey('dashboard:priorizados-fo', userId, query);
+    const cached = await cache.get(cacheKey);
     if (cached) return cached;
 
     const { permClause, permParams } = await buildPriorizadosPermissionClause(userId);
@@ -893,7 +982,7 @@ exports.getPriorizadosFilterOptions = async (userId, query = {}) => {
     };
 
     // Guardar en caché
-    cache.set(cacheKey, result, FILTER_OPTIONS_CACHE_TTL);
+    await cache.set(cacheKey, result, TTL.FILTER_OPT);
 
     return result;
 };
