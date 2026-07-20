@@ -37,23 +37,60 @@ const FIELD_MAP = {
 
 // ─── Operadores de Filtro Dinámico ──────────────────────────────────────────────
 
+// Builds a single SQL condition for one filter, advancing the param index.
+// Returns null if the filter is invalid. Handles all advanced operators:
+//   eq, neq, gt, lt, gte, lte, in, like, nlike, sw, nsw, ew, new,
+//   between, nbetween, isnull, notnull, regex
+//
+// `value` can be empty only for isnull / notnull operators.
+// `value2` is used by between / nbetween (min/max bounds).
 function buildFilterCondition(filter, paramIdx) {
     const fieldDef = FIELD_MAP[filter.field];
     if (!fieldDef) return null;
 
     const sql = fieldDef.sql;
     const op = (filter.operator || 'eq').toLowerCase();
+    const v  = filter.value;
+    const v2 = filter.value2;
+
+    const hasV  = v !== undefined && v !== null && v !== '';
+    const hasV2 = v2 !== undefined && v2 !== null && v2 !== '';
+
+    // ─── Null-check operators (no params consumed) ──────────────
+    if (op === 'isnull')   return { clause: `${sql} IS NULL`,         value: null };
+    if (op === 'notnull')  return { clause: `${sql} IS NOT NULL`,     value: null };
+
+    // ─── Between / Not between (two params) ─────────────────────
+    if (op === 'between' || op === 'nbetween') {
+        if (!hasV || !hasV2) return null;
+        const kw = op === 'between' ? 'BETWEEN' : 'NOT BETWEEN';
+        return {
+            clause: `${sql} ${kw} $${paramIdx} AND $${paramIdx + 1}`,
+            value: [v, v2],
+            paramCount: 2,
+        };
+    }
+
+    // ─── Operators requiring a single value ────────────────────
+    if (!hasV) return null;
 
     switch (op) {
-        case 'eq': return { clause: `${sql} = $${paramIdx}`, value: filter.value };
-        case 'neq': return { clause: `${sql} != $${paramIdx}`, value: filter.value };
-        case 'gt': return { clause: `${sql} > $${paramIdx}`, value: filter.value };
-        case 'lt': return { clause: `${sql} < $${paramIdx}`, value: filter.value };
-        case 'gte': return { clause: `${sql} >= $${paramIdx}`, value: filter.value };
-        case 'lte': return { clause: `${sql} <= $${paramIdx}`, value: filter.value };
-        case 'like': return { clause: `${sql} ILIKE $${paramIdx}`, value: `%${filter.value}%` };
-        case 'in': return { clause: `${sql} = ANY($${paramIdx})`, value: filter.value.split(',') };
-        default: return { clause: `${sql} = $${paramIdx}`, value: filter.value };
+        case 'eq':   return { clause: `${sql} = $${paramIdx}`,       value: v };
+        case 'neq':  return { clause: `${sql} != $${paramIdx}`,      value: v };
+        case 'gt':   return { clause: `${sql} > $${paramIdx}`,        value: v };
+        case 'lt':   return { clause: `${sql} < $${paramIdx}`,        value: v };
+        case 'gte':  return { clause: `${sql} >= $${paramIdx}`,       value: v };
+        case 'lte':  return { clause: `${sql} <= $${paramIdx}`,       value: v };
+        case 'like': return { clause: `${sql} ILIKE $${paramIdx}`,    value: `%${v}%` };
+        case 'nlike':return { clause: `${sql} NOT ILIKE $${paramIdx}`,value: `%${v}%` };
+        case 'sw':   return { clause: `${sql} ILIKE $${paramIdx}`,    value: `${v}%` };
+        case 'nsw':  return { clause: `${sql} NOT ILIKE $${paramIdx}`,value: `${v}%` };
+        case 'ew':   return { clause: `${sql} ILIKE $${paramIdx}`,    value: `%${v}` };
+        case 'new':  return { clause: `${sql} NOT ILIKE $${paramIdx}`,value: `%${v}` };
+        case 'in':   return { clause: `${sql} = ANY($${paramIdx})`,   value: String(v).split(',').map(s => s.trim()).filter(Boolean) };
+        case 'nin':  return { clause: `${sql} != ALL($${paramIdx})`,  value: String(v).split(',').map(s => s.trim()).filter(Boolean) };
+        case 'regex':return { clause: `${sql} ~ $${paramIdx}`,        value: v };
+        default:     return { clause: `${sql} = $${paramIdx}`,        value: v };
     }
 }
 
@@ -122,21 +159,54 @@ const resolvers = {
             let paramIdx = nextParamIndex;
             const queryParams = [...permParams];
 
-            // 2. Construir filtros dinámicos del usuario
-            let filterClauses = [];
+            // 2. Construir filtros dinámicos del usuario.
+            // Soporta agrupación AND/OR por campo: condiciones consecutivas con el
+            // mismo `field` se agrupan con `(...)` y se combinan con `combine`.
+            let filterGroups = [];
+            let currentGroup = null; // { field, parts: [{ conn, fragment }] }
             for (const f of filters) {
                 const condition = buildFilterCondition(f, paramIdx);
-                if (condition) {
-                    filterClauses.push(condition.clause);
-                    queryParams.push(condition.value);
-                    paramIdx++;
+                if (!condition) continue;
+
+                if (condition.value !== null) {
+                    // between/nbetween push a [v, v2] array; others push scalar.
+                    // pg treats array binding as a single $n param only when used
+                    // with ANY/ALL, but BETWEEN uses two placeholders bound to v and v2.
+                    if (condition.paramCount === 2) {
+                        // value === [v, v2] → push twice (one per placeholder)
+                        queryParams.push(condition.value[0]);
+                        queryParams.push(condition.value[1]);
+                    } else {
+                        queryParams.push(condition.value);
+                    }
+                }
+                paramIdx += condition.paramCount || 1;
+
+                const fragment = condition.clause;
+                if (currentGroup && currentGroup.field === f.field) {
+                    const conn = (f.combine || 'AND').toUpperCase() === 'OR' ? 'OR' : 'AND';
+                    currentGroup.parts.push({ conn, fragment });
+                } else {
+                    if (currentGroup) filterGroups.push(currentGroup);
+                    currentGroup = { field: f.field, parts: [{ conn: 'AND', fragment }] };
                 }
             }
+            if (currentGroup) filterGroups.push(currentGroup);
+
+            // Render each group: single-condition groups emit the bare fragment,
+            // multi-condition groups emit `( frag1 OP frag2 OP ... )` where OP
+            // is the `combine` declared by each condition (except the first one,
+            // which always acts as the group opener).
+            const renderedClauses = filterGroups.map(g => {
+                if (g.parts.length === 1) return g.parts[0].fragment;
+                const inner = g.parts.map((p, i) => (i === 0 ? p.fragment : `${p.conn} ${p.fragment}`)).join(' ');
+                return `(${inner})`;
+            });
 
             // Combinar permisos con filtros dinámicos
             let whereClause = permClause;
-            if (filterClauses.length > 0) {
-                const filtersSQL = filterClauses.join(' AND ');
+            if (renderedClauses.length > 0) {
+                const filtersSQL = renderedClauses.join(' AND ');
                 if (whereClause) {
                     whereClause += ' AND ' + filtersSQL;
                 } else {

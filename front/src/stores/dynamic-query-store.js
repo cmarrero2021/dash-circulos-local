@@ -3,6 +3,43 @@ import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { api } from 'boot/axios';
 
+// ─── Catálogo de operadores de filtro ─────────────────────────────────────────
+// `kind`: 'text' | 'numeric' | 'date' — determina qué operadores mostrar según
+// el tipo de campo. `arity`: 1 (solo value) | 2 (value + value2) | 0 (sin value)
+export const FILTER_OPERATORS = [
+  { value: 'eq',       label: 'Igual a',                    kind: 'all',     arity: 1 },
+  { value: 'neq',      label: 'Diferente de',               kind: 'all',     arity: 1 },
+  { value: 'like',     label: 'Contiene',                   kind: 'text',    arity: 1 },
+  { value: 'nlike',    label: 'No contiene',                kind: 'text',    arity: 1 },
+  { value: 'sw',       label: 'Comienza con',               kind: 'text',    arity: 1 },
+  { value: 'nsw',      label: 'No comienza con',            kind: 'text',    arity: 1 },
+  { value: 'ew',       label: 'Termina con',                kind: 'text',    arity: 1 },
+  { value: 'new',      label: 'No termina con',             kind: 'text',    arity: 1 },
+  { value: 'gt',       label: 'Mayor que',                  kind: 'numeric', arity: 1 },
+  { value: 'lt',       label: 'Menor que',                  kind: 'numeric', arity: 1 },
+  { value: 'gte',      label: 'Mayor o igual que',          kind: 'numeric', arity: 1 },
+  { value: 'lte',      label: 'Menor o igual que',          kind: 'numeric', arity: 1 },
+  { value: 'between',  label: 'Entre (rango)',             kind: 'numeric', arity: 2 },
+  { value: 'nbetween', label: 'No entre (rango)',           kind: 'numeric', arity: 2 },
+  { value: 'in',       label: 'En la lista (CSV)',          kind: 'all',     arity: 1 },
+  { value: 'nin',      label: 'No en la lista (CSV)',       kind: 'all',     arity: 1 },
+  { value: 'isnull',   label: 'Está vacío (NULL)',          kind: 'all',     arity: 0 },
+  { value: 'notnull',  label: 'No está vacío (NOT NULL)',   kind: 'all',     arity: 0 },
+  { value: 'regex',    label: 'Expresión regular (~)',      kind: 'text',    arity: 1 },
+];
+
+const OP_BY_VALUE = Object.fromEntries(FILTER_OPERATORS.map(o => [o.value, o]));
+
+function getOperatorsForField(field) {
+  if (field?.numeric) {
+    return FILTER_OPERATORS.filter(o => o.kind === 'all' || o.kind === 'numeric');
+  }
+  if (field?.date) {
+    return FILTER_OPERATORS.filter(o => o.kind === 'all' || o.kind === 'numeric');
+  }
+  return FILTER_OPERATORS.filter(o => o.kind === 'all' || o.kind === 'text');
+}
+
 export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
   // ─── State ────────────────────────────────────────────────────────────────
   const availableFields = ref([]);
@@ -20,6 +57,8 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
   const chartStacked = ref(false);
   const chartShowLabels = ref(false);
   const chartCustomColors = ref({});
+  // Mapa rename persistente: { 'header::estado': 'Estado Venezolano', 'series::Femenino': 'Mujeres' }
+  const customLabels = ref({});
 
   // Data
   const rawData = ref([]);
@@ -95,9 +134,27 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
       const fields = groupBy.length === 0
         ? [...pivotRows.value, ...pivotColumns.value, ...pivotValues.value].map(f => f.key)
         : undefined;
-      const filters = pivotFilters.value
-        .filter(f => f.value !== undefined && f.value !== '')
-        .map(f => ({ field: f.field, operator: f.operator || 'eq', value: String(f.value) }));
+
+      // Aplana los grupos AND/OR: cada condición se envía como un FilterInput individual,
+      // conservando `combine` para que el backend reconstruya las agrupaciones.
+      // Se omiten condiciones vacías y operadores sin valor (isnull/notnull no requieren value).
+      const filters = [];
+      pivotFilters.value.forEach(group => {
+        group.conditions.forEach((c, idx) => {
+          const arity = operatorArity(c.operator);
+          // Si la condición requiere valor y está vacío, se omite
+          if (arity >= 1 && (c.value === undefined || c.value === null || c.value === '')) return;
+          // Between requiere ambos valores
+          if (arity === 2 && (c.value2 === undefined || c.value2 === null || c.value2 === '')) return;
+          filters.push({
+            field: group.field,
+            operator: c.operator || 'eq',
+            value: arity >= 1 ? String(c.value) : undefined,
+            value2: arity === 2 ? String(c.value2) : undefined,
+            combine: idx === 0 ? 'AND' : (c.combine || 'AND'),
+          });
+        });
+      });
 
       const query = `
         query DashboardData($fields: [String], $filters: [FilterInput], $groupBy: [String], $values: [FieldConfigInput], $limit: Int) {
@@ -152,11 +209,19 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
     // If no column pivoting, return flat table
     if (colKeys.length === 0) {
       const headers = [
-        ...pivotRows.value.map(f => ({ key: f.key.replace('.', '_'), label: f.label })),
-        ...pivotValues.value.map(f => ({
-          key: `${f.key.replace('.', '_')}_${(f.aggregation || 'COUNT').toLowerCase()}`,
-          label: `${f.label} (${f.aggregation || 'COUNT'})`,
+        ...pivotRows.value.map(f => ({
+          key: f.key.replace('.', '_'),
+          label: resolveLabel('header', `${f.key.replace('.', '_')}`, f.label),
+          rawLabel: f.label,
         })),
+        ...pivotValues.value.map(f => {
+          const key = `${f.key.replace('.', '_')}_${(f.aggregation || 'COUNT').toLowerCase()}`;
+          return {
+            key,
+            label: resolveLabel('header', key, `${f.label} (${f.aggregation || 'COUNT'})`),
+            rawLabel: `${f.label} (${f.aggregation || 'COUNT'})`,
+          };
+        }),
       ];
       const grandTotals = {};
       valKeys.forEach(vk => { grandTotals[vk] = 0; });
@@ -174,17 +239,28 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
       const colVal = colKeys.map(ck => row[ck] || '(vacío)').join(' | ');
       colValuesSet.add(colVal);
     });
-    const colValues = [...colValuesSet].sort();
+    const colValuesRaw = [...colValuesSet].sort();
+    // Mapa raw → resolved (la serie renombrada se muestra en headers del cross-tab)
+    // Se conserva el valor raw como `key` para que el binding con rowGroups siga válido.
+    const colValues = colValuesRaw.map(cv => ({
+      raw: cv,
+      display: resolveLabel('series', cv, cv),
+    }));
 
     // Build headers
     const headers = [
-      ...pivotRows.value.map(f => ({ key: f.key.replace('.', '_'), label: f.label, isRowHeader: true })),
+      ...pivotRows.value.map(f => ({
+        key: f.key.replace('.', '_'),
+        label: resolveLabel('header', `${f.key.replace('.', '_')}`, f.label),
+        rawLabel: f.label,
+        isRowHeader: true,
+      })),
     ];
     colValues.forEach(cv => {
       pivotValues.value.forEach(f => {
         headers.push({
-          key: `${cv}__${f.key}`,
-          label: cv,
+          key: `${cv.raw}__${f.key}`,
+          label: cv.display,
           subLabel: `${f.label} (${f.aggregation || 'COUNT'})`,
           isValue: true,
         });
@@ -245,14 +321,21 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
         }
         break;
       case 'filters':
-        if (!pivotFilters.value.some(f => f.field === field.key)) {
+        // Cada campo genera un grupo que puede contener múltiples condiciones AND/OR
+        if (!pivotFilters.value.some(g => g.field === field.key)) {
           pivotFilters.value.push({
             field: field.key,
             label: field.label,
-            operator: (field.numeric || field.date) ? 'eq' : 'like',
-            value: '',
             numeric: !!field.numeric,
-            date: !!field.date
+            date: !!field.date,
+            conditions: [
+              {
+                operator: (field.numeric || field.date) ? 'eq' : 'like',
+                value: '',
+                value2: '',
+                combine: 'AND',
+              },
+            ],
           });
         }
         break;
@@ -280,6 +363,77 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
     if (field) field.aggregation = aggregation;
   }
 
+  // ─── CRUD de Filtros Avanzados (grupos AND/OR por campo) ─────────────────────
+  function addFilterCondition(groupField) {
+    const g = pivotFilters.value.find(it => it.field === groupField);
+    if (!g) return;
+    g.conditions.push({
+      operator: (g.numeric || g.date) ? 'eq' : 'like',
+      value: '',
+      value2: '',
+      combine: g.conditions.length > 0 ? 'AND' : 'AND',
+    });
+  }
+
+  function updateFilterCondition(groupField, condIndex, patch) {
+    const g = pivotFilters.value.find(it => it.field === groupField);
+    if (!g) return;
+    const c = g.conditions[condIndex];
+    if (!c) return;
+    Object.assign(c, patch);
+    // Si el nuevo operador no necesita valor, limpiar value/value2 para no enviarlo
+    const opDef = OP_BY_VALUE[patch.operator];
+    if (opDef) {
+      if (opDef.arity === 0) { c.value = ''; c.value2 = ''; }
+      if (opDef.arity === 1) c.value2 = '';
+    }
+  }
+
+  function removeFilterCondition(groupField, condIndex) {
+    const g = pivotFilters.value.find(it => it.field === groupField);
+    if (!g) return;
+    g.conditions.splice(condIndex, 1);
+    // Si el grupo queda sin condiciones, elimínalo del array (UI lo refleja solo)
+    if (g.conditions.length === 0) {
+      removeFieldFromZone(groupField, 'filters');
+    }
+  }
+
+  // Resuelve qué operadores puede mostrar el selector para un grupo
+  function operatorsForGroup(groupField) {
+    const g = pivotFilters.value.find(it => it.field === groupField);
+    return getOperatorsForField(g);
+  }
+
+  function getOperatorLabel(op) {
+    return OP_BY_VALUE[op]?.label || op;
+  }
+
+  // Devuelve cuántos valores (0, 1 o 2) necesita el operador
+  function operatorArity(op) {
+    return OP_BY_VALUE[op]?.arity ?? 1;
+  }
+
+  // ─── Etiquetas personalizadas (customLabels) ─────────────────────────────────
+  function setCustomLabel(kind, key, label) {
+    const mapKey = `${kind}::${key}`;
+    if (!label || label === '') {
+      delete customLabels.value[mapKey];
+      // Forzar reactividad de objeto (Vue no detecta delete directo en some casos)
+      customLabels.value = { ...customLabels.value };
+    } else {
+      customLabels.value = { ...customLabels.value, [mapKey]: label };
+    }
+  }
+
+  function resolveLabel(kind, key, fallback) {
+    return customLabels.value[`${kind}::${key}`] || fallback;
+  }
+
+  function resetCustomLabels() {
+    customLabels.value = {};
+  }
+
   function clearConfig() {
     pivotRows.value = [];
     pivotColumns.value = [];
@@ -287,6 +441,13 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
     pivotFilters.value = [];
     rawData.value = [];
     dataColumns.value = [];
+    totalRows.value = 0;
+    // Reset chart visual config so previous styling doesn't bleed into new sessions
+    chartType.value = 'bar';
+    chartStacked.value = false;
+    chartShowLabels.value = false;
+    chartCustomColors.value = {};
+    customLabels.value = {};
     currentQueryId.value = null;
     currentQueryName.value = '';
   }
@@ -316,7 +477,8 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
         type: chartType.value,
         stacked: chartStacked.value,
         showLabels: chartShowLabels.value,
-        customColors: chartCustomColors.value
+        customColors: chartCustomColors.value,
+        customLabels: customLabels.value,
       },
       visibility,
     };
@@ -337,6 +499,43 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
     }
   }
 
+  // Migra filtros con formato legacy (flat: { field, operator, value }) al
+  // nuevo formato de grupos AND/OR: { field, label, numeric, date, conditions: [...] }.
+  // Detecta ambos formatos y es idempotente.
+  function migrateLegacyFilters(arr) {
+    if (!Array.isArray(arr)) return [];
+    return arr.map(item => {
+      if (item && Array.isArray(item.conditions)) {
+        // Ya es formato nuevo: normaliza campos opcionales y borra claves legacy
+        return {
+          field: item.field,
+          label: item.label || item.field,
+          numeric: !!item.numeric,
+          date: !!item.date,
+          conditions: item.conditions.map(c => ({
+            operator: c.operator || 'eq',
+            value: c.value || '',
+            value2: c.value2 || '',
+            combine: c.combine || 'AND',
+          })),
+        };
+      }
+      // Legacy plano → grupo con 1 condición
+      return {
+        field: item.field,
+        label: item.label || item.field,
+        numeric: !!item.numeric,
+        date: !!item.date,
+        conditions: [{
+          operator: item.operator || 'eq',
+          value: item.value || '',
+          value2: '',
+          combine: 'AND',
+        }],
+      };
+    });
+  }
+
   async function loadSavedQuery(query) {
     currentQueryId.value = query.id;
     currentQueryName.value = query.name;
@@ -348,15 +547,15 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
     pivotRows.value = config.rows || [];
     pivotColumns.value = config.columns || [];
     pivotValues.value = config.values || [];
-    pivotFilters.value = config.filters || [];
+    pivotFilters.value = migrateLegacyFilters(config.filters || []);
     chartType.value = chart.type || 'bar';
     chartStacked.value = chart.stacked || false;
     chartShowLabels.value = chart.showLabels || false;
     chartCustomColors.value = chart.customColors || {};
+    customLabels.value = chart.customLabels || {};
 
     await fetchData();
   }
-
   async function deleteSavedQuery(id) {
     try {
       await api.delete(`/dashboard/saved-queries/${id}`);
@@ -375,7 +574,7 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
     // State
     availableFields, loading, dataLoading,
     pivotRows, pivotColumns, pivotValues, pivotFilters,
-    chartType, chartStacked, chartShowLabels, chartCustomColors,
+    chartType, chartStacked, chartShowLabels, chartCustomColors, customLabels,
     rawData, dataColumns, totalRows,
     savedQueries, currentQueryId, currentQueryName,
     // Computed
@@ -383,7 +582,11 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
     // Actions
     loadAvailableFields, fetchData,
     addFieldToZone, removeFieldFromZone, removeFieldFromAllZones,
-    changeAggregation, clearConfig,
+    changeAggregation,
+    addFilterCondition, updateFilterCondition, removeFilterCondition,
+    operatorsForGroup, getOperatorLabel, operatorArity,
+    setCustomLabel, resolveLabel, resetCustomLabels,
+    clearConfig,
     loadSavedQueries, saveCurrentQuery, loadSavedQuery, deleteSavedQuery,
   };
 });

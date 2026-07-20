@@ -43,14 +43,18 @@ const chartData = computed(() => {
   if (td.hasPivotColumns) {
     // Cross-tab: labels = row values, datasets = column groups
     const rowKeys = td.headers.filter(h => h.isRowHeader).map(h => h.key);
-    const labels = td.bodyRows.map(row => rowKeys.map(k => row[k] || '').join(' | '));
+    const labels = td.bodyRows.map(row =>
+      store.resolveLabel('series', rowKeys.map(k => row[k] || '').join(' | '),
+        rowKeys.map(k => row[k] || '').join(' | '))
+    );
     const valueHeaders = td.headers.filter(h => h.isValue);
 
     if (isPie) {
       if (store.pivotRows.length === 0) {
         // No rows: each value (column+field combo) is a slice
+        const sliceLabels = valueHeaders.map(h => `${h.label} - ${h.subLabel}`);
         return {
-          labels: valueHeaders.map(h => `${h.label} - ${h.subLabel}`),
+          labels: sliceLabels.map(l => store.resolveLabel('series', l, l)),
           datasets: [{
             data: valueHeaders.map(h => td.bodyRows.reduce((sum, row) => sum + (Number(row[h.key]) || 0), 0)),
             backgroundColor: valueHeaders.map((h, i) => store.chartCustomColors[`${h.label} - ${h.subLabel}`] || COLORS[i % COLORS.length]),
@@ -75,7 +79,7 @@ const chartData = computed(() => {
       const colHeaders = valueHeaders.filter(h => h.label === cv);
       const baseColor = store.chartCustomColors[cv] || COLORS[i % COLORS.length];
       return {
-        label: cv,
+        label: store.resolveLabel('series', cv, cv),
         data: td.bodyRows.map(row => colHeaders.reduce((sum, h) => sum + (Number(row[h.key]) || 0), 0)),
         backgroundColor: baseColor + (['bar', 'hbar'].includes(type) ? 'CC' : 'FF'),
         borderColor: baseColor,
@@ -88,13 +92,16 @@ const chartData = computed(() => {
   // Simple table: labels from row fields, values from value fields
   const rowHeaderKeys = td.headers.filter((_, i) => i < store.pivotRows.length).map(h => h.key);
   const valueHeaderKeys = td.headers.filter((_, i) => i >= store.pivotRows.length);
-  const labels = td.bodyRows.map(row => rowHeaderKeys.map(k => row[k] || '').join(' | '));
+  const labels = td.bodyRows.map(row =>
+    store.resolveLabel('series', rowHeaderKeys.map(k => row[k] || '').join(' | '),
+      rowHeaderKeys.map(k => row[k] || '').join(' | '))
+  );
 
   if (isPie) {
     if (store.pivotRows.length === 0) {
       // No rows: each value field is a slice
       return {
-        labels: valueHeaderKeys.map(h => h.label),
+        labels: valueHeaderKeys.map(h => store.resolveLabel('header', h.key, h.label)),
         datasets: [{
           data: valueHeaderKeys.map(h => td.bodyRows.reduce((sum, row) => sum + (Number(row[h.key]) || 0), 0)),
           backgroundColor: valueHeaderKeys.map((h, i) => store.chartCustomColors[h.label] || COLORS[i % COLORS.length]),
@@ -116,7 +123,7 @@ const chartData = computed(() => {
   const datasets = valueHeaderKeys.map((h, i) => {
     const baseColor = store.chartCustomColors[h.label] || COLORS[i % COLORS.length];
     return {
-      label: h.label,
+      label: store.resolveLabel('header', h.key, h.label),
       data: td.bodyRows.map(row => Number(row[h.key]) || 0),
       backgroundColor: baseColor + (['bar', 'hbar'].includes(type) ? 'CC' : '33'),
       borderColor: baseColor,
@@ -129,67 +136,106 @@ const chartData = computed(() => {
   return { labels, datasets };
 });
 
-function renderChart() {
-  if (!chartCanvas.value) return;
-  if (chartInstance) chartInstance.destroy();
-  if (!chartData.value) return;
-
+// Build the full Chart.js options object for a fresh chart instance
+function buildOptions() {
   const type = store.chartType;
   const isPie = type === 'pie' || type === 'doughnut';
-  const chartJsType = type === 'hbar' ? 'bar' : type;
   const isHorizontal = type === 'hbar';
-
-  // Configure scales dynamically based on orientation
-  const scales = isPie ? {} : {
-    x: {
-      stacked: store.chartStacked,
-      beginAtZero: isHorizontal,
-      grid: { display: !isHorizontal },
-      ticks: isHorizontal ? { callback: val => Number(val).toLocaleString('es-VE') } : {}
-    },
-    y: {
-      stacked: store.chartStacked,
-      beginAtZero: !isHorizontal,
-      grid: { display: isHorizontal },
-      ticks: !isHorizontal ? { callback: val => Number(val).toLocaleString('es-VE') } : {}
-    }
-  };
-
-  chartInstance = new Chart(chartCanvas.value, {
-    type: chartJsType,
-    data: chartData.value,
-    options: {
-      indexAxis: isHorizontal ? 'y' : 'x',
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { position: isPie ? 'right' : 'top', labels: { font: { size: 12 } } },
-        title: { display: false },
-        tooltip: {
-          callbacks: {
-            label: (ctx) => {
-              const val = isHorizontal ? ctx.parsed?.x : (ctx.parsed?.y ?? ctx.parsed ?? ctx.raw);
-              return `${ctx.dataset.label || ctx.label}: ${Number(val).toLocaleString('es-VE')}`;
-            },
+  return {
+    indexAxis: isHorizontal ? 'y' : 'x',
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: isPie ? 'right' : 'top', labels: { font: { size: 12 } } },
+      title: { display: false },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => {
+            const val = isHorizontal ? ctx.parsed?.x : (ctx.parsed?.y ?? ctx.parsed ?? ctx.raw);
+            const num = Number(val);
+            if (!isFinite(num)) return '';
+            return `${ctx.dataset.label || ctx.label}: ${num.toLocaleString('es-VE')}`;
           },
         },
-        datalabels: {
-          display: store.chartShowLabels,
-          anchor: isHorizontal ? 'end' : (isPie ? 'center' : 'end'),
-          align: isHorizontal ? 'right' : (isPie ? 'center' : 'top'),
-          formatter: (val) => {
-            const num = Number(val);
-            if (isNaN(num) || num === 0) return '';
-            return num.toLocaleString('es-VE', { maximumFractionDigits: 1 });
-          },
-          font: { weight: 'bold', size: 10 },
-          color: isPie ? '#fff' : '#666',
-          offset: 4
-        }
       },
-      scales
+      datalabels: {
+        display: store.chartShowLabels,
+        anchor: isHorizontal ? 'end' : (isPie ? 'center' : 'end'),
+        align: isHorizontal ? 'right' : (isPie ? 'center' : 'top'),
+        formatter: (val) => {
+          const num = Number(val);
+          if (isNaN(num) || num === 0) return '';
+          return num.toLocaleString('es-VE', { maximumFractionDigits: 1 });
+        },
+        font: { weight: 'bold', size: 10 },
+        color: isPie ? '#fff' : '#666',
+        offset: 4
+      }
     },
-  });
+    scales: isPie ? {} : {
+      x: {
+        stacked: store.chartStacked,
+        beginAtZero: isHorizontal,
+        grid: { display: !isHorizontal },
+        ticks: isHorizontal ? { callback: val => Number(val).toLocaleString('es-VE') } : {}
+      },
+      y: {
+        stacked: store.chartStacked,
+        beginAtZero: !isHorizontal,
+        grid: { display: isHorizontal },
+        ticks: !isHorizontal ? { callback: val => Number(val).toLocaleString('es-VE') } : {}
+      }
+    }
+  };
+}
+
+// Detect whether the chart needs to be fully recreated (structural change)
+// vs. simply updated (data/options tweak). Type/orientation changes require
+// destroy+create; everything else can be handled by `chartInstance.update()`.
+function shouldRecreate(prev, next) {
+  if (!prev || !next) return true;
+  const typeChanged = prev.type !== next.type;
+  const orientationChanged = (prev.type === 'hbar') !== (next.type === 'hbar');
+  const pivotModeChanged = !!prev.pivotMode !== !!next.pivotMode;
+  return typeChanged || orientationChanged || pivotModeChanged;
+}
+
+let lastSignature = null;
+
+function buildSignature() {
+  const td = store.pivotTableData;
+  return {
+    type: store.chartType,
+    pivotMode: !!td.hasPivotColumns && store.pivotRows.length === 0,
+  };
+}
+
+function renderChart() {
+  if (!chartCanvas.value) return;
+  if (!chartData.value) {
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+    return;
+  }
+
+  const sig = buildSignature();
+  const recreate = shouldRecreate(lastSignature, sig);
+  lastSignature = sig;
+
+  if (recreate || !chartInstance) {
+    if (chartInstance) chartInstance.destroy();
+    const type = store.chartType;
+    const chartJsType = type === 'hbar' ? 'bar' : type;
+    chartInstance = new Chart(chartCanvas.value, {
+      type: chartJsType,
+      data: chartData.value,
+      options: buildOptions(),
+    });
+  } else {
+    // Light update: mutate existing instance in place
+    chartInstance.data = chartData.value;
+    chartInstance.options = buildOptions();
+    chartInstance.update();
+  }
 }
 
 // Export functions
@@ -213,12 +259,20 @@ async function exportPDF() {
 
 defineExpose({ exportPNG, exportPDF });
 
-watch([chartData, () => store.chartType, () => store.chartStacked, () => store.chartShowLabels], () => {
-  nextTick(renderChart);
-}, { deep: true });
+// Shallow watch: `chartData` is a computed that returns a new ref on change,
+// so `deep` is unnecessary. Watchers cover both structural (type) and
+// cosmetic (stacked/labels/customColors) changes; `renderChart` internally
+// decides whether to recreate the instance or call `.update()`.
+watch(
+  [chartData, () => store.chartType, () => store.chartStacked, () => store.chartShowLabels, () => store.chartCustomColors, () => store.customLabels],
+  () => { nextTick(renderChart); }
+);
 
 onMounted(() => { if (chartData.value) nextTick(renderChart); });
-onUnmounted(() => { if (chartInstance) chartInstance.destroy(); });
+onUnmounted(() => {
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  lastSignature = null;
+});
 </script>
 
 <style scoped>

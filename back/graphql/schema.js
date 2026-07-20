@@ -34,8 +34,12 @@ const FilterInput = new GraphQLInputObjectType({
     name: 'FilterInput',
     fields: {
         field: { type: new GraphQLNonNull(GraphQLString) },
-        operator: { type: GraphQLString, defaultValue: 'eq' }, // eq, neq, gt, lt, gte, lte, in, like
-        value: { type: new GraphQLNonNull(GraphQLString) },
+        operator: { type: GraphQLString, defaultValue: 'eq' },
+        // eq, neq, gt, lt, gte, lte, in, like, nlike, sw, nsw, ew, new,
+        // between, nbetween, isnull, notnull, regex
+        value:  { type: GraphQLString },            // main value (nullable for isnull/notnull)
+        value2: { type: GraphQLString },            // second value (for between/nbetween)
+        combine: { type: GraphQLString, defaultValue: 'AND' }, // AND/OR with previous condition on same field
     }
 });
 

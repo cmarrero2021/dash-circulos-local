@@ -170,46 +170,49 @@ v-for="field in fields" :key="field.key" class="draggable-field-chip row items-c
       <div class="center-panel-workspace col column no-wrap q-pa-md">
         <!-- Drop Zones -->
         <div class="pivot-dropzones column q-gutter-sm bg-white q-pa-md rounded-borders shadow-light">
-          <!-- Filtros -->
+          <!-- Filtros Avanzados -->
           <div
 class="dropzone-box" :class="{ 'dropzone-active': dragOverZone === 'filters' }" @dragover.prevent
             @dragenter.prevent="dragOverZone = 'filters'" @dragleave="dragOverZone = null"
             @drop="onDrop($event, 'filters')">
-            <span class="dropzone-header row items-center">
-              <q-icon name="filter_alt" size="16px" class="q-mr-xs text-amber-9" />
-              <span>Filtros Globales</span>
+            <span class="dropzone-header row items-center justify-between">
+              <span class="row items-center">
+                <q-icon name="filter_alt" size="16px" class="q-mr-xs text-amber-9" />
+                <span>Filtros Avanzados</span>
+                <q-badge
+                  v-if="totalFilterConditions > 0"
+                  :label="`${totalFilterConditions}`"
+                  color="amber-8" text-color="white" dense class="q-ml-sm" />
+              </span>
+              <span class="text-caption text-grey-6 text-xs">Doble-clic en un chip para combinar AND/OR</span>
             </span>
             <div class="dropzone-chips-container row items-center q-gutter-xs">
               <q-chip
 v-for="f in store.pivotFilters" :key="f.field" removable dense
-                color="amber-1" text-color="amber-10" clickable class="pivot-badge shadow-light" @remove="store.removeFieldFromZone(f.field, 'filters')">
-                <q-icon name="edit" size="12px" class="q-mr-xs cursor-pointer" />
-                <span class="text-weight-bold">{{ f.label }}:</span>&nbsp;{{ getFilterLabel(f) }}
-                <q-menu padding style="min-width: 280px" class="glass-dropdown">
-                  <div class="q-pa-md">
-                    <div class="text-weight-bold text-primary q-mb-md">Filtro: {{ f.label }}</div>
-                    <q-select
-v-model="f.operator" dense outlined label="Comparación" class="q-mb-sm" :options="[
-                      { label: 'Igual a', value: 'eq' },
-                      { label: 'Diferente de', value: 'neq' },
-                      { label: 'Contiene', value: 'like' },
-                      { label: 'Mayor que', value: 'gt' },
-                      { label: 'Menor que', value: 'lt' },
-                      { label: 'Mayor o igual', value: 'gte' },
-                      { label: 'Menor o igual', value: 'lte' },
-                      { label: 'Uno de (CSV)', value: 'in' },
-                    ]" emit-value map-options />
-                    <q-input
-v-model="f.value" dense outlined label="Valor a buscar" :type="f.date ? 'date' : 'text'" autofocus
-                      @keyup.enter="store.fetchData" />
-                    <div class="row q-mt-md justify-end q-gutter-sm">
-                      <q-btn v-close-popup flat label="Cerrar" size="sm" class="rounded-btn" />
-                      <q-btn v-close-popup color="primary" label="Aplicar" size="sm" class="rounded-btn shadow-xs" @click="store.fetchData" />
-                    </div>
+                color="amber-1" text-color="amber-10" clickable class="pivot-badge shadow-light"
+                @remove="store.removeFieldFromZone(f.field, 'filters')">
+                <q-icon name="tune" size="14px" class="q-mr-xs cursor-pointer" />
+                <span class="text-weight-bold">{{ f.label }}</span>
+                <q-badge
+                  v-if="f.conditions.length > 1"
+                  :label="`${f.conditions.length} reglas`"
+                  color="amber-8" text-color="white" dense class="q-ml-xs" />
+                <span v-else class="text-xs q-ml-xs">{{ conditionSummary(f) }}</span>
+                <q-menu padding style="min-width: 600px; max-width: 720px;" class="glass-dropdown">
+                  <FilterEditorPanel />
+                  <div class="row justify-end q-gutter-sm q-pa-md bg-grey-1">
+                    <q-btn v-close-popup flat label="Cerrar" size="sm" class="rounded-btn" />
+                    <q-btn
+                      v-close-popup color="primary" label="Aplicar Filtros" icon="play_arrow"
+                      size="sm" class="rounded-btn shadow-xs" @click="store.fetchData" />
                   </div>
                 </q-menu>
               </q-chip>
-              <span v-if="!store.pivotFilters.length" class="dropzone-empty-text text-italic text-grey-5">Arrastra campos aquí para filtrar la consulta...</span>
+              <span
+                v-if="!store.pivotFilters.length"
+                class="dropzone-empty-text text-italic text-grey-5">
+                Arrastra campos aquí para filtrar la consulta...
+              </span>
             </div>
           </div>
 
@@ -320,6 +323,14 @@ v-if="['bar', 'hbar', 'line'].includes(store.chartType)" v-model="store.chartSta
               <q-toggle v-model="store.chartShowLabels" label="Valores" dense color="primary" class="text-xs" />
               <q-btn flat round dense icon="palette" color="primary" @click="showColorDialog = true">
                 <q-tooltip>Colores del gráfico</q-tooltip>
+              </q-btn>
+            </div>
+            <div class="row items-center q-gutter-xs">
+              <q-btn
+                flat round dense icon="label" color="primary"
+                :disable="!store.rawData.length"
+                @click="showLabelsDialog = true">
+                <q-tooltip>Renombrar columnas y series</q-tooltip>
               </q-btn>
             </div>
           </div>
@@ -460,6 +471,111 @@ v-model="saveVisibility"
         </q-card-actions>
       </q-card>
     </q-dialog>
+
+    <!-- ═══ Labels Customization Dialog ══════════════════════════════════ -->
+    <q-dialog v-model="showLabelsDialog">
+      <q-card style="min-width: 600px; max-width: 800px; border-radius: 12px;">
+        <q-card-section class="bg-primary text-white row items-center q-py-md">
+          <div class="text-h6 text-weight-bold row items-center">
+            <q-icon name="label" class="q-mr-sm" />
+            <span>Renombrar Columnas y Series</span>
+          </div>
+          <q-space />
+          <q-btn v-close-popup icon="close" flat round dense />
+        </q-card-section>
+
+        <q-card-section class="q-pa-md" style="max-height: 60vh; overflow-y: auto">
+          <div
+            v-if="!renameCandidates.length"
+            class="text-center text-grey-6 q-pa-lg">
+            <q-icon name="info" size="32px" class="q-mb-sm opacity-4" />
+            <div>Ejecuta una consulta primero para renombrar sus columnas y series.</div>
+          </div>
+
+          <div v-else>
+            <p class="text-caption text-grey-6 q-mb-md">
+              Personaliza los nombres mostrados en la tabla y el gráfico.
+              Deja el campo vacío para restaurar el nombre original.
+              Doble-clic en cualquier cabecera de la tabla también abre este editor.
+            </p>
+
+            <!-- Headers section -->
+            <div class="text-weight-bold text-grey-8 q-mb-sm row items-center">
+              <q-icon name="view_column" size="16px" class="q-mr-xs text-primary" />
+              Columnas
+              <q-badge :label="`${renameCandidates.filter(c => c.kind === 'header').length}`" color="grey-3" text-color="grey-9" dense class="q-ml-sm" />
+            </div>
+            <q-list separator class="rounded-borders q-mb-md">
+              <q-item
+                v-for="cand in renameCandidates.filter(c => c.kind === 'header')"
+                :key="cand.kind + '::' + cand.key"
+                class="q-px-none row items-center">
+                <q-item-section>
+                  <q-item-label class="text-weight-medium text-grey-8 text-sm">
+                    {{ cand.original }}
+                    <q-icon
+                      v-if="cand.isCustomized"
+                      name="check_circle" size="13px" class="text-positive q-ml-xs" />
+                  </q-item-label>
+                  <q-item-label caption class="text-xs">Clave: {{ cand.key }}</q-item-label>
+                </q-item-section>
+                <q-item-section side style="min-width: 240px;">
+                  <q-input
+                    :model-value="cand.current"
+                    dense outlined clearable
+                    placeholder="Nombre personalizado"
+                    @update:model-value="(v) => store.setCustomLabel('header', cand.key, v || '')" />
+                </q-item-section>
+              </q-item>
+            </q-list>
+
+            <!-- Series section -->
+            <div
+              v-if="renameCandidates.filter(c => c.kind === 'series').length"
+              class="text-weight-bold text-grey-8 q-mb-sm row items-center">
+              <q-icon name="stacked_bar_chart" size="16px" class="q-mr-xs text-secondary" />
+              Series (valores de columnas pivote)
+              <q-badge :label="`${renameCandidates.filter(c => c.kind === 'series').length}`" color="grey-3" text-color="grey-9" dense class="q-ml-sm" />
+            </div>
+            <q-list
+              v-if="renameCandidates.filter(c => c.kind === 'series').length"
+              separator class="rounded-borders">
+              <q-item
+                v-for="cand in renameCandidates.filter(c => c.kind === 'series')"
+                :key="cand.kind + '::' + cand.key"
+                class="q-px-none row items-center">
+                <q-item-section>
+                  <q-item-label class="text-weight-medium text-grey-8 text-sm">
+                    {{ cand.original }}
+                    <q-icon
+                      v-if="cand.isCustomized"
+                      name="check_circle" size="13px" class="text-positive q-ml-xs" />
+                  </q-item-label>
+                  <q-item-label caption class="text-xs">Clave: {{ cand.key }}</q-item-label>
+                </q-item-section>
+                <q-item-section side style="min-width: 240px;">
+                  <q-input
+                    :model-value="cand.current"
+                    dense outlined clearable
+                    placeholder="Nombre personalizado"
+                    @update:model-value="(v) => store.setCustomLabel('series', cand.key, v || '')" />
+                </q-item-section>
+              </q-item>
+            </q-list>
+          </div>
+        </q-card-section>
+
+        <q-separator />
+
+        <q-card-actions align="between" class="q-pa-md bg-grey-1">
+          <q-btn
+            flat label="Restablecer Todo" color="negative" class="rounded-btn"
+            :disable="!Object.keys(store.customLabels).length"
+            @click="store.resetCustomLabels()" />
+          <q-btn v-close-popup color="primary" label="Cerrar" class="rounded-btn text-weight-bold shadow-xs" />
+        </q-card-actions>
+      </q-card>
+    </q-dialog>
   </div>
 </template>
 
@@ -468,18 +584,29 @@ import { ref, computed, onMounted, watch } from 'vue';
 import { useDynamicQueryStore } from 'stores/dynamic-query-store';
 import PivotTable from './PivotTable.vue';
 import PivotChart from './PivotChart.vue';
+import FilterEditorPanel from './FilterEditorPanel.vue';
 
 const store = useDynamicQueryStore();
 
 // ─── Local state ──────────────────────────────────────────────────────────────
 const fieldSearch = ref('');
+// Debounced search term, so `filteredFields` (which iterates all fields) doesn't
+// recompute on every keystroke when there are many fields.
+const debouncedSearch = ref('');
+let searchTimer = null;
+watch(fieldSearch, (val) => {
+  if (searchTimer) clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => { debouncedSearch.value = val; }, 250);
+});
 const expandedCategories = ref({});
 const dragOverZone = ref(null);
 const activeTab = ref('table');
 const pivotTableRef = ref(null);
 const pivotChartRef = ref(null);
 
-// Automatically expand field categories when they load asynchronously
+// Automatically expand field categories when they load asynchronously.
+// `fieldsByCategory` is a computed that returns a new object reference whenever
+// `availableFields` changes, so shallow watching is enough (no `deep` needed).
 watch(() => store.fieldsByCategory, (newCats) => {
   if (!newCats) return;
   for (const cat of Object.keys(newCats)) {
@@ -487,12 +614,13 @@ watch(() => store.fieldsByCategory, (newCats) => {
       expandedCategories.value[cat] = true;
     }
   }
-}, { deep: true, immediate: true });
+}, { immediate: true });
 
 // Dialogs state
 const showSaveDialog = ref(false);
 const showDeleteDialog = ref(false);
 const showColorDialog = ref(false);
+const showLabelsDialog = ref(false);
 const saveAsNew = ref(false);
 const saveName = ref('');
 const saveDescription = ref('');
@@ -501,7 +629,7 @@ const queryToDelete = ref(null);
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const filteredFields = computed(() => {
-  const search = (fieldSearch.value || '').toLowerCase();
+  const search = (debouncedSearch.value || '').toLowerCase();
   const result = {};
   for (const [cat, fields] of Object.entries(store.fieldsByCategory)) {
     const filtered = search
@@ -541,6 +669,64 @@ const currentChartSeries = computed(() => {
   return valueHeaderKeys.map(h => h.label);
 });
 
+// Candidatos a renombrar: lista combinada de headers + series del dataset actual.
+// Cada entrada: { kind, key, original, current }
+// `kind` distingue 'header' (columnas de la tabla) de 'series' (valores de columnas pivote / datasets del gráfico).
+const renameCandidates = computed(() => {
+  const td = store.pivotTableData;
+  const result = [];
+  if (!td.headers?.length) return result;
+
+  // Headers (todas las columnas de la tabla)
+  td.headers.forEach(h => {
+    if (h.isRowHeader || !td.hasPivotColumns || h.isValue) {
+      const kind = 'header';
+      const mapKey = `${kind}::${h.key}`;
+      const current = store.customLabels[mapKey];
+      result.push({
+        kind,
+        key: h.key,
+        original: h.rawLabel || h.label,
+        current: current || '',
+        isCustomized: !!current,
+      });
+    }
+  });
+
+  // Series (valores de columnas pivote) — solo aplica en cross-tab
+  if (td.hasPivotColumns && td.colValues?.length) {
+    td.colValues.forEach(cv => {
+      const kind = 'series';
+      const mapKey = `${kind}::${cv.raw}`;
+      const current = store.customLabels[mapKey];
+      result.push({
+        kind,
+        key: cv.raw,
+        original: cv.raw,
+        current: current || '',
+        isCustomized: !!current,
+      });
+    });
+  } else if (!td.hasPivotColumns) {
+    // Modo simple: cada valor distinto de las columnas pivote = una serie (en el chart).
+    // Lo derive de los labels del primer dataset del chartData.
+    currentChartSeries.value.forEach(label => {
+      const kind = 'series';
+      const mapKey = `${kind}::${label}`;
+      const current = store.customLabels[mapKey];
+      result.push({
+        kind,
+        key: label,
+        original: label,
+        current: current || '',
+        isCustomized: !!current,
+      });
+    });
+  }
+
+  return result;
+});
+
 // ─── Drag & Drop ──────────────────────────────────────────────────────────────
 function onDragStart(event, field) {
   event.dataTransfer.setData('application/json', JSON.stringify(field));
@@ -559,12 +745,20 @@ function toggleCategory(cat) {
   expandedCategories.value[cat] = !expandedCategories.value[cat];
 }
 
-function getFilterLabel(f) {
-  if (!f.value && f.value !== 0) return '(vacío)';
-  const opMap = {
-    eq: '=', neq: '≠', like: 'contiene', gt: '>', lt: '<', gte: '≥', lte: '≤', in: 'uno de'
-  };
-  return `${opMap[f.operator] || f.operator} "${f.value}"`;
+// Total de condiciones en todos los grupos (para badge superior)
+const totalFilterConditions = computed(() =>
+  store.pivotFilters.reduce((acc, g) => acc + g.conditions.length, 0)
+);
+
+// Resumen legible para el chip cuando hay una sola condición: "Estado = Miranda"
+function conditionSummary(group) {
+  if (!group.conditions.length) return '';
+  const c = group.conditions[0];
+  const op = store.getOperatorLabel(c.operator);
+  const ar = store.operatorArity(c.operator);
+  if (ar === 0) return op;
+  if (ar === 2) return `${op} ${c.value}–${c.value2}`;
+  return `${op} ${c.value}`;
 }
 
 // ─── Query Save Operations ────────────────────────────────────────────────────
@@ -674,13 +868,11 @@ function downloadFile(content, filename, type) {
 }
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
-onMounted(async () => {
-  await store.loadAvailableFields();
-  await store.loadSavedQueries();
-  // Expand all categories by default
-  for (const cat of Object.keys(store.fieldsByCategory)) {
-    expandedCategories.value[cat] = true;
-  }
+// Both loads run in parallel; category expansion is handled reactively by the
+// `fieldsByCategory` watcher above (immediate:true), so no manual loop needed.
+onMounted(() => {
+  store.loadAvailableFields();
+  store.loadSavedQueries();
 });
 </script>
 
