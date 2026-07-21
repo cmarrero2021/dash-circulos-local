@@ -63,20 +63,26 @@ v-for="sq in store.savedQueries" :key="sq.id" v-close-popup clickable
         <!-- Exportar -->
         <q-btn-dropdown flat dense no-caps icon="download" label="Exportar" color="positive" :disable="!store.rawData.length" class="rounded-btn">
           <q-list class="q-py-xs">
-            <q-item-label header class="text-weight-bold">Formato de Tabla</q-item-label>
+            <q-item-label header class="text-weight-bold">Tabla Dinámica (vista actual)</q-item-label>
             <q-item v-close-popup clickable @click="exportExcel">
               <q-item-section avatar><q-icon name="grid_on" color="positive" /></q-item-section>
               <q-item-section>Excel (.xlsx)</q-item-section>
             </q-item>
             <q-item v-close-popup clickable @click="exportCSV">
               <q-item-section avatar><q-icon name="description" color="secondary" /></q-item-section>
-              <q-item-section>Valores separados por coma (.csv)</q-item-section>
+              <q-item-section>CSV separado por comas (.csv)</q-item-section>
             </q-item>
             <q-item v-close-popup clickable @click="exportJSON">
-              <q-item-section avatar><q-icon name="data_object" color="grey-8" /></q-item-section>
-              <q-item-section>JSON Crudo</q-item-section>
+              <q-item-section avatar><q-icon name="table_view" color="teal-8" /></q-item-section>
+              <q-item-section>Tabla Pivot (.json)</q-item-section>
             </q-item>
-            <q-separator q-my-sm />
+            <q-separator />
+            <q-item-label header class="text-weight-bold">Datos crudos</q-item-label>
+            <q-item v-close-popup clickable @click="exportJSONRaw">
+              <q-item-section avatar><q-icon name="data_object" color="grey-8" /></q-item-section>
+              <q-item-section>Datos sin procesar (.json)</q-item-section>
+            </q-item>
+            <q-separator />
             <q-item-label header class="text-weight-bold">Formato de Gráfico</q-item-label>
             <q-item v-close-popup clickable @click="exportChartPNG">
               <q-item-section avatar><q-icon name="image" color="primary" /></q-item-section>
@@ -499,6 +505,40 @@ v-model="saveVisibility"
               Doble-clic en cualquier cabecera de la tabla también abre este editor.
             </p>
 
+            <!-- Aggregation aliases section (visible only when there are value fields) -->
+            <div
+              v-if="renameCandidates.filter(c => c.kind === 'agg').length"
+              class="text-weight-bold text-grey-8 q-mb-sm row items-center">
+              <q-icon name="functions" size="16px" class="q-mr-xs text-purple" />
+              Agregaciones
+              <q-badge :label="`${renameCandidates.filter(c => c.kind === 'agg').length}`" color="purple-1" text-color="purple-10" dense class="q-ml-sm" />
+              <span class="text-caption text-grey-5 q-ml-sm text-weight-regular">Alias para sub-encabezados del modo cruzado</span>
+            </div>
+            <q-list
+              v-if="renameCandidates.filter(c => c.kind === 'agg').length"
+              separator class="rounded-borders q-mb-md">
+              <q-item
+                v-for="cand in renameCandidates.filter(c => c.kind === 'agg')"
+                :key="cand.kind + '::' + cand.key"
+                class="q-px-none row items-center">
+                <q-item-section>
+                  <q-item-label class="text-weight-medium text-grey-8 text-sm">
+                    {{ cand.fieldLabel }}
+                    <q-badge :label="cand.original" color="purple-1" text-color="purple-10" dense class="q-ml-xs" />
+                    <q-icon v-if="cand.isCustomized" name="check_circle" size="13px" class="text-positive q-ml-xs" />
+                  </q-item-label>
+                  <q-item-label caption class="text-xs">Campo: {{ cand.key }}</q-item-label>
+                </q-item-section>
+                <q-item-section side style="min-width: 240px;">
+                  <q-input
+                    :model-value="cand.current"
+                    dense outlined clearable
+                    :placeholder="`Alias (actual: ${cand.original}). Ej: CANT.`"
+                    @update:model-value="(v) => store.setCustomLabel('agg', cand.key, v || '')" />
+                </q-item-section>
+              </q-item>
+            </q-list>
+
             <!-- Headers section -->
             <div class="text-weight-bold text-grey-8 q-mb-sm row items-center">
               <q-icon name="view_column" size="16px" class="q-mr-xs text-primary" />
@@ -677,6 +717,21 @@ const renameCandidates = computed(() => {
   const result = [];
   if (!td.headers?.length) return result;
 
+  // Aggregation aliases — alias shown in cross-tab sub-headers (agg::<fieldKey>)
+  store.pivotValues.forEach(f => {
+    const kind = 'agg';
+    const mapKey = `${kind}::${f.key}`;
+    const current = store.customLabels[mapKey];
+    result.push({
+      kind,
+      key: f.key,
+      original: f.aggregation || 'COUNT',
+      current: current || '',
+      isCustomized: !!current,
+      fieldLabel: f.label,
+    });
+  });
+
   // Headers (todas las columnas de la tabla)
   td.headers.forEach(h => {
     if (h.isRowHeader || !td.hasPivotColumns || h.isValue) {
@@ -805,48 +860,109 @@ async function handleDeleteQuery() {
 }
 
 // ─── Export functions ─────────────────────────────────────────────────────────
-function exportCSV() {
+
+/**
+ * Builds the pivot-table matrix ready for export.
+ * Returns { headerLabels, keys, rows } — rows includes grand-total row when available.
+ */
+function buildPivotExportData() {
   const data = store.pivotTableData;
-  if (!data.bodyRows?.length) return;
-  const headers = data.headers.map(h => h.subLabel ? `${h.label} - ${h.subLabel}` : h.label);
+  if (!data.bodyRows?.length) return null;
+
+  const headerLabels = data.headers.map(h =>
+    h.subLabel ? `${h.label} - ${h.subLabel}` : h.label
+  );
   const keys = data.headers.map(h => h.key);
-  let csv = '\uFEFF' + headers.join(',') + '\n'; // Add UTF-8 BOM for Spanish characters in Excel
-  data.bodyRows.forEach(row => {
-    csv += keys.map(k => {
+
+  const rows = data.bodyRows.map(row =>
+    keys.map(k => {
       const v = row[k];
-      if (v === null || v === undefined) return '""';
+      return v === null || v === undefined ? '' : v;
+    })
+  );
+
+  // Append grand-total row when available
+  if (data.grandTotals && Object.keys(data.grandTotals).length) {
+    const nDims = store.pivotRows.length || 1;
+    const totalRow = keys.map((k, i) => {
+      if (i === 0) return 'TOTAL';
+      if (i < nDims) return '';
+      return data.grandTotals[k] ?? '';
+    });
+    rows.push(totalRow);
+  }
+
+  return { headerLabels, keys, rows };
+}
+
+/** Export the pivot table (as displayed) to CSV with UTF-8 BOM */
+function exportCSV() {
+  const d = buildPivotExportData();
+  if (!d) return;
+  let csv = '\uFEFF';
+  csv += d.headerLabels.map(h => `"${String(h).replace(/"/g, '""')}"`).join(',') + '\n';
+  d.rows.forEach(row => {
+    csv += row.map(v => {
+      if (v === null || v === undefined || v === '') return '""';
       return `"${String(v).replace(/"/g, '""')}"`;
     }).join(',') + '\n';
   });
-  downloadFile(csv, `consulta-pivot-${store.currentQueryName || 'priorizados'}.csv`, 'text/csv;charset=utf-8');
+  downloadFile(csv, `tabla-pivot-${store.currentQueryName || 'datos'}.csv`, 'text/csv;charset=utf-8');
 }
 
+/** Export pivot table as JSON array with labeled keys (includes grand-total row) */
 function exportJSON() {
-  const data = store.rawData;
-  downloadFile(JSON.stringify(data, null, 2), `datos-raw-${store.currentQueryName || 'priorizados'}.json`, 'application/json');
-}
-
-async function exportExcel() {
-  const XLSX = await import('xlsx');
   const data = store.pivotTableData;
   if (!data.bodyRows?.length) return;
-  const headers = data.headers.map(h => h.subLabel ? `${h.label} - ${h.subLabel}` : h.label);
-  const keys = data.headers.map(h => h.key);
-  
-  // Format numeric values
+  const objects = data.bodyRows.map(row => {
+    const obj = {};
+    data.headers.forEach(h => {
+      const label = h.subLabel ? `${h.label} - ${h.subLabel}` : h.label;
+      obj[label] = row[h.key] ?? null;
+    });
+    return obj;
+  });
+  // Append grand-total object
+  if (data.grandTotals && Object.keys(data.grandTotals).length) {
+    const totObj = { _fila: 'TOTAL' };
+    data.headers.forEach(h => {
+      if (data.grandTotals[h.key] !== undefined) {
+        const label = h.subLabel ? `${h.label} - ${h.subLabel}` : h.label;
+        totObj[label] = data.grandTotals[h.key];
+      }
+    });
+    objects.push(totObj);
+  }
+  downloadFile(JSON.stringify(objects, null, 2), `tabla-pivot-${store.currentQueryName || 'datos'}.json`, 'application/json');
+}
+
+/** Export raw unprocessed records as JSON */
+function exportJSONRaw() {
+  if (!store.rawData.length) return;
+  downloadFile(JSON.stringify(store.rawData, null, 2), `datos-raw-${store.currentQueryName || 'datos'}.json`, 'application/json');
+}
+
+/** Export the pivot table to Excel (.xlsx) with grand-total row */
+async function exportExcel() {
+  const XLSX = await import('xlsx');
+  const d = buildPivotExportData();
+  if (!d) return;
+
   const wsData = [
-    headers,
-    ...data.bodyRows.map(row => keys.map(k => {
-      const val = row[k];
-      const num = Number(val);
-      return (!isNaN(num) && val !== '' && val !== null) ? num : (val ?? '');
-    }))
+    d.headerLabels,
+    ...d.rows.map(row =>
+      row.map(v => {
+        if (v === '' || v === null || v === undefined) return '';
+        const num = Number(v);
+        return !isNaN(num) && typeof v !== 'string' ? num : v;
+      })
+    ),
   ];
-  
+
   const ws = XLSX.utils.aoa_to_sheet(wsData);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Datos Pivot');
-  XLSX.writeFile(wb, `consulta-pivot-${store.currentQueryName || 'priorizados'}.xlsx`);
+  XLSX.utils.book_append_sheet(wb, ws, 'Tabla Pivot');
+  XLSX.writeFile(wb, `tabla-pivot-${store.currentQueryName || 'datos'}.xlsx`);
 }
 
 function exportChartPNG() {

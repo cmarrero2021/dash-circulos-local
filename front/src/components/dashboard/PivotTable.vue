@@ -1,158 +1,213 @@
 <template>
-  <div ref="tableContainer" class="pivot-table-container">
-    <div v-if="tableData.bodyRows?.length" class="pivot-info-bar">
-      <div class="info-left">
-        <q-icon name="table_rows" size="14px" class="text-grey-6" />
-        <span class="row-count text-weight-medium">{{ tableData.bodyRows.length }} filas</span>
-        <span v-if="store.totalRows && store.totalRows !== tableData.bodyRows.length" class="total-label">
-          de {{ store.totalRows }} registros
-        </span>
-        <span v-if="tableData.hasPivotColumns" class="pivot-mode-badge">
-          <q-icon name="view_module" size="12px" /> Modo cruzado
-        </span>
+  <div class="pivot-table-wrapper">
+
+    <!-- ─── Controls bar ─────────────────────────────────────────────────────── -->
+    <div v-if="tableData.bodyRows?.length" class="pivot-controls-bar">
+      <!-- Row count label -->
+      <div class="row items-center q-gutter-xs text-caption text-grey-7">
+        <q-icon name="table_rows" size="14px" />
+        <span><strong>{{ tableData.bodyRows.length }}</strong> filas</span>
+        <span v-if="tableData.hasPivotColumns" class="pivot-mode-chip">Modo cruzado</span>
       </div>
-      <div class="info-right">
-        <span class="heat-legend">
-          <span class="heat-dot heat-low"></span>
-          <span class="heat-dot heat-medium"></span>
-          <span class="heat-dot heat-high"></span>
-          <span class="text-grey-7 text-xs">Intensidad</span>
-        </span>
+
+      <div class="row items-center q-gutter-sm">
+        <!-- Visible rows selector -->
+        <div class="row items-center q-gutter-xs no-wrap">
+          <q-icon name="height" size="13px" class="text-grey-6" />
+          <q-select
+            v-model="visibleRows"
+            :options="rowOptions"
+            dense outlined emit-value map-options
+            class="rows-select"
+            behavior="menu"
+          />
+        </div>
+
+        <!-- Display mode toggle -->
+        <q-btn-toggle
+          v-model="displayMode"
+          dense flat
+          toggle-color="primary"
+          class="mode-toggle"
+          :options="[
+            { label: 'Valores', value: 'values' },
+            { label: '%',       value: 'pct'    },
+            { label: 'Ambos',   value: 'both'   },
+          ]"
+        />
       </div>
     </div>
-    <div class="pivot-table-scroll">
-      <table v-if="tableData.headers?.length" class="pivot-table">
-        <!-- Header -->
+
+    <!-- ─── Scroll container ──────────────────────────────────────────────────── -->
+    <div class="pivot-scroll" :style="tableScrollStyle">
+      <table v-if="tableData.headers?.length" class="pivot-tbl">
+
+        <!-- ══ THEAD ═══════════════════════════════════════════════════════════ -->
         <thead>
-          <!-- If pivot columns: 2-row header -->
-          <tr v-if="tableData.hasPivotColumns" class="pivot-header-top">
+
+          <!-- Cross-tab: 2-row header ----------------------------------------- -->
+          <tr v-if="tableData.hasPivotColumns">
+            <!-- Row-dimension headers (span 2 rows) -->
             <th
-v-for="h in rowHeaders" :key="'rh-'+h.key"
-              class="pivot-th pivot-th-row" :rowspan="2"
-              @dblclick="startRename(h, 'header')">
-              <span class="th-content">
-                <span class="th-label">{{ h.label }}</span>
-                <q-icon name="edit" size="11px" class="th-edit-hint" />
-              </span>
-            </th>
-            <template v-for="cv in tableData.colValues" :key="'cv-'+cv.raw">
-              <th
-                :colspan="store.pivotValues.length"
-                class="pivot-th pivot-th-col"
-                @dblclick="startRename({ key: cv.raw, label: cv.display }, 'series')">
-                <span class="th-content">
-                  <span class="th-label">{{ cv.display }}</span>
-                  <q-icon name="edit" size="11px" class="th-edit-hint" />
-                </span>
-              </th>
-            </template>
-            <th v-if="tableData.colValues?.length" class="pivot-th pivot-th-total" :rowspan="2">Total</th>
-          </tr>
-          <tr v-if="tableData.hasPivotColumns" class="pivot-header-sub">
-            <template v-for="cv in tableData.colValues" :key="'cvs-'+cv.raw">
-              <th v-for="v in store.pivotValues" :key="'vs-'+cv.raw+v.key" class="pivot-th pivot-th-val">
-                {{ v.aggregation || 'COUNT' }}
-              </th>
-            </template>
-          </tr>
-          <!-- Simple header (no pivot columns) -->
-          <tr v-if="!tableData.hasPivotColumns" class="pivot-header-simple">
+              v-for="h in rowHeaders"
+              :key="'rh-' + h.key"
+              rowspan="2"
+              class="pt-th pt-th-dim text-left"
+              @dblclick="startRename(h, 'header')"
+            >{{ h.label }}<q-icon name="edit" size="10px" class="edit-hint q-ml-xs" /></th>
+
+            <!-- Column-group headers -->
             <th
-v-for="h in tableData.headers" :key="'sh-'+h.key" class="pivot-th"
+              v-for="cv in tableData.colValues"
+              :key="'cg-' + cv.raw"
+              :colspan="subHeaderColspan"
+              class="pt-th pt-th-colgroup text-center"
+              @dblclick="startRename({ key: cv.raw, label: cv.display }, 'series')"
+            >{{ cv.display }}<q-icon name="edit" size="10px" class="edit-hint q-ml-xs" /></th>
+
+            <!-- Grand-total header -->
+            <th v-if="tableData.colValues?.length" rowspan="2" class="pt-th pt-th-total text-right">TOTAL</th>
+          </tr>
+
+          <!-- Cross-tab row 2: sub-column headers (agg names) -->
+          <tr v-if="tableData.hasPivotColumns">
+            <template v-for="cv in tableData.colValues" :key="'cs-' + cv.raw">
+              <template v-for="v in store.pivotValues" :key="'vs-' + cv.raw + v.key">
+                <th v-if="displayMode !== 'pct'"    class="pt-th pt-th-val text-right">{{ aggLabel(v) }}</th>
+                <th v-if="displayMode !== 'values'" class="pt-th pt-th-pct text-right">{{ aggLabel(v) }} %</th>
+              </template>
+            </template>
+          </tr>
+
+          <!-- Simple: 1-row header -------------------------------------------- -->
+          <tr v-if="!tableData.hasPivotColumns">
+            <th
+              v-for="h in simpleRowHeaders"
+              :key="'srh-' + h.key"
+              class="pt-th pt-th-dim text-left"
               :class="{ 'sort-active': sortColumn === h.key }"
-              @click="sortBy(h.key)">
-              <div class="th-simple-content">
-                <span class="th-label">{{ h.label }}</span>
-                <span class="th-actions">
-                  <q-icon
-v-if="sortColumn === h.key"
-                    :name="sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'" size="13px" class="sort-icon" />
-                  <q-icon name="edit" size="11px" class="th-edit-hint" @click.stop="startRename(h, 'header')" />
-                </span>
-              </div>
+              @click="sortBy(h.key)"
+            >
+              {{ h.label }}
+              <q-icon v-if="sortColumn === h.key" :name="sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'" size="11px" />
+              <q-icon name="edit" size="10px" class="edit-hint q-ml-xs" @click.stop="startRename(h, 'header')" />
+            </th>
+
+            <th
+              v-for="h in effectiveSimpleValueHeaders"
+              :key="'svh-' + h.key"
+              class="pt-th text-right"
+              :class="{
+                'pt-th-val': !h._isPct,
+                'pt-th-pct': h._isPct,
+                'sort-active': !h._isPct && sortColumn === (h._srcKey || h.key),
+              }"
+              @click="!h._isPct ? sortBy(h._srcKey || h.key) : null"
+            >
+              {{ h.label }}
+              <q-icon v-if="!h._isPct && sortColumn === (h._srcKey || h.key)" :name="sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'" size="11px" />
+              <q-icon v-if="!h._isPct" name="edit" size="10px" class="edit-hint q-ml-xs" @click.stop="startRename(h, 'header')" />
             </th>
           </tr>
         </thead>
-        <!-- Body -->
+
+        <!-- ══ TBODY ═══════════════════════════════════════════════════════════ -->
         <tbody>
-          <tr v-for="(row, idx) in sortedRows" :key="rowKey(row, idx)" class="pivot-row" :class="{ 'row-even': idx % 2 === 0 }">
+          <tr
+            v-for="(row, idx) in sortedRows"
+            :key="rowKey(row, idx)"
+            class="pivot-row"
+            :class="{ 'row-odd': idx % 2 !== 0 }"
+          >
+            <!-- Simple mode -->
             <template v-if="!tableData.hasPivotColumns">
+              <td v-for="h in simpleRowHeaders"  :key="'dr-' + h.key" class="pt-td pt-td-dim">{{ formatValue(row[h.key]) }}</td>
               <td
-v-for="h in tableData.headers" :key="'d-'+h.key"
-                class="pivot-td" :class="{ 'td-numeric': isNumericHeader(h) }">
-                {{ formatValue(row[h.key]) }}
-              </td>
+                v-for="h in effectiveSimpleValueHeaders"
+                :key="'dv-' + h.key"
+                class="pt-td text-right"
+                :class="{ 'pt-td-pct': h._isPct }"
+              >{{ h._isPct ? calcPct(row[h._srcKey], h._srcKey) : formatNumber(row[h.key]) }}</td>
             </template>
+
+            <!-- Cross-tab mode -->
             <template v-else>
-              <td
-v-for="h in rowHeaders" :key="'dr-'+h.key"
-                class="pivot-td pivot-td-row">{{ formatValue(row[h.key]) }}</td>
-              <td
-v-for="h in valueHeaders" :key="'dv-'+h.key"
-                class="pivot-td td-numeric" :class="heatmapClass(row[h.key], h.key)"
-                :title="`Col max: ${formatNumber(colMaxByKey[h.key])}`">
-                {{ formatNumber(row[h.key]) }}
-              </td>
-              <td class="pivot-td td-numeric td-total">{{ formatNumber(rowTotal(row)) }}</td>
+              <td v-for="h in rowHeaders" :key="'rr-' + h.key" class="pt-td pt-td-dim">{{ formatValue(row[h.key]) }}</td>
+
+              <template v-for="cv in tableData.colValues" :key="'cvb-' + cv.raw">
+                <template v-for="v in store.pivotValues" :key="'vb-' + cv.raw + v.key">
+                  <td v-if="displayMode !== 'pct'"    class="pt-td text-right">{{ formatNumber(row[pivotCellKey(cv, v)]) }}</td>
+                  <td v-if="displayMode !== 'values'" class="pt-td text-right pt-td-pct">{{ calcPct(row[pivotCellKey(cv, v)], pivotCellKey(cv, v)) }}</td>
+                </template>
+              </template>
+
+              <td class="pt-td text-right pt-td-total">{{ formatNumber(rowTotal(row)) }}</td>
             </template>
           </tr>
         </tbody>
-        <!-- Footer: Grand Totals -->
+
+        <!-- ══ TFOOT ════════════════════════════════════════════════════════════ -->
         <tfoot v-if="tableData.grandTotals && Object.keys(tableData.grandTotals).length">
           <tr class="pivot-total-row">
+            <!-- Simple -->
             <td
-v-if="tableData.hasPivotColumns"
-              :colspan="store.pivotRows.length" class="pivot-td pivot-td-total-label">
-              <q-icon name="functions" size="14px" class="q-mr-xs" />Gran Total
-            </td>
-            <td
-v-if="!tableData.hasPivotColumns"
-              :colspan="store.pivotRows.length || 1" class="pivot-td pivot-td-total-label">
-              <q-icon name="functions" size="14px" class="q-mr-xs" />Total
-            </td>
+              v-if="!tableData.hasPivotColumns"
+              :colspan="store.pivotRows.length || 1"
+              class="pt-td pt-td-total-label"
+            >TOTAL</td>
             <template v-if="!tableData.hasPivotColumns">
               <td
-v-for="h in simpleValueHeaders"
-                :key="'gt-'+h.key" class="pivot-td td-numeric td-total">
-                {{ formatNumber(tableData.grandTotals[h.key]) }}
-              </td>
+                v-for="h in effectiveSimpleValueHeaders"
+                :key="'gt-' + h.key"
+                class="pt-td text-right pt-td-total"
+                :class="{ 'pt-td-pct': h._isPct }"
+              >{{ h._isPct ? '100.0%' : formatNumber(tableData.grandTotals[h._srcKey || h.key]) }}</td>
             </template>
-            <template v-else>
-              <td
-v-for="h in valueHeaders" :key="'gtv-'+h.key"
-                class="pivot-td td-numeric td-total">
-                {{ formatNumber(tableData.grandTotals[h.key]) }}
-              </td>
-              <td class="pivot-td td-numeric td-total td-grand-total">
-                {{ formatNumber(grandTotalSum) }}
-              </td>
+
+            <!-- Cross-tab -->
+            <td
+              v-if="tableData.hasPivotColumns"
+              :colspan="store.pivotRows.length"
+              class="pt-td pt-td-total-label"
+            >TOTAL</td>
+            <template v-if="tableData.hasPivotColumns">
+              <template v-for="cv in tableData.colValues" :key="'cvgt-' + cv.raw">
+                <template v-for="v in store.pivotValues" :key="'vgt-' + cv.raw + v.key">
+                  <td v-if="displayMode !== 'pct'"    class="pt-td text-right pt-td-total">{{ formatNumber(tableData.grandTotals[pivotCellKey(cv, v)]) }}</td>
+                  <td v-if="displayMode !== 'values'" class="pt-td text-right pt-td-pct pt-td-total">100.0%</td>
+                </template>
+              </template>
+              <td class="pt-td text-right pt-td-total">{{ formatNumber(grandTotalSum) }}</td>
             </template>
           </tr>
         </tfoot>
       </table>
+
+      <!-- Empty state -->
+      <div v-else class="pivot-empty text-center text-grey-5 q-pa-xl">
+        <q-icon name="table_chart" size="48px" class="q-mb-sm" />
+        <div class="text-body2">Ejecuta una consulta para ver los datos aquí</div>
+      </div>
     </div>
 
-    <!-- Inline rename dialog (no requiere ancla DOM) -->
-    <q-dialog v-model="renamePopup" persistent @keyup.esc="cancelRename">
-      <q-card class="rename-card" style="min-width: 320px;">
+    <!-- ─── Inline rename dialog ─────────────────────────────────────────────── -->
+    <q-dialog v-model="renamePopup" persistent>
+      <q-card style="min-width: 320px;">
         <q-card-section class="row items-center q-pb-none">
-          <div class="text-weight-medium text-grey-8 text-sm row items-center">
-            <q-icon name="drive_file_rename_outline" size="18px" class="q-mr-xs text-primary" />
-            Renombrar {{ renameKind === 'header' ? 'columna' : 'serie' }}
-          </div>
-          <q-space />
-          <q-btn flat round dense icon="close" size="sm" @click="cancelRename" />
+          <span class="text-weight-medium">Renombrar {{ renameKind === 'header' ? 'columna' : renameKind === 'agg' ? 'agregación' : 'serie' }}</span>
+          <q-space /><q-btn flat round dense icon="close" size="sm" @click="cancelRename" />
         </q-card-section>
-        <q-card-section class="q-pt-sm">
+        <q-card-section>
           <div class="text-caption text-grey-6 q-mb-sm">Original: "{{ renameOriginal }}"</div>
           <q-input
             ref="renameInput"
             v-model="renameValue"
             dense outlined autofocus
             placeholder="Nuevo nombre (vacío = restaurar)"
-            @keyup.enter="commitRename" />
+            @keyup.enter="commitRename"
+          />
         </q-card-section>
-        <q-card-actions align="right" class="q-pa-md">
+        <q-card-actions align="right">
           <q-btn flat dense label="Cancelar" color="grey-7" size="sm" @click="cancelRename" />
           <q-btn flat dense label="Restaurar" color="warning" size="sm" @click="restoreRename" />
           <q-btn unelevated dense label="Aplicar" color="primary" size="sm" @click="commitRename" />
@@ -167,86 +222,96 @@ import { ref, computed, watch } from 'vue';
 import { useDynamicQueryStore } from 'stores/dynamic-query-store';
 
 const store = useDynamicQueryStore();
-const tableContainer = ref(null);
-const sortColumn = ref(null);
-const sortDir = ref('asc');
 
 const tableData = computed(() => store.pivotTableData);
 
-// Pre-filter headers to avoid repeated .filter() calls inside templates/render loops
+// ─── Display controls ────────────────────────────────────────────────────────
+const visibleRows  = ref(10);
+const displayMode  = ref('values'); // 'values' | 'pct' | 'both'
+
+const rowOptions = [
+  { label: '10 filas',  value: 10   },
+  { label: '20 filas',  value: 20   },
+  { label: '50 filas',  value: 50   },
+  { label: '100 filas', value: 100  },
+  { label: 'Todas',     value: 'all' },
+];
+
+const ROW_H    = 30;   // px per data row (dense)
+const THEAD_H  = 34;   // 1-row header
+const THEAD2_H = 62;   // 2-row header (cross-tab)
+const FOOT_H   = 34;   // sticky tfoot
+const MIN_ROWS = 10;
+
+const tableScrollStyle = computed(() => {
+  const headerH = tableData.value.hasPivotColumns ? THEAD2_H : THEAD_H;
+  const minH = `${MIN_ROWS * ROW_H + headerH + FOOT_H}px`;
+  if (visibleRows.value === 'all') {
+    return { maxHeight: 'calc(100vh - 360px)', minHeight: minH };
+  }
+  const h = visibleRows.value * ROW_H + headerH + FOOT_H;
+  return { maxHeight: `${h}px`, minHeight: minH };
+});
+
+// ─── Cross-tab colspan ───────────────────────────────────────────────────────
+const subHeaderColspan = computed(() => {
+  const b = store.pivotValues.length;
+  return displayMode.value === 'both' ? b * 2 : b;
+});
+
+// ─── Aggregation label with alias ────────────────────────────────────────────
+function aggLabel(v) {
+  return store.customLabels[`agg::${v.key}`] || v.aggregation || 'COUNT';
+}
+
+// ─── Cell key (cross-tab) ────────────────────────────────────────────────────
+function pivotCellKey(cv, v) {
+  return `${cv.raw}__${v.key}`;
+}
+
+// ─── Percentage ──────────────────────────────────────────────────────────────
+function calcPct(val, key) {
+  const num = Number(val) || 0;
+  const gt  = Number(tableData.value.grandTotals?.[key]) || 0;
+  if (!gt) return '—';
+  return (num / gt * 100).toFixed(1) + '%';
+}
+
+// ─── Header partitions ───────────────────────────────────────────────────────
 const rowHeaders = computed(() => tableData.value.headers?.filter(h => h.isRowHeader) || []);
 const valueHeaders = computed(() => tableData.value.headers?.filter(h => h.isValue) || []);
-const simpleValueHeaders = computed(() => {
-  const headers = tableData.value.headers || [];
-  const offset = store.pivotRows.length || 1;
-  return headers.filter((_, i) => i >= offset);
-});
 
-// Set of numeric header keys (labels are known to be measurement fields in pivot mode;
-// in simple mode we fall back to per-value numeric detection via store field metadata)
-const numericHeaderKeys = computed(() => {
-  const set = new Set();
-  // Value headers are always numeric (aggregations)
-  valueHeaders.value.forEach(h => set.add(h.key));
-  // In simple (non-pivot) mode, mark numeric by matching store pivotValues keys
-  if (!tableData.value.hasPivotColumns) {
-    store.pivotValues.forEach(f => {
-      const k = f.key.replace('.', '_');
-      set.add(k);
-      set.add(`${k}_${(f.aggregation || 'COUNT').toLowerCase()}`);
-    });
+const simpleRowHeaders = computed(() => {
+  if (tableData.value.hasPivotColumns) return [];
+  return (tableData.value.headers || []).slice(0, store.pivotRows.length);
+});
+const simpleValueHeaders = computed(() =>
+  (tableData.value.headers || []).slice(store.pivotRows.length)
+);
+const effectiveSimpleValueHeaders = computed(() => {
+  const base = simpleValueHeaders.value;
+  if (displayMode.value === 'values') return base.map(h => ({ ...h, _isPct: false }));
+  if (displayMode.value === 'pct')    return base.map(h => ({ ...h, label: h.label + ' %', _isPct: true, _srcKey: h.key }));
+  const result = [];
+  for (const h of base) {
+    result.push({ ...h, _isPct: false });
+    result.push({ ...h, key: h.key + '__pct', label: h.label + ' %', _isPct: true, _srcKey: h.key });
   }
-  return set;
+  return result;
 });
 
-function isNumericHeader(h) {
-  return numericHeaderKeys.value.has(h.key);
+// ─── Row total (cross-tab) ───────────────────────────────────────────────────
+function rowTotal(row) {
+  return valueHeaders.value.reduce((s, h) => s + (Number(row[h.key]) || 0), 0);
 }
 
-// Pre-compute the maximum value per column once per dataset to avoid
-// re-scanning all rows for every single cell (O(n*cols) -> O(n+cols))
-const colMaxByKey = computed(() => {
-  const map = {};
-  const rows = tableData.value.bodyRows || [];
-  if (!rows.length) return map;
-  for (const h of valueHeaders.value) {
-    let max = 0;
-    for (const row of rows) {
-      const v = Number(row[h.key]) || 0;
-      if (v > max) max = v;
-    }
-    map[h.key] = max;
-  }
-  return map;
-});
+const grandTotalSum = computed(() =>
+  Object.values(tableData.value.grandTotals || {}).reduce((s, v) => s + (Number(v) || 0), 0)
+);
 
-// Stable row key: join row-header values (or fall back to index for empty rows)
-function rowKey(row, idx) {
-  const headers = rowHeaders.value;
-  if (headers.length) {
-    const k = headers.map(h => row[h.key]).join('|||');
-    return k || `row-${idx}`;
-  }
-  // Simple mode: join all header values
-  const allKeys = (tableData.value.headers || []).map(h => row[h.key]).join('|||');
-  return allKeys || `row-${idx}`;
-}
-
-const sortedRows = computed(() => {
-  const rows = [...(tableData.value.bodyRows || [])];
-  if (sortColumn.value) {
-    rows.sort((a, b) => {
-      const va = a[sortColumn.value];
-      const vb = b[sortColumn.value];
-      const isNum = !isNaN(Number(va)) && !isNaN(Number(vb));
-      if (isNum) return sortDir.value === 'asc' ? Number(va) - Number(vb) : Number(vb) - Number(va);
-      return sortDir.value === 'asc'
-        ? String(va || '').localeCompare(String(vb || ''))
-        : String(vb || '').localeCompare(String(va || ''));
-    });
-  }
-  return rows;
-});
+// ─── Sorting ─────────────────────────────────────────────────────────────────
+const sortColumn = ref(null);
+const sortDir    = ref('asc');
 
 function sortBy(key) {
   if (sortColumn.value === key) {
@@ -257,349 +322,208 @@ function sortBy(key) {
   }
 }
 
-// Reset sort when the underlying columns change (e.g. new query executed)
-watch(() => tableData.value.headers, () => {
-  sortColumn.value = null;
-  sortDir.value = 'asc';
+const sortedRows = computed(() => {
+  const rows = [...(tableData.value.bodyRows || [])];
+  if (sortColumn.value) {
+    rows.sort((a, b) => {
+      const va = a[sortColumn.value], vb = b[sortColumn.value];
+      const num = !isNaN(Number(va)) && !isNaN(Number(vb));
+      if (num) return sortDir.value === 'asc' ? Number(va) - Number(vb) : Number(vb) - Number(va);
+      return sortDir.value === 'asc'
+        ? String(va || '').localeCompare(String(vb || ''))
+        : String(vb || '').localeCompare(String(va || ''));
+    });
+  }
+  return rows;
 });
 
+watch(() => tableData.value.headers, () => { sortColumn.value = null; sortDir.value = 'asc'; });
+
+// ─── Row key ─────────────────────────────────────────────────────────────────
+function rowKey(row, idx) {
+  const keys = rowHeaders.value.length ? rowHeaders.value : (tableData.value.headers || []);
+  const k = keys.map(h => row[h.key]).join('|||');
+  return k || `r-${idx}`;
+}
+
+// ─── Formatters ──────────────────────────────────────────────────────────────
 function formatValue(val) {
   if (val === null || val === undefined) return '—';
   if (typeof val === 'boolean') return val ? 'Sí' : 'No';
   return val;
 }
-
 function formatNumber(val) {
   if (val === null || val === undefined) return '—';
   const num = Number(val);
   if (isNaN(num) || !isFinite(num)) return val;
-  return num.toLocaleString('es-VE', { maximumFractionDigits: 2 });
+  return new Intl.NumberFormat('de-DE', { maximumFractionDigits: 2 }).format(num);
 }
 
-// Hoist valueHeaders lookup out of per-row computation
-function rowTotal(row) {
-  let sum = 0;
-  for (const h of valueHeaders.value) {
-    sum += Number(row[h.key]) || 0;
-  }
-  return sum;
-}
-
-// Sum of grand totals (precomputed once per dataset, not per footer cell)
-const grandTotalSum = computed(() => {
-  const gt = tableData.value.grandTotals || {};
-  let sum = 0;
-  for (const v of Object.values(gt)) {
-    sum += Number(v) || 0;
-  }
-  return sum;
-});
-
-// Heatmap coloring using precomputed column max (O(1) per cell instead of O(n))
-function heatmapClass(val, key) {
-  if (!val) return '';
-  const max = colMaxByKey.value[key];
-  if (!max) return '';
-  const ratio = (Number(val) || 0) / max;
-  if (ratio > 0.8) return 'heat-high';
-  if (ratio > 0.5) return 'heat-medium';
-  if (ratio > 0.2) return 'heat-low';
-  return '';
-}
-
-// ─── Inline rename (header / series) ──────────────────────────────────────────
-// `startRename` abre un q-menu anclado al <th> cliqueado. El usuario escribe un
-// nuevo nombre (vacío = restaurar original), y al confirmar se persiste en el
-// store via `store.setCustomLabel(kind, key, label)`. La tabla se actualiza
-// automáticamente porque `pivotTableData` es un `computed` que resuelve labels.
-const renamePopup = ref(false);
-const renameKind = ref('header');
-const renameKey = ref('');
+// ─── Inline rename ────────────────────────────────────────────────────────────
+const renamePopup    = ref(false);
+const renameKind     = ref('header');
+const renameKey      = ref('');
 const renameOriginal = ref('');
-const renameValue = ref('');
-const renameInput = ref(null);
+const renameValue    = ref('');
 
 function startRename(header, kind) {
-  // Anclar el popover al propio <th> clickeado es complicado sin el DOM ref;
-  // usamos el evento para localizar el elemento clicked.
-  renameKind.value = kind;
-  // En modo cross-tab, las series usan cv.raw; los headers simples usan h.key.
-  renameKey.value = header.key;
-  renameOriginal.value = header.label || header.rawLabel || '';
-  // Cargar valor existente o vacío
-  const existing = store.customLabels[`${kind}::${header.key}`];
-  renameValue.value = existing || '';
-  // Buscar el th element clickeado para anclar el menu
-  // startRename se llama desde @dblclick del <th> — event.currentTarget
-  // Pero como el handler a veces recibe un objeto custom (cv), usamos el último
-  // th clickeado guardándolo en un ref. Para simplicidad, dejamos que el q-menu
-  // se ancle al tableContainer si no hay target específico.
-  renamePopup.value = true;
+  renameKind.value     = kind;
+  renameKey.value      = header.key;
+  renameOriginal.value = header.label || '';
+  renameValue.value    = store.customLabels[`${kind}::${header.key}`] || '';
+  renamePopup.value    = true;
 }
-
 function commitRename() {
-  const val = (renameValue.value || '').trim();
-  store.setCustomLabel(renameKind.value, renameKey.value, val);
+  store.setCustomLabel(renameKind.value, renameKey.value, (renameValue.value || '').trim());
   renamePopup.value = false;
 }
-
 function restoreRename() {
   store.setCustomLabel(renameKind.value, renameKey.value, '');
   renamePopup.value = false;
 }
+function cancelRename() { renamePopup.value = false; }
 
-function cancelRename() {
-  renamePopup.value = false;
-}
-
-defineExpose({ tableContainer, startRename });
+defineExpose({ startRename });
 </script>
 
 <style scoped>
-/* ─── Container ───────────────────────────────────────────────────────────── */
-.pivot-table-container {
+/* ─── Wrapper ────────────────────────────────────────────────────────────────── */
+.pivot-table-wrapper {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #ffffff;
-  font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  font-family: 'Roboto', 'Segoe UI', -apple-system, sans-serif;
 }
 
-.pivot-info-bar {
+/* ─── Controls bar ───────────────────────────────────────────────────────────── */
+.pivot-controls-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 8px 16px;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px 10px;
+  background: #fafafa;
+  border-bottom: 1px solid #e0e0e0;
   font-size: 12px;
-  color: #607d8b;
-  background: #fafbfc;
-  border-bottom: 1px solid #eceff1;
 }
-.info-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.pivot-mode-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 8px;
+
+.pivot-mode-chip {
+  display: inline-block;
+  padding: 1px 7px;
   border-radius: 10px;
   background: #e3f2fd;
   color: #1565c0;
   font-size: 10.5px;
   font-weight: 600;
 }
-.heat-legend {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-.heat-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 1px solid rgba(0,0,0,0.06);
-}
-.heat-dot.heat-low    { background: rgba(33, 150, 243, 0.18); }
-.heat-dot.heat-medium { background: rgba(255, 193, 7, 0.25);  }
-.heat-dot.heat-high   { background: rgba(76, 175, 80, 0.30);  }
 
-.pivot-table-scroll {
-  flex: 1;
+/* Compact select */
+.rows-select { min-width: 105px; }
+.rows-select :deep(.q-field__control) { height: 26px; min-height: 26px; padding: 0 8px; font-size: 11.5px; }
+.rows-select :deep(.q-field__native)  { font-size: 11.5px; padding: 0; min-height: unset; }
+.rows-select :deep(.q-field__append)  { height: 26px; }
+
+.mode-toggle { border: 1px solid #e0e0e0; border-radius: 4px; background: #f5f5f5; font-size: 11.5px; }
+.mode-toggle :deep(.q-btn) { padding: 0 8px; height: 24px; font-size: 11.5px; min-height: unset; }
+
+/* ─── Scroll area ────────────────────────────────────────────────────────────── */
+.pivot-scroll {
   overflow: auto;
+  flex: 1;
   position: relative;
 }
 
-.pivot-table {
+/* ─── Table  (mirrors q-table flat dense) ────────────────────────────────────── */
+.pivot-tbl {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-  font-size: 13px;
-  color: #37474f;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  color: #212121;
 }
 
-/* ─── Headers (Material minimalista) ───────────────────────────────────────── */
-.pivot-th {
-  background: #ffffff;
-  color: #263238;
-  font-weight: 600;
-  padding: 10px 14px;
-  text-align: left;
+/* ── Headers ─────────────────────────────────────────────────────────────────── */
+.pt-th {
+  font-weight: bold;
+  font-size: 0.74rem;
+  padding: 7px 5px;
   white-space: nowrap;
+  border-bottom: 1px solid #bdbdbd;
+  border-right: 1px solid #e0e0e0;
   position: sticky;
   top: 0;
+  background: #eeeeee;    /* matches bg-grey-3 from the reference table */
   z-index: 2;
-  cursor: default;
-  user-select: none;
-  font-size: 12px;
-  letter-spacing: 0.2px;
-  border-bottom: 1px solid #eceff1;
-  transition: background 0.15s;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
-.pivot-header-simple .pivot-th {
-  cursor: pointer;
-}
-.pivot-header-simple .pivot-th:hover {
-  background: #f5f7fa;
-}
-.pivot-th::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -1px;
-  height: 2px;
-  background: transparent;
-  transition: background 0.15s;
-}
-.pivot-th.sort-active {
-  color: #1565c0;
-  background: #e3f2fd;
-}
-.pivot-th.sort-active::after {
-  background: #1565c0;
-}
+.pt-th:last-child { border-right: none; }
 
-.pivot-th-row {
-  background: #eceff1;
-  font-weight: 700;
-  color: #37474f;
-}
-.pivot-th-col {
-  text-align: center;
-  background: #f5f7fa;
-  color: #455a64;
-  font-weight: 600;
-}
-.pivot-th-col:hover {
-  background: #e8eaf6;
-}
-.pivot-th-val {
-  text-align: center;
-  font-size: 10.5px;
-  font-weight: 500;
-  background: #fafbfc;
-  color: #78909c;
-  border-bottom: 1px solid #eceff1;
-}
-.pivot-th-total {
-  background: #37474f;
-  color: #ffffff;
-  text-align: center;
-  font-weight: 700;
-}
+/* Dimension (row-group) column header */
+.pt-th-dim { background: #eeeeee; color: #424242; }
 
-/* Header content wrappers for inline rename affordance */
-.th-content {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.th-simple-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-}
-.th-label {
-  display: inline-block;
-}
-.th-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: 6px;
-  opacity: 0.35;
-  transition: opacity 0.15s;
-}
-.pivot-th:hover .th-actions,
-.th-content:hover .th-edit-hint {
-  opacity: 1;
-}
-.th-edit-hint {
-  opacity: 0;
-  color: #90a4ae;
-  transition: opacity 0.15s, color 0.15s;
-  cursor: pointer;
-}
-.th-content:hover .th-edit-hint,
-.pivot-th:hover .th-edit-hint {
-  opacity: 0.6;
-}
-.th-edit-hint:hover {
-  opacity: 1 !important;
-  color: #1565c0;
-}
-.sort-icon {
-  color: #1565c0;
-}
+/* Column-group (pivot cross) header — each group gets a tint */
+.pt-th-colgroup { background: #bbdefb; color: #0d47a1; }  /* blue-2 */
 
-/* ─── Body ─────────────────────────────────────────────────────────────────── */
-.pivot-td {
-  padding: 8px 14px;
-  white-space: nowrap;
+/* Value sub-column header */
+.pt-th-val { background: #e3f2fd; color: #1565c0; }       /* blue-1 */
+
+/* Percentage sub-column header */
+.pt-th-pct { background: #f3e5f5; color: #6a1b9a; }       /* purple-1 */
+
+/* Grand total column header */
+.pt-th-total { background: #eeeeee; color: #37474f; }
+
+/* Sorting active */
+.pt-th.sort-active { background: #c8e6c9; color: #1b5e20; }
+
+/* Edit hint icon */
+.edit-hint { opacity: 0; transition: opacity 0.15s; cursor: pointer; }
+.pt-th:hover .edit-hint { opacity: 0.55; }
+.edit-hint:hover { opacity: 1 !important; }
+
+/* ── Cells ───────────────────────────────────────────────────────────────────── */
+.pt-td {
+  padding: 5px 5px;
+  font-size: 0.84rem;
   border-bottom: 1px solid #f5f5f5;
-  transition: background 0.1s;
+  border-right: 1px solid #f5f5f5;
+  white-space: nowrap;
 }
-.pivot-row {
-  transition: background 0.12s;
-}
-.pivot-row:nth-child(even),
-.pivot-row.row-even {
-  background: #fafbfc;
-}
-.pivot-row:hover {
-  background: #f1f8ff !important;
-}
-.td-numeric {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: 'tnum';
-}
-.pivot-td-row {
-  font-weight: 500;
-  color: #37474f;
-  background: #f5f7fa;
-  border-right: 1px solid #eceff1;
-}
+.pt-td:last-child { border-right: none; }
 
-/* ─── Totals row ───────────────────────────────────────────────────────────── */
-.pivot-total-row {
-  position: sticky;
-  bottom: 0;
-  z-index: 1;
-}
-.pivot-total-row .pivot-td {
-  background: #eceff1;
-  font-weight: 700;
-  color: #263238;
-  border-top: 2px solid #1565c0;
+/* Zebra stripes */
+.pivot-row.row-odd { background: #fafafa; }
+.pivot-row:hover { background: #e3f2fd !important; }
+
+/* Dimension cell */
+.pt-td-dim { font-weight: 500; color: #37474f; }
+
+/* Percentage cells */
+.pt-td-pct { background: rgba(243, 229, 245, 0.4); color: #6a1b9a; font-size: 0.78rem; }
+
+/* Total column cell */
+.pt-td-total { font-weight: bold; }
+
+/* ── Footer (sticky totals) ──────────────────────────────────────────────────── */
+.pivot-total-row { position: sticky; bottom: 0; z-index: 1; }
+.pivot-total-row .pt-td {
+  background: #eeeeee;
+  font-weight: bold;
+  font-size: 0.82rem;
+  border-top: 2px solid #9e9e9e;
   border-bottom: none;
+  color: #212121;
 }
-.pivot-td-total-label {
-  font-weight: 700;
-  text-align: left;
-  color: #1565c0;
-}
-.td-total {
-  font-weight: 700;
-  background: #eceff1;
-}
-.td-grand-total {
-  background: #cfd8dc;
-}
+.pt-td-total-label { text-align: left; color: #424242; }
 
-/* ─── Heatmap cells (sombreado suave sobre el fondo Material) ───────────────── */
-.heat-low    { background: rgba(33, 150, 243, 0.08) !important; }
-.heat-medium { background: rgba(255, 193, 7, 0.12)  !important; }
-.heat-high   { background: rgba(76, 175, 80, 0.18)  !important; }
-
-/* ─── Rename popover ───────────────────────────────────────────────────────── */
-.rename-popover {
-  border-radius: 10px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+/* ── Empty state ─────────────────────────────────────────────────────────────── */
+.pivot-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  color: #9e9e9e;
 }
 </style>
