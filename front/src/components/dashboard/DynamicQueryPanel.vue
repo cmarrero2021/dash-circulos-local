@@ -512,7 +512,7 @@ v-model="saveVisibility"
               <q-icon name="functions" size="16px" class="q-mr-xs text-purple" />
               Agregaciones
               <q-badge :label="`${renameCandidates.filter(c => c.kind === 'agg').length}`" color="purple-1" text-color="purple-10" dense class="q-ml-sm" />
-              <span class="text-caption text-grey-5 q-ml-sm text-weight-regular">Alias para sub-encabezados del modo cruzado</span>
+              <span class="text-caption text-grey-5 q-ml-sm text-weight-regular">Alias independiente para columna de valor y columna de porcentaje</span>
             </div>
             <q-list
               v-if="renameCandidates.filter(c => c.kind === 'agg').length"
@@ -520,24 +520,43 @@ v-model="saveVisibility"
               <q-item
                 v-for="cand in renameCandidates.filter(c => c.kind === 'agg')"
                 :key="cand.kind + '::' + cand.key"
-                class="q-px-none row items-center">
-                <q-item-section>
+                class="q-px-none column q-py-sm">
+                <!-- Field info row -->
+                <div class="row items-center q-mb-xs">
                   <q-item-label class="text-weight-medium text-grey-8 text-sm">
                     {{ cand.fieldLabel }}
                     <q-badge :label="cand.original" color="purple-1" text-color="purple-10" dense class="q-ml-xs" />
-                    <q-icon v-if="cand.isCustomized" name="check_circle" size="13px" class="text-positive q-ml-xs" />
                   </q-item-label>
-                  <q-item-label caption class="text-xs">Campo: {{ cand.key }}</q-item-label>
-                </q-item-section>
-                <q-item-section side style="min-width: 240px;">
-                  <q-input
-                    :model-value="cand.current"
-                    dense outlined clearable
-                    :placeholder="`Alias (actual: ${cand.original}). Ej: CANT.`"
-                    @update:model-value="(v) => store.setCustomLabel('agg', cand.key, v || '')" />
-                </q-item-section>
+                  <q-item-label caption class="text-xs q-ml-sm text-grey-5">Campo: {{ cand.key }}</q-item-label>
+                </div>
+                <!-- Two inputs side by side -->
+                <div class="row q-gutter-sm">
+                  <div class="col">
+                    <div class="text-caption text-grey-6 q-mb-xs row items-center q-gutter-xs">
+                      <q-icon name="tag" size="11px" />
+                      <span>Etiqueta Valor</span>
+                    </div>
+                    <q-input
+                      :model-value="cand.current"
+                      dense outlined clearable
+                      :placeholder="`Ej: CANT. (original: ${cand.original})`"
+                      @update:model-value="(v) => store.setCustomLabel('agg', cand.key, v || '')" />
+                  </div>
+                  <div class="col">
+                    <div class="text-caption text-grey-6 q-mb-xs row items-center q-gutter-xs">
+                      <q-icon name="percent" size="11px" color="purple" />
+                      <span class="text-purple">Etiqueta Porcentaje</span>
+                    </div>
+                    <q-input
+                      :model-value="store.customLabels[`agg_pct::${cand.key}`] || ''"
+                      dense outlined clearable
+                      :placeholder="`Ej: % CANT. (sin alias: ${cand.current || cand.original} %)`"
+                      @update:model-value="(v) => store.setCustomLabel('agg_pct', cand.key, v || '')" />
+                  </div>
+                </div>
               </q-item>
             </q-list>
+
 
             <!-- Headers section -->
             <div class="text-weight-bold text-grey-8 q-mb-sm row items-center">
@@ -862,75 +881,150 @@ async function handleDeleteQuery() {
 // ─── Export functions ─────────────────────────────────────────────────────────
 
 /**
- * Builds the pivot-table matrix ready for export.
- * Returns { headerLabels, keys, rows } — rows includes grand-total row when available.
+ * Helper: resolve aggregation label (value column) — mirrors PivotTable.vue aggLabel()
+ */
+function _aggLabel(v) {
+  return store.customLabels[`agg::${v.key}`] || v.aggregation || 'COUNT';
+}
+/** Helper: resolve aggregation pct label — mirrors PivotTable.vue aggPctLabel() */
+function _aggPctLabel(v) {
+  return store.customLabels[`agg_pct::${v.key}`] || (_aggLabel(v) + ' %');
+}
+/** Helper: resolve header/series custom label */
+function _headerLabel(h) {
+  const custom = store.customLabels[`header::${h.key}`];
+  if (custom) return custom;
+  return h.subLabel ? `${h.label} - ${h.subLabel}` : h.label;
+}
+
+/**
+ * Builds the export matrix that EXACTLY mirrors what is rendered in PivotTable.vue.
+ * Respects: store.pivotDisplayMode (values/pct/both), custom labels (header/agg/agg_pct).
+ * Returns: { cols: [{label, key, isPct, srcKey?}], rows: Array<Array>, totalRow: Array|null }
  */
 function buildPivotExportData() {
   const data = store.pivotTableData;
   if (!data.bodyRows?.length) return null;
 
-  const headerLabels = data.headers.map(h =>
-    h.subLabel ? `${h.label} - ${h.subLabel}` : h.label
-  );
-  const keys = data.headers.map(h => h.key);
+  const mode = store.pivotDisplayMode || 'values';
+  const cols = []; // { label, key, isPct, srcKey? }
 
-  const rows = data.bodyRows.map(row =>
-    keys.map(k => {
-      const v = row[k];
-      return v === null || v === undefined ? '' : v;
-    })
-  );
+  if (data.hasPivotColumns) {
+    // ── Cross-tab mode ──────────────────────────────────────────────────────
+    // Dimension columns
+    const rowHdrs = data.headers.filter(h => h.isRowHeader);
+    rowHdrs.forEach(h => cols.push({ label: _headerLabel(h), key: h.key, isPct: false }));
 
-  // Append grand-total row when available
-  if (data.grandTotals && Object.keys(data.grandTotals).length) {
-    const nDims = store.pivotRows.length || 1;
-    const totalRow = keys.map((k, i) => {
-      if (i === 0) return 'TOTAL';
-      if (i < nDims) return '';
-      return data.grandTotals[k] ?? '';
+    // Value / pct sub-columns per colValue × pivotValue
+    (data.colValues || []).forEach(cv => {
+      const colGroupLabel = store.customLabels[`series::${cv.raw}`] || cv.display;
+      store.pivotValues.forEach(v => {
+        const cellKey = `${cv.raw}__${v.key}`;
+        if (mode !== 'pct') {
+          cols.push({ label: `${colGroupLabel} - ${_aggLabel(v)}`, key: cellKey, isPct: false });
+        }
+        if (mode !== 'values') {
+          cols.push({ label: `${colGroupLabel} - ${_aggPctLabel(v)}`, key: cellKey, isPct: true, srcKey: cellKey });
+        }
+      });
     });
-    rows.push(totalRow);
+
+    // Grand-total column (only values; percentage of total is always 100%)
+    if (data.colValues?.length) {
+      cols.push({ label: 'TOTAL', key: '__total__', isPct: false });
+    }
+  } else {
+    // ── Simple mode ─────────────────────────────────────────────────────────
+    const nDims = store.pivotRows.length;
+    data.headers.forEach((h, i) => {
+      if (i < nDims) {
+        // Dimension column
+        cols.push({ label: _headerLabel(h), key: h.key, isPct: false });
+      } else {
+        // Value column (+ optional pct)
+        const valIdx = i - nDims;
+        const pf = store.pivotValues[valIdx]; // matching pivotValue by index
+        const valLabel = store.customLabels[`header::${h.key}`] || h.label;
+        if (mode !== 'pct') {
+          cols.push({ label: valLabel, key: h.key, isPct: false });
+        }
+        if (mode !== 'values') {
+          const pctLabel = pf ? _aggPctLabel(pf) : (valLabel + ' %');
+          cols.push({ label: pctLabel, key: h.key, isPct: true, srcKey: h.key });
+        }
+      }
+    });
   }
 
-  return { headerLabels, keys, rows };
+  // Helper: compute grand-total for a column
+  const colGT = (col) => {
+    if (col.isPct) return null; // pct total is always 100%
+    if (col.key === '__total__') return null; // computed separately
+    return data.grandTotals?.[col.key];
+  };
+
+  // Helper: compute cross-tab row total
+  const rowTotalVal = (row) => {
+    const valHdrs = data.headers.filter(h => h.isValue);
+    return valHdrs.reduce((s, h) => s + (Number(row[h.key]) || 0), 0);
+  };
+
+  // Helper: compute pct value for a cell
+  const calcPct = (val, key) => {
+    const num = Number(val) || 0;
+    const gt  = Number(data.grandTotals?.[key]) || 0;
+    if (!gt) return '—';
+    return (num / gt * 100).toFixed(1) + '%';
+  };
+
+  // Build data rows
+  const rows = data.bodyRows.map(row => cols.map(col => {
+    if (col.key === '__total__') return rowTotalVal(row);
+    if (col.isPct) return calcPct(row[col.srcKey], col.srcKey);
+    const v = row[col.key];
+    return v === null || v === undefined ? '' : v;
+  }));
+
+  // Grand-total row
+  const nDims = data.hasPivotColumns ? data.headers.filter(h => h.isRowHeader).length : store.pivotRows.length;
+  const totalRow = cols.map((col, i) => {
+    if (i === 0) return 'TOTAL';
+    if (i < nDims) return '';
+    if (col.isPct) return '100.0%';
+    if (col.key === '__total__') {
+      return Object.values(data.grandTotals || {}).reduce((s, v) => s + (Number(v) || 0), 0);
+    }
+    const gt = colGT(col);
+    return gt !== null && gt !== undefined ? gt : '';
+  });
+
+  return { cols, rows, totalRow: Object.keys(data.grandTotals || {}).length ? totalRow : null };
 }
 
 /** Export the pivot table (as displayed) to CSV with UTF-8 BOM */
 function exportCSV() {
   const d = buildPivotExportData();
   if (!d) return;
+  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
   let csv = '\uFEFF';
-  csv += d.headerLabels.map(h => `"${String(h).replace(/"/g, '""')}"`).join(',') + '\n';
-  d.rows.forEach(row => {
-    csv += row.map(v => {
-      if (v === null || v === undefined || v === '') return '""';
-      return `"${String(v).replace(/"/g, '""')}"`;
-    }).join(',') + '\n';
-  });
+  csv += d.cols.map(c => q(c.label)).join(',') + '\n';
+  d.rows.forEach(row => { csv += row.map(q).join(',') + '\n'; });
+  if (d.totalRow) csv += d.totalRow.map(q).join(',') + '\n';
   downloadFile(csv, `tabla-pivot-${store.currentQueryName || 'datos'}.csv`, 'text/csv;charset=utf-8');
 }
 
-/** Export pivot table as JSON array with labeled keys (includes grand-total row) */
+/** Export pivot table as JSON (labeled keys) mirroring the rendered view */
 function exportJSON() {
-  const data = store.pivotTableData;
-  if (!data.bodyRows?.length) return;
-  const objects = data.bodyRows.map(row => {
+  const d = buildPivotExportData();
+  if (!d) return;
+  const objects = d.rows.map(row => {
     const obj = {};
-    data.headers.forEach(h => {
-      const label = h.subLabel ? `${h.label} - ${h.subLabel}` : h.label;
-      obj[label] = row[h.key] ?? null;
-    });
+    d.cols.forEach((col, i) => { obj[col.label] = row[i] ?? null; });
     return obj;
   });
-  // Append grand-total object
-  if (data.grandTotals && Object.keys(data.grandTotals).length) {
-    const totObj = { _fila: 'TOTAL' };
-    data.headers.forEach(h => {
-      if (data.grandTotals[h.key] !== undefined) {
-        const label = h.subLabel ? `${h.label} - ${h.subLabel}` : h.label;
-        totObj[label] = data.grandTotals[h.key];
-      }
-    });
+  if (d.totalRow) {
+    const totObj = {};
+    d.cols.forEach((col, i) => { totObj[col.label] = d.totalRow[i] ?? null; });
     objects.push(totObj);
   }
   downloadFile(JSON.stringify(objects, null, 2), `tabla-pivot-${store.currentQueryName || 'datos'}.json`, 'application/json');
@@ -942,24 +1036,50 @@ function exportJSONRaw() {
   downloadFile(JSON.stringify(store.rawData, null, 2), `datos-raw-${store.currentQueryName || 'datos'}.json`, 'application/json');
 }
 
-/** Export the pivot table to Excel (.xlsx) with grand-total row */
+/** Export the pivot table to Excel (.xlsx) mirroring the rendered view */
 async function exportExcel() {
   const XLSX = await import('xlsx');
   const d = buildPivotExportData();
   if (!d) return;
 
+  const toNum = v => {
+    if (v === '' || v === null || v === undefined || typeof v === 'string') return v ?? '';
+    const n = Number(v);
+    return isNaN(n) ? v : n;
+  };
+
+  // Generate date in dd/mm/aaaa hh:mm AM/PM format
+  const dateObj = new Date();
+  const pad = n => n.toString().padStart(2, '0');
+  const dd = pad(dateObj.getDate());
+  const mm = pad(dateObj.getMonth() + 1);
+  const yyyy = dateObj.getFullYear();
+  let hr = dateObj.getHours();
+  const ampm = hr >= 12 ? 'PM' : 'AM';
+  hr = hr % 12;
+  hr = hr ? hr : 12;
+  const mins = pad(dateObj.getMinutes());
+  const formattedDate = `${dd}/${mm}/${yyyy} ${pad(hr)}:${mins} ${ampm}`;
+
+  const titleText = store.pivotTableTitle || store.currentQueryName || 'Consulta Dinámica';
+  const headerText = `${titleText} (Generado el: ${formattedDate})`;
+
   const wsData = [
-    d.headerLabels,
-    ...d.rows.map(row =>
-      row.map(v => {
-        if (v === '' || v === null || v === undefined) return '';
-        const num = Number(v);
-        return !isNaN(num) && typeof v !== 'string' ? num : v;
-      })
-    ),
+    [headerText],
+    d.cols.map(c => c.label),
+    ...d.rows.map(row => row.map(toNum)),
+    ...(d.totalRow ? [d.totalRow.map(toNum)] : []),
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  // Merge the first row across all columns for the title
+  if (d.cols.length > 1) {
+    ws['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: d.cols.length - 1 } }
+    ];
+  }
+
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Tabla Pivot');
   XLSX.writeFile(wb, `tabla-pivot-${store.currentQueryName || 'datos'}.xlsx`);

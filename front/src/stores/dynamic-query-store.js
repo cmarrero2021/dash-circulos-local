@@ -59,6 +59,10 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
   const chartCustomColors = ref({});
   // Mapa rename persistente: { 'header::estado': 'Estado Venezolano', 'series::Femenino': 'Mujeres' }
   const customLabels = ref({});
+  // Vista de la tabla: 'values' | 'pct' | 'both'
+  const pivotDisplayMode = ref('values');
+  // Encabezado editable de la tabla (vacío = usa currentQueryName como fallback)
+  const pivotTableTitle = ref('');
 
   // Data
   const rawData = ref([]);
@@ -448,6 +452,8 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
     chartShowLabels.value = false;
     chartCustomColors.value = {};
     customLabels.value = {};
+    pivotDisplayMode.value = 'values';
+    pivotTableTitle.value = '';
     currentQueryId.value = null;
     currentQueryName.value = '';
   }
@@ -479,6 +485,8 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
         showLabels: chartShowLabels.value,
         customColors: chartCustomColors.value,
         customLabels: customLabels.value,
+        displayMode: pivotDisplayMode.value,
+        tableTitle: pivotTableTitle.value,
       },
       visibility,
     };
@@ -553,6 +561,8 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
     chartShowLabels.value = chart.showLabels || false;
     chartCustomColors.value = chart.customColors || {};
     customLabels.value = chart.customLabels || {};
+    pivotDisplayMode.value = chart.displayMode || 'values';
+    pivotTableTitle.value = chart.tableTitle || '';
 
     await fetchData();
   }
@@ -574,7 +584,7 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
     // State
     availableFields, loading, dataLoading,
     pivotRows, pivotColumns, pivotValues, pivotFilters,
-    chartType, chartStacked, chartShowLabels, chartCustomColors, customLabels,
+    chartType, chartStacked, chartShowLabels, chartCustomColors, customLabels, pivotDisplayMode, pivotTableTitle,
     rawData, dataColumns, totalRows,
     savedQueries, currentQueryId, currentQueryName,
     // Computed

@@ -1,6 +1,17 @@
 <template>
   <div class="pivot-table-wrapper">
 
+    <!-- ─── Table Title ──────────────────────────────────────────────────────── -->
+    <div v-if="tableData.bodyRows?.length" class="pivot-title-bar q-px-sm q-pt-sm q-pb-xs bg-grey-1 border-bottom">
+      <div class="text-subtitle2 text-blue-grey-9 cursor-pointer row items-center inline pivot-title-text">
+        {{ tableTitle }}
+        <q-icon name="edit" size="14px" class="q-ml-sm edit-icon" />
+        <q-popup-edit v-slot="scope" v-model="editableTitle" auto-save anchor="bottom left">
+          <q-input v-model="scope.value" dense autofocus placeholder="Título de la tabla" @keyup.enter="scope.set" />
+        </q-popup-edit>
+      </div>
+    </div>
+
     <!-- ─── Controls bar ─────────────────────────────────────────────────────── -->
     <div v-if="tableData.bodyRows?.length" class="pivot-controls-bar">
       <!-- Row count label -->
@@ -74,7 +85,7 @@
             <template v-for="cv in tableData.colValues" :key="'cs-' + cv.raw">
               <template v-for="v in store.pivotValues" :key="'vs-' + cv.raw + v.key">
                 <th v-if="displayMode !== 'pct'"    class="pt-th pt-th-val text-right">{{ aggLabel(v) }}</th>
-                <th v-if="displayMode !== 'values'" class="pt-th pt-th-pct text-right">{{ aggLabel(v) }} %</th>
+                <th v-if="displayMode !== 'values'" class="pt-th pt-th-pct text-right">{{ aggPctLabel(v) }}</th>
               </template>
             </template>
           </tr>
@@ -227,7 +238,20 @@ const tableData = computed(() => store.pivotTableData);
 
 // ─── Display controls ────────────────────────────────────────────────────────
 const visibleRows  = ref(10);
-const displayMode  = ref('values'); // 'values' | 'pct' | 'both'
+// displayMode lives in the store so export and save/load can access it
+const displayMode  = computed({
+  get: () => store.pivotDisplayMode,
+  set: (v) => { store.pivotDisplayMode = v; },
+});
+
+// Editable table title
+const tableTitle = computed(() => {
+  return store.pivotTableTitle || store.currentQueryName || 'Consulta Dinámica';
+});
+const editableTitle = computed({
+  get: () => store.pivotTableTitle,
+  set: (v) => { store.pivotTableTitle = (v || '').trim(); }
+});
 
 const rowOptions = [
   { label: '10 filas',  value: 10   },
@@ -259,9 +283,13 @@ const subHeaderColspan = computed(() => {
   return displayMode.value === 'both' ? b * 2 : b;
 });
 
-// ─── Aggregation label with alias ────────────────────────────────────────────
+// ─── Aggregation label with alias (values column) ───────────────────────────
 function aggLabel(v) {
   return store.customLabels[`agg::${v.key}`] || v.aggregation || 'COUNT';
+}
+// Aggregation label for the percentage column (falls back to aggLabel + ' %')
+function aggPctLabel(v) {
+  return store.customLabels[`agg_pct::${v.key}`] || (aggLabel(v) + ' %');
 }
 
 // ─── Cell key (cross-tab) ────────────────────────────────────────────────────
@@ -290,12 +318,18 @@ const simpleValueHeaders = computed(() =>
 );
 const effectiveSimpleValueHeaders = computed(() => {
   const base = simpleValueHeaders.value;
+  // For pct labels in simple mode, match each header with its pivotValue by index
+  const pctLabel = (h, i) => {
+    const f = store.pivotValues[i];
+    return f ? aggPctLabel(f) : (h.label + ' %');
+  };
   if (displayMode.value === 'values') return base.map(h => ({ ...h, _isPct: false }));
-  if (displayMode.value === 'pct')    return base.map(h => ({ ...h, label: h.label + ' %', _isPct: true, _srcKey: h.key }));
+  if (displayMode.value === 'pct')    return base.map((h, i) => ({ ...h, label: pctLabel(h, i), _isPct: true, _srcKey: h.key }));
   const result = [];
-  for (const h of base) {
+  for (let i = 0; i < base.length; i++) {
+    const h = base[i];
     result.push({ ...h, _isPct: false });
-    result.push({ ...h, key: h.key + '__pct', label: h.label + ' %', _isPct: true, _srcKey: h.key });
+    result.push({ ...h, key: h.key + '__pct', label: pctLabel(h, i), _isPct: true, _srcKey: h.key });
   }
   return result;
 });
@@ -396,6 +430,10 @@ defineExpose({ startRename });
 }
 
 /* ─── Controls bar ───────────────────────────────────────────────────────────── */
+.pivot-title-bar { border-bottom: 1px solid #e0e0e0; }
+.pivot-title-text .edit-icon { opacity: 0.3; transition: opacity 0.2s; }
+.pivot-title-text:hover .edit-icon { opacity: 1; color: #1976d2; }
+
 .pivot-controls-bar {
   display: flex;
   align-items: center;
