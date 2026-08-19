@@ -143,6 +143,17 @@ exports.listSavedQueries = async (req, res) => {
         );
         const roleId = roleResult.rows[0]?.rol_id || 0;
 
+        // Filtro opcional por fuente de datos: las consultas guardadas de
+        // PRIORIZADOS y REGISTROS usan datasets distintos y no deben mezclarse.
+        // Las consultas antiguas sin `source` en pivot_config se asumen 'priorizados'.
+        const source = req.query.source || null;
+        const params = [userId, roleId];
+        let sourceFilter = '';
+        if (source) {
+            params.push(source);
+            sourceFilter = ` AND COALESCE(sq.pivot_config->>'source', 'priorizados') = $${params.length}`;
+        }
+
         const result = await client.query(
             `SELECT sq.*,
                     u.nombre AS created_by_name,
@@ -166,8 +177,9 @@ exports.listSavedQueries = async (req, res) => {
                        WHERE sqa.query_id = sq.id AND sqa.role_id = $2
                    )
                )
+               ${sourceFilter}
              ORDER BY sq.updated_at DESC`,
-            [userId, roleId]
+            params
         );
 
         res.json(result.rows);

@@ -170,7 +170,9 @@ async function exportTableExcel(item) {
 async function loadPinned() {
   loading.value = true;
   try {
-    const res = await api.get('/dashboard/saved-queries');
+    const res = await api.get('/dashboard/saved-queries', {
+      params: { source: 'registros' }
+    });
     const queries = (res.data || []).filter(q => q.pin_table || q.pin_chart);
 
     // Destruye stores previos (estado ya no necesario)

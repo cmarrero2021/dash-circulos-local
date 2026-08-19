@@ -504,7 +504,9 @@ function dynamicQuerySetup() {
   // ─── Saved queries ────────────────────────────────────────────────────────
   async function loadSavedQueries() {
     try {
-      const res = await api.get('/dashboard/saved-queries');
+      const res = await api.get('/dashboard/saved-queries', {
+        params: { source: dataSource.value || 'priorizados' }
+      });
       savedQueries.value = res.data || [];
     } catch (err) {
       console.error('Error loading saved queries:', err);
