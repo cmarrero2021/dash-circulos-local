@@ -60,6 +60,7 @@ const RootQuery = new GraphQLObjectType({
         dashboardData: {
             type: DashboardResultType,
             args: {
+                source: { type: GraphQLString, defaultValue: 'priorizados' },
                 fields: { type: new GraphQLList(GraphQLString) },
                 filters: { type: new GraphQLList(FilterInput) },
                 groupBy: { type: new GraphQLList(GraphQLString) },
@@ -72,6 +73,9 @@ const RootQuery = new GraphQLObjectType({
         // Metadata of available fields for dynamic querying
         availableFields: {
             type: GraphQLString, // JSON string with fields metadata list
+            args: {
+                source: { type: GraphQLString, defaultValue: 'priorizados' },
+            },
             resolve: resolvers.availableFields,
         },
     }

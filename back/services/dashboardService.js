@@ -691,6 +691,30 @@ const buildPriorizadosPermissionClause = async (userId) => {
 exports.buildPriorizadosPermissionClause = buildPriorizadosPermissionClause;
 
 /**
+ * Construye la cláusula de permisos geográficos para rm_data_registros.
+ * La tabla foránea no tiene estado_id; filtra por nombre de estado (UPPER)
+ * mediante subquery a vestados para hacer la correspondencia por ID.
+ * Retorna { permClause, permParams, nextParamIndex }.
+ */
+const buildRegistrosPermissionClause = async (userId) => {
+    const hasNationalAccess = await hasNationalDashboardAccess(userId);
+    if (hasNationalAccess) {
+        return { permClause: '', permParams: [], nextParamIndex: 1 };
+    }
+    const allowedStates = await getAllowedStatesForUser(userId);
+    if (!allowedStates.length) {
+        return { permClause: 'WHERE 1 = 0', permParams: [], nextParamIndex: 1 };
+    }
+    return {
+        permClause: 'WHERE UPPER(estado) = ANY(SELECT estado FROM vestados WHERE id = ANY($1))',
+        permParams: [allowedStates],
+        nextParamIndex: 2,
+    };
+};
+
+exports.buildRegistrosPermissionClause = buildRegistrosPermissionClause;
+
+/**
  * Obtiene datos paginados de vpriorizados con filtrado server-side.
  * @param {number} userId
  * @param {object} query - Query params del request HTTP

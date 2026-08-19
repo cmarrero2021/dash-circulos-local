@@ -31,9 +31,19 @@ v-for="sq in store.savedQueries" :key="sq.id" v-close-popup clickable
               </q-item-section>
               <q-item-section side>
                 <div class="column items-end q-gutter-xs">
-                  <q-badge
-:color="sq.visibility === 'public' ? 'green-14' : 'amber-14'"
-                    :label="sq.visibility === 'public' ? 'Público' : 'Privado'" dense />
+                  <div class="row items-center q-gutter-xs">
+                    <q-icon
+                      v-if="sq.pin_table" name="push_pin" color="red-14" size="14px">
+                      <q-tooltip>Tabla fijada en Registros</q-tooltip>
+                    </q-icon>
+                    <q-icon
+                      v-if="sq.pin_chart" name="bar_chart" color="red-14" size="14px">
+                      <q-tooltip>Gráfica fijada en Registros</q-tooltip>
+                    </q-icon>
+                    <q-badge
+                      :color="sq.visibility === 'public' ? 'green-14' : 'amber-14'"
+                      :label="sq.visibility === 'public' ? 'Público' : 'Privado'" dense />
+                  </div>
                   <q-btn icon="delete" size="sm" flat round color="negative" @click.stop="confirmDeleteQuery(sq)" />
                 </div>
               </q-item-section>
@@ -77,13 +87,27 @@ v-for="sq in store.savedQueries" :key="sq.id" v-close-popup clickable
               <q-item-section>Tabla Pivot (.json)</q-item-section>
             </q-item>
             <q-separator />
+            <q-item-label header class="text-weight-bold">Datos del Gráfico (series actuales)</q-item-label>
+            <q-item v-close-popup clickable @click="exportChartExcel">
+              <q-item-section avatar><q-icon name="bar_chart" color="positive" /></q-item-section>
+              <q-item-section>Datos del gráfico (.xlsx)</q-item-section>
+            </q-item>
+            <q-item v-close-popup clickable @click="exportChartCSV">
+              <q-item-section avatar><q-icon name="bar_chart" color="secondary" /></q-item-section>
+              <q-item-section>Datos del gráfico (.csv)</q-item-section>
+            </q-item>
+            <q-item v-close-popup clickable @click="exportChartJSON">
+              <q-item-section avatar><q-icon name="bar_chart" color="teal-8" /></q-item-section>
+              <q-item-section>Datos del gráfico (.json)</q-item-section>
+            </q-item>
+            <q-separator />
             <q-item-label header class="text-weight-bold">Datos crudos</q-item-label>
             <q-item v-close-popup clickable @click="exportJSONRaw">
               <q-item-section avatar><q-icon name="data_object" color="grey-8" /></q-item-section>
               <q-item-section>Datos sin procesar (.json)</q-item-section>
             </q-item>
             <q-separator />
-            <q-item-label header class="text-weight-bold">Formato de Gráfico</q-item-label>
+            <q-item-label header class="text-weight-bold">Imagen del Gráfico</q-item-label>
             <q-item v-close-popup clickable @click="exportChartPNG">
               <q-item-section avatar><q-icon name="image" color="primary" /></q-item-section>
               <q-item-section>Gráfico PNG</q-item-section>
@@ -205,7 +229,7 @@ v-for="f in store.pivotFilters" :key="f.field" removable dense
                   color="amber-8" text-color="white" dense class="q-ml-xs" />
                 <span v-else class="text-xs q-ml-xs">{{ conditionSummary(f) }}</span>
                 <q-menu padding style="min-width: 600px; max-width: 720px;" class="glass-dropdown">
-                  <FilterEditorPanel />
+                  <FilterEditorPanel :store="store" />
                   <div class="row justify-end q-gutter-sm q-pa-md bg-grey-1">
                     <q-btn v-close-popup flat label="Cerrar" size="sm" class="rounded-btn" />
                     <q-btn
@@ -326,12 +350,50 @@ v-model="store.chartType" dense flat toggle-color="primary" class="chart-toggle-
               <q-toggle
 v-if="['bar', 'hbar', 'line'].includes(store.chartType)" v-model="store.chartStacked" label="Apilar"
                 dense color="primary" class="text-xs" />
+              <q-toggle
+v-if="store.chartType === 'line'" v-model="store.chartFill" label="Rellenar"
+                dense color="primary" class="text-xs" />
               <q-toggle v-model="store.chartShowLabels" label="Valores" dense color="primary" class="text-xs" />
+              <q-btn
+                flat round dense icon="swap_horiz" class="text-xs"
+                :color="store.chartSwapAxes ? 'primary' : 'grey-7'"
+                :disable="['pie', 'doughnut'].includes(store.chartType)"
+                @click="store.chartSwapAxes = !store.chartSwapAxes">
+                <q-tooltip>Intercambiar filas y columnas</q-tooltip>
+              </q-btn>
               <q-btn flat round dense icon="palette" color="primary" @click="showColorDialog = true">
                 <q-tooltip>Colores del gráfico</q-tooltip>
               </q-btn>
             </div>
             <div class="row items-center q-gutter-xs">
+              <template v-if="showPinButtons">
+                <q-btn
+                  v-if="activeTab === 'table'"
+                  flat round dense
+                  :icon="store.pinTable ? 'push_pin' : 'push_pin_outlined'"
+                  :color="store.pinTable ? 'red-14' : 'primary'"
+                  :disable="!store.currentQueryId"
+                  @click="handleTogglePin('table')">
+                  <q-tooltip>
+                    {{ store.pinTable
+                      ? 'Quitar fijación (la tabla dejará de mostrarse por defecto en Registros)'
+                      : 'Fijar esta tabla para mostrarla por defecto en Registros' }}
+                  </q-tooltip>
+                </q-btn>
+                <q-btn
+                  v-if="activeTab === 'chart'"
+                  flat round dense
+                  :icon="store.pinChart ? 'push_pin' : 'push_pin_outlined'"
+                  :color="store.pinChart ? 'red-14' : 'primary'"
+                  :disable="!store.currentQueryId"
+                  @click="handleTogglePin('chart')">
+                  <q-tooltip>
+                    {{ store.pinChart
+                      ? 'Quitar fijación (la gráfica dejará de mostrarse por defecto en Registros)'
+                      : 'Fijar esta gráfica para mostrarla por defecto en Registros' }}
+                  </q-tooltip>
+                </q-btn>
+              </template>
               <q-btn
                 flat round dense icon="label" color="primary"
                 :disable="!store.rawData.length"
@@ -345,10 +407,10 @@ v-if="['bar', 'hbar', 'line'].includes(store.chartType)" v-model="store.chartSta
           <div class="results-body-panel col bg-white rounded-b-borders shadow-light overflow-hidden column no-wrap relative-position">
             <q-tab-panels v-model="activeTab" animated class="col overflow-hidden bg-transparent">
               <q-tab-panel name="table" class="q-pa-none col column no-wrap overflow-hidden">
-                <PivotTable ref="pivotTableRef" class="col" />
+                <PivotTable ref="pivotTableRef" :store="store" class="col" />
               </q-tab-panel>
-              <q-tab-panel name="chart" class="q-pa-md col column no-wrap overflow-auto">
-                <PivotChart ref="pivotChartRef" class="col flex flex-center" />
+              <q-tab-panel name="chart" class="q-pa-none col column no-wrap overflow-hidden">
+                <PivotChart ref="pivotChartRef" :store="store" class="col column no-wrap" />
               </q-tab-panel>
             </q-tab-panels>
           </div>
@@ -644,8 +706,43 @@ import { useDynamicQueryStore } from 'stores/dynamic-query-store';
 import PivotTable from './PivotTable.vue';
 import PivotChart from './PivotChart.vue';
 import FilterEditorPanel from './FilterEditorPanel.vue';
+import {
+  exportTableCSV,
+  exportTableJSON,
+  exportTableExcel,
+  exportRawJSON,
+  exportChartCSV as exportChartCSVFromShared,
+  exportChartJSON as exportChartJSONFromShared,
+  exportChartExcel as exportChartExcelFromShared,
+} from './pivotExports';
 
-const store = useDynamicQueryStore();
+// Props:
+//  - showPinButtons: habilita los botones "Fijar Tabla" / "Fijar Gráfica" usados
+//    en el dashboard de Registros. En Priorizados (sin prop) se omite esta UI.
+//  - store: instancia de store dinámico. Si se omite usa el singleton. Al pasar
+//    una instancia aislada (createDynamicQueryStore) cada tab mantiene su propia
+//    configuración y fuente de datos sin pisarse entre sí.
+//  - dataSource: 'priorizados' (public.vpriorizados) | 'registros'
+//    (public.rm_data_registros). Determina el catálogo de campos y la tabla base.
+const props = defineProps({
+  showPinButtons: { type: Boolean, default: false },
+  store: { type: Object, default: null },
+  dataSource: { type: String, default: 'priorizados' },
+});
+const emit = defineEmits(['pins-updated']);
+
+const store = props.store || useDynamicQueryStore();
+
+// Aplica la fuente de datos al store y recarga el catálogo de campos cuando
+// cambia (inmediato para cubrir el montaje). La lista de consultas guardadas se
+// carga una sola vez en onMounted.
+watch(() => props.dataSource, (src) => {
+  const target = src || 'priorizados';
+  if (store.dataSource !== target) {
+    store.dataSource = target;
+    store.loadAvailableFields();
+  }
+}, { immediate: true });
 
 // ─── Local state ──────────────────────────────────────────────────────────────
 const fieldSearch = ref('');
@@ -878,211 +975,29 @@ async function handleDeleteQuery() {
   }
 }
 
+// ─── Pin (Fijar) ──────────────────────────────────────────────────────────────
+function handleTogglePin(target) {
+  store.togglePin(target).then(() => emit('pins-updated'));
+}
+
 // ─── Export functions ─────────────────────────────────────────────────────────
+// Shared export helpers live in ./pivotExports.js; these wrappers bind them to
+// this panel's store instance (the dynamic-query singleton).
 
-/**
- * Helper: resolve aggregation label (value column) — mirrors PivotTable.vue aggLabel()
- */
-function _aggLabel(v) {
-  return store.customLabels[`agg::${v.key}`] || v.aggregation || 'COUNT';
-}
-/** Helper: resolve aggregation pct label — mirrors PivotTable.vue aggPctLabel() */
-function _aggPctLabel(v) {
-  return store.customLabels[`agg_pct::${v.key}`] || (_aggLabel(v) + ' %');
-}
-/** Helper: resolve header/series custom label */
-function _headerLabel(h) {
-  const custom = store.customLabels[`header::${h.key}`];
-  if (custom) return custom;
-  return h.subLabel ? `${h.label} - ${h.subLabel}` : h.label;
-}
-
-/**
- * Builds the export matrix that EXACTLY mirrors what is rendered in PivotTable.vue.
- * Respects: store.pivotDisplayMode (values/pct/both), custom labels (header/agg/agg_pct).
- * Returns: { cols: [{label, key, isPct, srcKey?}], rows: Array<Array>, totalRow: Array|null }
- */
-function buildPivotExportData() {
-  const data = store.pivotTableData;
-  if (!data.bodyRows?.length) return null;
-
-  const mode = store.pivotDisplayMode || 'values';
-  const cols = []; // { label, key, isPct, srcKey? }
-
-  if (data.hasPivotColumns) {
-    // ── Cross-tab mode ──────────────────────────────────────────────────────
-    // Dimension columns
-    const rowHdrs = data.headers.filter(h => h.isRowHeader);
-    rowHdrs.forEach(h => cols.push({ label: _headerLabel(h), key: h.key, isPct: false }));
-
-    // Value / pct sub-columns per colValue × pivotValue
-    (data.colValues || []).forEach(cv => {
-      const colGroupLabel = store.customLabels[`series::${cv.raw}`] || cv.display;
-      store.pivotValues.forEach(v => {
-        const cellKey = `${cv.raw}__${v.key}`;
-        if (mode !== 'pct') {
-          cols.push({ label: `${colGroupLabel} - ${_aggLabel(v)}`, key: cellKey, isPct: false });
-        }
-        if (mode !== 'values') {
-          cols.push({ label: `${colGroupLabel} - ${_aggPctLabel(v)}`, key: cellKey, isPct: true, srcKey: cellKey });
-        }
-      });
-    });
-
-    // Grand-total column (only values; percentage of total is always 100%)
-    if (data.colValues?.length) {
-      cols.push({ label: 'TOTAL', key: '__total__', isPct: false });
-    }
-  } else {
-    // ── Simple mode ─────────────────────────────────────────────────────────
-    const nDims = store.pivotRows.length;
-    data.headers.forEach((h, i) => {
-      if (i < nDims) {
-        // Dimension column
-        cols.push({ label: _headerLabel(h), key: h.key, isPct: false });
-      } else {
-        // Value column (+ optional pct)
-        const valIdx = i - nDims;
-        const pf = store.pivotValues[valIdx]; // matching pivotValue by index
-        const valLabel = store.customLabels[`header::${h.key}`] || h.label;
-        if (mode !== 'pct') {
-          cols.push({ label: valLabel, key: h.key, isPct: false });
-        }
-        if (mode !== 'values') {
-          const pctLabel = pf ? _aggPctLabel(pf) : (valLabel + ' %');
-          cols.push({ label: pctLabel, key: h.key, isPct: true, srcKey: h.key });
-        }
-      }
-    });
-  }
-
-  // Helper: compute grand-total for a column
-  const colGT = (col) => {
-    if (col.isPct) return null; // pct total is always 100%
-    if (col.key === '__total__') return null; // computed separately
-    return data.grandTotals?.[col.key];
-  };
-
-  // Helper: compute cross-tab row total
-  const rowTotalVal = (row) => {
-    const valHdrs = data.headers.filter(h => h.isValue);
-    return valHdrs.reduce((s, h) => s + (Number(row[h.key]) || 0), 0);
-  };
-
-  // Helper: compute pct value for a cell
-  const calcPct = (val, key) => {
-    const num = Number(val) || 0;
-    const gt  = Number(data.grandTotals?.[key]) || 0;
-    if (!gt) return '—';
-    return (num / gt * 100).toFixed(1) + '%';
-  };
-
-  // Build data rows
-  const rows = data.bodyRows.map(row => cols.map(col => {
-    if (col.key === '__total__') return rowTotalVal(row);
-    if (col.isPct) return calcPct(row[col.srcKey], col.srcKey);
-    const v = row[col.key];
-    return v === null || v === undefined ? '' : v;
-  }));
-
-  // Grand-total row
-  const nDims = data.hasPivotColumns ? data.headers.filter(h => h.isRowHeader).length : store.pivotRows.length;
-  const totalRow = cols.map((col, i) => {
-    if (i === 0) return 'TOTAL';
-    if (i < nDims) return '';
-    if (col.isPct) return '100.0%';
-    if (col.key === '__total__') {
-      return Object.values(data.grandTotals || {}).reduce((s, v) => s + (Number(v) || 0), 0);
-    }
-    const gt = colGT(col);
-    return gt !== null && gt !== undefined ? gt : '';
-  });
-
-  return { cols, rows, totalRow: Object.keys(data.grandTotals || {}).length ? totalRow : null };
-}
-
-/** Export the pivot table (as displayed) to CSV with UTF-8 BOM */
 function exportCSV() {
-  const d = buildPivotExportData();
-  if (!d) return;
-  const q = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-  let csv = '\uFEFF';
-  csv += d.cols.map(c => q(c.label)).join(',') + '\n';
-  d.rows.forEach(row => { csv += row.map(q).join(',') + '\n'; });
-  if (d.totalRow) csv += d.totalRow.map(q).join(',') + '\n';
-  downloadFile(csv, `tabla-pivot-${store.currentQueryName || 'datos'}.csv`, 'text/csv;charset=utf-8');
+  return exportTableCSV(store);
 }
 
-/** Export pivot table as JSON (labeled keys) mirroring the rendered view */
 function exportJSON() {
-  const d = buildPivotExportData();
-  if (!d) return;
-  const objects = d.rows.map(row => {
-    const obj = {};
-    d.cols.forEach((col, i) => { obj[col.label] = row[i] ?? null; });
-    return obj;
-  });
-  if (d.totalRow) {
-    const totObj = {};
-    d.cols.forEach((col, i) => { totObj[col.label] = d.totalRow[i] ?? null; });
-    objects.push(totObj);
-  }
-  downloadFile(JSON.stringify(objects, null, 2), `tabla-pivot-${store.currentQueryName || 'datos'}.json`, 'application/json');
+  return exportTableJSON(store);
 }
 
-/** Export raw unprocessed records as JSON */
 function exportJSONRaw() {
-  if (!store.rawData.length) return;
-  downloadFile(JSON.stringify(store.rawData, null, 2), `datos-raw-${store.currentQueryName || 'datos'}.json`, 'application/json');
+  return exportRawJSON(store);
 }
 
-/** Export the pivot table to Excel (.xlsx) mirroring the rendered view */
 async function exportExcel() {
-  const XLSX = await import('xlsx');
-  const d = buildPivotExportData();
-  if (!d) return;
-
-  const toNum = v => {
-    if (v === '' || v === null || v === undefined || typeof v === 'string') return v ?? '';
-    const n = Number(v);
-    return isNaN(n) ? v : n;
-  };
-
-  // Generate date in dd/mm/aaaa hh:mm AM/PM format
-  const dateObj = new Date();
-  const pad = n => n.toString().padStart(2, '0');
-  const dd = pad(dateObj.getDate());
-  const mm = pad(dateObj.getMonth() + 1);
-  const yyyy = dateObj.getFullYear();
-  let hr = dateObj.getHours();
-  const ampm = hr >= 12 ? 'PM' : 'AM';
-  hr = hr % 12;
-  hr = hr ? hr : 12;
-  const mins = pad(dateObj.getMinutes());
-  const formattedDate = `${dd}/${mm}/${yyyy} ${pad(hr)}:${mins} ${ampm}`;
-
-  const titleText = store.pivotTableTitle || store.currentQueryName || 'Consulta Dinámica';
-  const headerText = `${titleText} (Generado el: ${formattedDate})`;
-
-  const wsData = [
-    [headerText],
-    d.cols.map(c => c.label),
-    ...d.rows.map(row => row.map(toNum)),
-    ...(d.totalRow ? [d.totalRow.map(toNum)] : []),
-  ];
-
-  const ws = XLSX.utils.aoa_to_sheet(wsData);
-
-  // Merge the first row across all columns for the title
-  if (d.cols.length > 1) {
-    ws['!merges'] = [
-      { s: { r: 0, c: 0 }, e: { r: 0, c: d.cols.length - 1 } }
-    ];
-  }
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Tabla Pivot');
-  XLSX.writeFile(wb, `tabla-pivot-${store.currentQueryName || 'datos'}.xlsx`);
+  return exportTableExcel(store);
 }
 
 function exportChartPNG() {
@@ -1093,21 +1008,23 @@ function exportChartPDF() {
   pivotChartRef.value?.exportPDF();
 }
 
-function downloadFile(content, filename, type) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+function exportChartCSV() {
+  return exportChartCSVFromShared(store);
+}
+
+function exportChartJSON() {
+  return exportChartJSONFromShared(store);
+}
+
+async function exportChartExcel() {
+  return exportChartExcelFromShared(store);
 }
 
 // ─── Lifecycle ────────────────────────────────────────────────────────────────
-// Both loads run in parallel; category expansion is handled reactively by the
-// `fieldsByCategory` watcher above (immediate:true), so no manual loop needed.
+// loadAvailableFields se dispara por el watcher de dataSource (immediate).
+// loadSavedQueries corre una sola vez en montaje; category expansion se maneja
+// reactivamente por el watcher `fieldsByCategory` (immediate:true).
 onMounted(() => {
-  store.loadAvailableFields();
   store.loadSavedQueries();
 });
 </script>

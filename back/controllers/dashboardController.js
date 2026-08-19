@@ -241,9 +241,12 @@ exports.createSavedQuery = async (req, res) => {
             return res.status(400).json({ error: 'Nombre y configuración pivote son requeridos.' });
         }
 
+        const pinTable = !!(chart_config && chart_config.pinTable);
+        const pinChart = !!(chart_config && chart_config.pinChart);
+
         const result = await client.query(
-            `INSERT INTO public.saved_queries (name, description, graphql_query, graphql_variables, pivot_config, chart_config, visibility, created_by)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            `INSERT INTO public.saved_queries (name, description, graphql_query, graphql_variables, pivot_config, chart_config, visibility, pin_table, pin_chart, created_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
              RETURNING *`,
             [
                 name,
@@ -253,6 +256,8 @@ exports.createSavedQuery = async (req, res) => {
                 JSON.stringify(pivot_config),
                 JSON.stringify(chart_config || {}),
                 visibility || 'private',
+                pinTable,
+                pinChart,
                 req.user.id
             ]
         );
@@ -283,6 +288,11 @@ exports.updateSavedQuery = async (req, res) => {
             return res.status(403).json({ error: 'Solo el creador puede modificar esta consulta.' });
         }
 
+        const pinTable = chart_config && Object.prototype.hasOwnProperty.call(chart_config, 'pinTable')
+            ? !!chart_config.pinTable : null;
+        const pinChart = chart_config && Object.prototype.hasOwnProperty.call(chart_config, 'pinChart')
+            ? !!chart_config.pinChart : null;
+
         const result = await client.query(
             `UPDATE public.saved_queries SET
                 name = COALESCE($1, name),
@@ -292,8 +302,10 @@ exports.updateSavedQuery = async (req, res) => {
                 pivot_config = COALESCE($5, pivot_config),
                 chart_config = COALESCE($6, chart_config),
                 visibility = COALESCE($7, visibility),
+                pin_table = COALESCE($8, pin_table),
+                pin_chart = COALESCE($9, pin_chart),
                 updated_at = NOW()
-             WHERE id = $8
+             WHERE id = $10
              RETURNING *`,
             [
                 name || null,
@@ -303,6 +315,8 @@ exports.updateSavedQuery = async (req, res) => {
                 pivot_config ? JSON.stringify(pivot_config) : null,
                 chart_config ? JSON.stringify(chart_config) : null,
                 visibility || null,
+                pinTable,
+                pinChart,
                 id
             ]
         );
@@ -340,6 +354,48 @@ exports.deleteSavedQuery = async (req, res) => {
     } catch (err) {
         console.error('Error al eliminar consulta guardada:', err);
         res.status(500).json({ error: 'Error al eliminar consulta guardada', detail: err.message });
+    } finally {
+        client.release();
+    }
+};
+
+// ─── Toggle de Pin (Fijar Tabla / Fijar Gráfica) ──────────────────────────────
+// Body: { target: 'table' | 'chart', value: true | false }
+// Solo el creador de la consulta puede fijarla. Update es incremental: no toca
+// el resto de columnas (COALESCE preserva el valor existente para el otro pin).
+exports.toggleSavedQueryPin = async (req, res) => {
+    const { id } = req.params;
+    const { target, value } = req.body;
+    const client = await pool.connect();
+    try {
+        if (!['table', 'chart'].includes(target)) {
+            return res.status(400).json({ error: "target debe ser 'table' o 'chart'." });
+        }
+
+        // Verificar propiedad (sólo el creador puede fijar)
+        const existing = await client.query(
+            'SELECT created_by FROM public.saved_queries WHERE id = $1 AND deleted_at IS NULL',
+            [id]
+        );
+        if (!existing.rows.length) {
+            return res.status(404).json({ error: 'Consulta no encontrada.' });
+        }
+        if (existing.rows[0].created_by !== req.user.id) {
+            return res.status(403).json({ error: 'Solo el creador puede fijar esta consulta.' });
+        }
+
+        const col = target === 'table' ? 'pin_table' : 'pin_chart';
+        const result = await client.query(
+            `UPDATE public.saved_queries SET ${col} = $1, updated_at = NOW()
+             WHERE id = $2
+             RETURNING id, name, pin_table, pin_chart`,
+            [!!value, id]
+        );
+
+        res.json(result.rows[0]);
+    } catch (err) {
+        console.error('Error al actualizar pin:', err);
+        res.status(500).json({ error: 'Error al actualizar pin', detail: err.message });
     } finally {
         client.release();
     }

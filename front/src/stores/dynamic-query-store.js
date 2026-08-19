@@ -40,7 +40,24 @@ function getOperatorsForField(field) {
   return FILTER_OPERATORS.filter(o => o.kind === 'all' || o.kind === 'text');
 }
 
-export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
+export const useDynamicQueryStore = defineStore('dynamicQuery', dynamicQuerySetup);
+
+// ─── Factory para instancias aisladas ─────────────────────────────────────────
+// Permite renderizar simultáneamente varias consultas fijadas (pins) en el
+// dashboard de Registros, cada una con su propio estado (rows/columns/values/
+// rawData/…) sin compartir nada entre sí. Cada llamada con `id` distinto genera
+// un store Pinia independiente. Se cachean las definiciones para no re-registrar
+// el mismo id (evita warnings de Pinia al recargar la lista de pines).
+const pinnedStoreCache = new Map();
+
+export function createDynamicQueryStore(id) {
+  if (!pinnedStoreCache.has(id)) {
+    pinnedStoreCache.set(id, defineStore(`dynamicQuery_${id}`, dynamicQuerySetup));
+  }
+  return pinnedStoreCache.get(id);
+}
+
+function dynamicQuerySetup() {
   // ─── State ────────────────────────────────────────────────────────────────
   const availableFields = ref([]);
   const loading = ref(false);
@@ -56,13 +73,18 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
   const chartType = ref('bar');
   const chartStacked = ref(false);
   const chartShowLabels = ref(false);
+  const chartFill = ref(false);
   const chartCustomColors = ref({});
+  // Transpone los ejes del gráfico: las filas pasan a series y las series a etiquetas
+  const chartSwapAxes = ref(false);
   // Mapa rename persistente: { 'header::estado': 'Estado Venezolano', 'series::Femenino': 'Mujeres' }
   const customLabels = ref({});
   // Vista de la tabla: 'values' | 'pct' | 'both'
   const pivotDisplayMode = ref('values');
   // Encabezado editable de la tabla (vacío = usa currentQueryName como fallback)
   const pivotTableTitle = ref('');
+  // Encabezado editable del gráfico (vacío = usa currentQueryName como fallback)
+  const chartTitle = ref('');
 
   // Data
   const rawData = ref([]);
@@ -73,6 +95,18 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
   const savedQueries = ref([]);
   const currentQueryId = ref(null);
   const currentQueryName = ref('');
+
+  // Fuente de datos de la consulta dinámica:
+  //   'priorizados' → public.vpriorizados (tab Priorizados)
+  //   'registros'   → public.rm_data_registros (tab Registros)
+  const dataSource = ref('priorizados');
+
+  // Pin (Fijar) — consulta guardada cuyo Tabla / Gráfica se muestra por defecto
+  // en el dashboard de Registros. Persiste en columnas `pin_table`/`pin_chart`
+  // de `saved_queries`; también se espeja dentro de `chart_config` para
+  // hidratación rápida desde el payload completo de la query.
+  const pinTable = ref(false);
+  const pinChart = ref(false);
 
   // ─── Computed ─────────────────────────────────────────────────────────────
   const fieldsByCategory = computed(() => {
@@ -108,7 +142,8 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
     try {
       loading.value = true;
       const res = await api.post('/graphql', {
-        query: '{ availableFields }'
+        query: `query AvailableFields($source: String) { availableFields(source: $source) }`,
+        variables: { source: dataSource.value || 'priorizados' }
       }, {
         headers: {
           'Content-Type': 'application/json',
@@ -161,8 +196,8 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
       });
 
       const query = `
-        query DashboardData($fields: [String], $filters: [FilterInput], $groupBy: [String], $values: [FieldConfigInput], $limit: Int) {
-          dashboardData(fields: $fields, filters: $filters, groupBy: $groupBy, values: $values, limit: $limit) {
+        query DashboardData($source: String, $fields: [String], $filters: [FilterInput], $groupBy: [String], $values: [FieldConfigInput], $limit: Int) {
+          dashboardData(source: $source, fields: $fields, filters: $filters, groupBy: $groupBy, values: $values, limit: $limit) {
             columns
             rows
             totalRows
@@ -173,6 +208,7 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
       const res = await api.post('/graphql', {
         query,
         variables: {
+          source: dataSource.value || 'priorizados',
           fields,
           filters,
           groupBy: groupBy.length > 0 ? groupBy : undefined,
@@ -446,14 +482,21 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
     rawData.value = [];
     dataColumns.value = [];
     totalRows.value = 0;
+    // Nota: dataSource no se resetea aquí; lo fija el prop `data-source` del
+    // panel o la consulta guardada cargada (pivot_config.source).
     // Reset chart visual config so previous styling doesn't bleed into new sessions
     chartType.value = 'bar';
     chartStacked.value = false;
     chartShowLabels.value = false;
+    chartFill.value = false;
+    chartSwapAxes.value = false;
     chartCustomColors.value = {};
     customLabels.value = {};
     pivotDisplayMode.value = 'values';
     pivotTableTitle.value = '';
+    chartTitle.value = '';
+    pinTable.value = false;
+    pinChart.value = false;
     currentQueryId.value = null;
     currentQueryName.value = '';
   }
@@ -474,6 +517,7 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
       description,
       graphql_query: '',
       pivot_config: {
+        source: dataSource.value || 'priorizados',
         rows: pivotRows.value,
         columns: pivotColumns.value,
         values: pivotValues.value,
@@ -483,10 +527,15 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
         type: chartType.value,
         stacked: chartStacked.value,
         showLabels: chartShowLabels.value,
+        fill: chartFill.value,
         customColors: chartCustomColors.value,
         customLabels: customLabels.value,
         displayMode: pivotDisplayMode.value,
         tableTitle: pivotTableTitle.value,
+        chartTitle: chartTitle.value,
+        swapAxes: chartSwapAxes.value,
+        pinTable: pinTable.value,
+        pinChart: pinChart.value,
       },
       visibility,
     };
@@ -556,13 +605,22 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
     pivotColumns.value = config.columns || [];
     pivotValues.value = config.values || [];
     pivotFilters.value = migrateLegacyFilters(config.filters || []);
+    dataSource.value = config.source || 'priorizados';
+    await loadAvailableFields();
     chartType.value = chart.type || 'bar';
     chartStacked.value = chart.stacked || false;
     chartShowLabels.value = chart.showLabels || false;
+    chartFill.value = chart.fill || false;
     chartCustomColors.value = chart.customColors || {};
     customLabels.value = chart.customLabels || {};
     pivotDisplayMode.value = chart.displayMode || 'values';
     pivotTableTitle.value = chart.tableTitle || '';
+    chartTitle.value = chart.chartTitle || '';
+    chartSwapAxes.value = chart.swapAxes || false;
+    // Pin flags: prioridad a las columnas dedicadas de la BD (query.pin_table /
+    // query.pin_chart); fallback al espejo dentro de chart_config.
+    pinTable.value = typeof query.pin_table !== 'undefined' ? !!query.pin_table : !!chart.pinTable;
+    pinChart.value = typeof query.pin_chart !== 'undefined' ? !!query.pin_chart : !!chart.pinChart;
 
     await fetchData();
   }
@@ -580,13 +638,36 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
     }
   }
 
+  // ─── Pin (Fijar) ────────────────────────────────────────────────────────
+  // Alterna pin_table / pin_chart de la consulta actual. Requiere que la
+  // consulta esté guardada (tiene id). Actualiza el estado local y re-sincroniza
+  // la lista de savedQueries para que los flags reflejen el cambio.
+  async function togglePin(target) {
+    if (!currentQueryId.value) return false;
+    try {
+      const next = target === 'table' ? !pinTable.value : !pinChart.value;
+      const res = await api.put(`/dashboard/saved-queries/${currentQueryId.value}/pin`, {
+        target,
+        value: next,
+      });
+      if (target === 'table') pinTable.value = !!res.data.pin_table;
+      else pinChart.value = !!res.data.pin_chart;
+      await loadSavedQueries();
+      return true;
+    } catch (err) {
+      console.error('Error toggling pin:', err);
+      return false;
+    }
+  }
+
   return {
     // State
     availableFields, loading, dataLoading,
     pivotRows, pivotColumns, pivotValues, pivotFilters,
-    chartType, chartStacked, chartShowLabels, chartCustomColors, customLabels, pivotDisplayMode, pivotTableTitle,
+    chartType, chartStacked, chartShowLabels, chartFill, chartSwapAxes, chartCustomColors, customLabels, pivotDisplayMode, pivotTableTitle, chartTitle,
     rawData, dataColumns, totalRows,
     savedQueries, currentQueryId, currentQueryName,
+    pinTable, pinChart, dataSource,
     // Computed
     fieldsByCategory, hasConfig, pivotConfig, pivotTableData,
     // Actions
@@ -598,5 +679,6 @@ export const useDynamicQueryStore = defineStore('dynamicQuery', () => {
     setCustomLabel, resolveLabel, resetCustomLabels,
     clearConfig,
     loadSavedQueries, saveCurrentQuery, loadSavedQuery, deleteSavedQuery,
+    togglePin,
   };
-});
+}

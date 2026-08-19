@@ -64,8 +64,10 @@
               :key="'rh-' + h.key"
               rowspan="2"
               class="pt-th pt-th-dim text-left"
+              :class="{ 'sort-active': sortColumn === h.key }"
+              @click="sortBy(h.key)"
               @dblclick="startRename(h, 'header')"
-            >{{ h.label }}<q-icon name="edit" size="10px" class="edit-hint q-ml-xs" /></th>
+            >{{ h.label }}<q-icon name="edit" size="10px" class="edit-hint q-ml-xs" @click.stop="startRename(h, 'header')" /><q-icon v-if="sortColumn === h.key" :name="sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'" size="11px" /></th>
 
             <!-- Column-group headers -->
             <th
@@ -77,15 +79,26 @@
             >{{ cv.display }}<q-icon name="edit" size="10px" class="edit-hint q-ml-xs" /></th>
 
             <!-- Grand-total header -->
-            <th v-if="tableData.colValues?.length" rowspan="2" class="pt-th pt-th-total text-right">TOTAL</th>
+            <th
+              v-if="tableData.colValues?.length" rowspan="2" class="pt-th pt-th-total text-right"
+              :class="{ 'sort-active': sortColumn === '__total__' }"
+              @click="sortBy('__total__')"
+            >TOTAL<q-icon v-if="sortColumn === '__total__'" :name="sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'" size="11px" /></th>
           </tr>
 
           <!-- Cross-tab row 2: sub-column headers (agg names) -->
           <tr v-if="tableData.hasPivotColumns">
             <template v-for="cv in tableData.colValues" :key="'cs-' + cv.raw">
               <template v-for="v in store.pivotValues" :key="'vs-' + cv.raw + v.key">
-                <th v-if="displayMode !== 'pct'"    class="pt-th pt-th-val text-right">{{ aggLabel(v) }}</th>
-                <th v-if="displayMode !== 'values'" class="pt-th pt-th-pct text-right">{{ aggPctLabel(v) }}</th>
+                <th
+                  v-if="displayMode !== 'pct'" class="pt-th pt-th-val text-right"
+                  :class="{ 'sort-active': sortColumn === (cv.raw + '__' + v.key) }"
+                  @click="sortBy(cv.raw + '__' + v.key)"
+                >{{ aggLabel(v) }}<q-icon v-if="sortColumn === (cv.raw + '__' + v.key)" :name="sortDir === 'asc' ? 'arrow_upward' : 'arrow_downward'" size="11px" /></th>
+                <th
+                  v-if="displayMode !== 'values'" class="pt-th pt-th-pct text-right"
+                  @click="sortBy(cv.raw + '__' + v.key)"
+                >{{ aggPctLabel(v) }}</th>
               </template>
             </template>
           </tr>
@@ -125,7 +138,7 @@
         <!-- ══ TBODY ═══════════════════════════════════════════════════════════ -->
         <tbody>
           <tr
-            v-for="(row, idx) in sortedRows"
+            v-for="(row, idx) in paginatedRows"
             :key="rowKey(row, idx)"
             class="pivot-row"
             :class="{ 'row-odd': idx % 2 !== 0 }"
@@ -201,6 +214,40 @@
       </div>
     </div>
 
+    <!-- ─── Pagination bar ──────────────────────────────────────────────────── -->
+    <div
+      v-if="totalPages > 1"
+      class="pivot-pagination-bar row items-center justify-between q-px-sm"
+    >
+      <div class="text-caption text-grey-7">
+        Página <strong>{{ currentPage }}</strong> de <strong>{{ totalPages }}</strong>
+        ({{ tableData.bodyRows.length }} filas)
+      </div>
+      <div class="row items-center q-gutter-xs">
+        <q-btn
+          flat round dense size="sm" icon="first_page" color="grey-7"
+          :disable="currentPage === 1" @click="goToPage(1)">
+          <q-tooltip>Primera página</q-tooltip>
+        </q-btn>
+        <q-btn
+          flat round dense size="sm" icon="chevron_left" color="grey-7"
+          :disable="currentPage === 1" @click="goToPage(currentPage - 1)">
+          <q-tooltip>Anterior</q-tooltip>
+        </q-btn>
+        <span class="q-px-xs text-body2 text-grey-8">{{ currentPage }} / {{ totalPages }}</span>
+        <q-btn
+          flat round dense size="sm" icon="chevron_right" color="grey-7"
+          :disable="currentPage === totalPages" @click="goToPage(currentPage + 1)">
+          <q-tooltip>Siguiente</q-tooltip>
+        </q-btn>
+        <q-btn
+          flat round dense size="sm" icon="last_page" color="grey-7"
+          :disable="currentPage === totalPages" @click="goToPage(totalPages)">
+          <q-tooltip>Última página</q-tooltip>
+        </q-btn>
+      </div>
+    </div>
+
     <!-- ─── Inline rename dialog ─────────────────────────────────────────────── -->
     <q-dialog v-model="renamePopup" persistent>
       <q-card style="min-width: 320px;">
@@ -232,7 +279,11 @@
 import { ref, computed, watch } from 'vue';
 import { useDynamicQueryStore } from 'stores/dynamic-query-store';
 
-const store = useDynamicQueryStore();
+const props = defineProps({
+  store: { type: Object, default: null },
+});
+
+const store = props.store || useDynamicQueryStore();
 
 const tableData = computed(() => store.pivotTableData);
 
@@ -356,11 +407,17 @@ function sortBy(key) {
   }
 }
 
+function rowSortValue(row, key) {
+  if (key === '__total__') return rowTotal(row);
+  return row[key];
+}
+
 const sortedRows = computed(() => {
   const rows = [...(tableData.value.bodyRows || [])];
   if (sortColumn.value) {
     rows.sort((a, b) => {
-      const va = a[sortColumn.value], vb = b[sortColumn.value];
+      const va = rowSortValue(a, sortColumn.value);
+      const vb = rowSortValue(b, sortColumn.value);
       const num = !isNaN(Number(va)) && !isNaN(Number(vb));
       if (num) return sortDir.value === 'asc' ? Number(va) - Number(vb) : Number(vb) - Number(va);
       return sortDir.value === 'asc'
@@ -372,6 +429,38 @@ const sortedRows = computed(() => {
 });
 
 watch(() => tableData.value.headers, () => { sortColumn.value = null; sortDir.value = 'asc'; });
+
+// ─── Pagination ───────────────────────────────────────────────────────────────
+const currentPage = ref(1);
+const pageSize = computed(() => {
+  if (visibleRows.value === 'all') return null;
+  return Number(visibleRows.value) || 10;
+});
+const totalPages = computed(() => {
+  const size = pageSize.value;
+  const total = (tableData.value.bodyRows || []).length;
+  if (!size || total === 0) return 1;
+  return Math.max(1, Math.ceil(total / size));
+});
+const paginatedRows = computed(() => {
+  const rows = sortedRows.value;
+  const size = pageSize.value;
+  if (!size || rows.length <= size) return rows;
+  const start = (currentPage.value - 1) * size;
+  return rows.slice(start, start + size);
+});
+function goToPage(page) {
+  const p = Math.min(Math.max(1, page), totalPages.value);
+  currentPage.value = p;
+}
+
+watch(visibleRows, () => { currentPage.value = 1; });
+watch(() => tableData.value.bodyRows, () => { currentPage.value = 1; });
+watch(() => sortColumn.value, () => { currentPage.value = 1; });
+watch(() => sortDir.value, () => { currentPage.value = 1; });
+watch(totalPages, (tp) => {
+  if (currentPage.value > tp) currentPage.value = tp;
+});
 
 // ─── Row key ─────────────────────────────────────────────────────────────────
 function rowKey(row, idx) {
@@ -563,5 +652,14 @@ defineExpose({ startRename });
   justify-content: center;
   padding: 64px 24px;
   color: #9e9e9e;
+}
+
+/* ── Pagination bar ─────────────────────────────────────────────────────────── */
+.pivot-pagination-bar {
+  background: #fafafa;
+  border-top: 1px solid #e0e0e0;
+  padding-top: 3px;
+  padding-bottom: 3px;
+  min-height: 34px;
 }
 </style>

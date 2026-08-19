@@ -45,6 +45,7 @@ router.get('/saved-queries/:id', dashboardController.getSavedQuery);
 router.post('/saved-queries', dashboardController.createSavedQuery);
 router.put('/saved-queries/:id', dashboardController.updateSavedQuery);
 router.delete('/saved-queries/:id', dashboardController.deleteSavedQuery);
+router.put('/saved-queries/:id/pin', dashboardController.toggleSavedQueryPin);
 router.post('/saved-queries/:id/grant', dashboardController.grantQueryAccess);
 router.delete('/saved-queries/:id/grant', dashboardController.revokeQueryAccess);
 

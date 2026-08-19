@@ -317,7 +317,8 @@ v-model:pagination="municipioPagination" :rows="municipioTableRows"
             </q-tab-panel>
 
             <q-tab-panel name="registros" class="q-pa-none">
-              <div class="row q-col-gutter-md">
+              <!-- Indicadores tradicionales siempre visibles -->
+              <div class="row q-col-gutter-md q-pa-md">
                 <!-- Indicadores Nacionales de Registros -->
                 <div v-for="indicator in registrosIndicadoresCards" :key="indicator.label" class="col-12 col-md-3">
                   <q-card flat bordered>
@@ -340,6 +341,47 @@ v-model:pagination="municipioPagination" :rows="municipioTableRows"
                   <RegistrosIndicadoresTable />
                 </div>
               </div>
+
+              <!-- Sección colapsable: Generador Dinámico de Consultas (colapsada por defecto) -->
+              <q-expansion-item
+                expand-icon="keyboard_arrow_down" expanded-icon="keyboard_arrow_up"
+                :default-opened="false"
+                header-class="q-px-md bg-grey-1 text-grey-8"
+                class="registros-section rounded-borders"
+              >
+                <template #header>
+                  <div class="row items-center q-gutter-x-sm">
+                    <q-icon name="dashboard_customize" size="20px" color="primary" />
+                    <span class="text-subtitle2 text-weight-bold text-grey-8">
+                      Generador Dinámico de Consultas
+                    </span>
+                  </div>
+                </template>
+                <DynamicQueryPanel
+                  :store="registrosGeneratorStore"
+                  data-source="registros"
+                  show-pin-buttons
+                  @pins-updated="onPinsUpdated"
+                />
+              </q-expansion-item>
+
+              <!-- Sección colapsable: Indicadores (expandida por defecto) -->
+              <q-expansion-item
+                expand-icon="keyboard_arrow_down" expanded-icon="keyboard_arrow_up"
+                default-opened
+                header-class="q-px-md bg-grey-1 text-grey-8"
+                class="registros-section rounded-borders"
+              >
+                <template #header>
+                  <div class="row items-center q-gutter-x-sm">
+                    <q-icon name="push_pin" size="20px" color="red-14" />
+                    <span class="text-subtitle2 text-weight-bold text-grey-8">
+                      Indicadores
+                    </span>
+                  </div>
+                </template>
+                <RegistrosDashboard ref="registrosDashboardRef" />
+              </q-expansion-item>
             </q-tab-panel>
 
             <q-tab-panel name="priorizados" class="q-pa-none">
@@ -375,6 +417,8 @@ v-model:pagination="municipioPagination" :rows="municipioTableRows"
                 />
                 <DynamicQueryPanel
                   v-else
+                  :store="priorizadosGeneratorStore"
+                  data-source="priorizados"
                 />
               </div>
             </q-tab-panel>
@@ -395,8 +439,10 @@ import ParroquiaDataVisualizer from 'components/ParroquiaDataVisualizer.vue';
 import ComunaParroquiaDataVisualizer from 'components/ComunaParroquiaDataVisualizer.vue';
 import MapaVenezuela from 'components/MapaVenezuela.vue';
 import RegistrosIndicadoresTable from 'components/RegistrosIndicadoresTable.vue';
+import RegistrosDashboard from 'components/RegistrosDashboard.vue';
 import PriorizadosTable from 'components/PriorizadosTable.vue';
 import DynamicQueryPanel from 'components/dashboard/DynamicQueryPanel.vue';
+import { createDynamicQueryStore } from 'stores/dynamic-query-store';
 import { utils, writeFile } from 'xlsx';
 import { exportFile, Notify } from 'quasar';
 import html2canvas from 'html2canvas';
@@ -417,6 +463,19 @@ const dailyCertificationsHeight = ref(425);
 const stateIndicatorsHeight = ref(425);
 const tab = ref('circulos');
 const priorizadosTableRef = ref(null);
+const registrosDashboardRef = ref(null);
+
+// Stores aislados para el Generador Dinámico de cada tab. Cada uno apunta a su
+// propia fuente de datos (vpriorizados en Priorizados, rm_data_registros en
+// Registros) y mantiene su configuración sin pisarse entre sí.
+const priorizadosGeneratorStore = createDynamicQueryStore('generador_priorizados')();
+const registrosGeneratorStore = createDynamicQueryStore('generador_registros')();
+
+// Cuando se fija/desfija una tabla o gráfica desde el panel dinámico, recarga
+// el dashboard de pines para reflejar el cambio al instante.
+function onPinsUpdated() {
+  registrosDashboardRef.value?.loadPinned();
+}
 
 // --- Handlers para eventos del mapa cuando el tab activo es priorizados ---
 const onMapFilterPriorizados = ({ stateName }) => {
@@ -844,5 +903,18 @@ watch(showStateIndicators, (val) => {
 .state-indicators-table :deep(tbody tr.row-highlight) {
   background-color: rgba(76, 175, 80, 0.18);
   box-shadow: inset 0 0 0 2px rgba(76, 175, 80, 0.4);
+}
+
+/* Secciones colapsables del tab Registros */
+.registros-section {
+  border: 1px solid #e2e8f0;
+  margin: 8px 12px;
+}
+
+/* El Generador Dinámico ocupa una altura razonable dentro del flujo de la
+   página; el contenido externo ya no depende del viewport. */
+.registros-section :deep(.dynamic-query-panel-root) {
+  height: auto;
+  min-height: 760px;
 }
 </style>

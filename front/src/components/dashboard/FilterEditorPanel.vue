@@ -129,7 +129,10 @@ v-for="(cond, idx) in group.conditions" :key="idx"
 <script setup>
 import { useDynamicQueryStore } from 'stores/dynamic-query-store';
 
-const store = useDynamicQueryStore();
+const props = defineProps({
+  store: { type: Object, default: null },
+});
+const store = props.store || useDynamicQueryStore();
 
 function operatorsFor(group) {
   return store.operatorsForGroup(group.field);
