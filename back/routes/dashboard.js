@@ -35,6 +35,9 @@ router.get('/mapa-priorizados', dashboardController.getPriorizadosPorEstado);
 router.get('/registros-indicadores', dashboardController.getRegistrosIndicadoresPorEstado);
 router.get('/registros-indicadores-nacionales', dashboardController.getRegistrosIndicadoresNacionales);
 
+// --- Pirámide Poblacional ---
+router.get('/registros-piramide', dashboardController.getPyramideEdad);
+
 // --- Endpoints de Priorizados ---
 router.get('/priorizados', dashboardController.getPriorizados);
 router.get('/priorizados/filter-options', dashboardController.getPriorizadosFilterOptions);

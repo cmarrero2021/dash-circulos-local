@@ -1010,3 +1010,67 @@ exports.getPriorizadosFilterOptions = async (userId, query = {}) => {
 
     return result;
 };
+
+// ─── Pirámide Poblacional ──────────────────────────────────────────────────────
+
+/**
+ * Obtiene la distribución de registros por rangos etarios (60 a 100+) y género,
+ * usando la tabla foránea rm_data_registros.
+ *
+ * @param {number} userId  - ID del usuario (para permisos geográficos).
+ * @param {number} step    - Amplitud del rango etario: 5 o 10 (default 5).
+ * @returns {Promise<Array<{rango, grupo_orden, masculino, femenino, total}>>}
+ */
+exports.getPyramideEdad = async (userId, step = 5) => {
+    const stepInt = [5, 10].includes(Number(step)) ? Number(step) : 5;
+    const cacheKey = `dashboard:piramide-edad:${userId}:step${stepInt}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
+    // Permisos geográficos
+    const { permClause, permParams } = await buildRegistrosPermissionClause(userId);
+    if (permClause === 'WHERE 1 = 0') return [];
+
+    const today = new Date();
+    const curYear = today.getFullYear();
+    const cutoffDate = new Date(curYear - 60, today.getMonth(), today.getDate());
+    const cutoffStr = cutoffDate.toISOString().slice(0, 10);
+
+    // Condición de fecha de nacimiento pushable a postgres_fdw
+    const baseCond = `fecha_nacimiento <= '${cutoffStr}'
+              AND fecha_nacimiento >= '1900-01-01'`;
+
+    let whereClause;
+    if (!permClause) {
+        whereClause = `WHERE ${baseCond}`;
+    } else {
+        const geoCondition = permClause.replace(/^\s*WHERE\s+/i, '');
+        whereClause = `WHERE ${baseCond} AND (${geoCondition})`;
+    }
+
+    const query = `
+        SELECT
+            CASE
+                WHEN (${curYear} - SUBSTRING(fecha_nacimiento, 1, 4)::integer) >= 100 THEN '100+'
+                ELSE (FLOOR(((${curYear} - SUBSTRING(fecha_nacimiento, 1, 4)::integer) - 60)::numeric / $1) * $1 + 60)::integer::text
+                     || ' - ' ||
+                     (FLOOR(((${curYear} - SUBSTRING(fecha_nacimiento, 1, 4)::integer) - 60)::numeric / $1) * $1 + 60 + $1 - 1)::integer::text
+            END AS rango,
+            CASE
+                WHEN (${curYear} - SUBSTRING(fecha_nacimiento, 1, 4)::integer) >= 100 THEN 9999
+                ELSE FLOOR(((${curYear} - SUBSTRING(fecha_nacimiento, 1, 4)::integer) - 60)::numeric / $1)::integer
+            END AS grupo_orden,
+            COUNT(*) FILTER (WHERE genero = 'M') AS masculino,
+            COUNT(*) FILTER (WHERE genero = 'F') AS femenino,
+            COUNT(*) AS total
+        FROM rm_data_registros
+        ${whereClause}
+        GROUP BY rango, grupo_orden
+        ORDER BY grupo_orden
+    `;
+
+    const { rows } = await pool.query(query, [stepInt, ...permParams]);
+    // Cachear por 1 hora (datos demográficos muy estables)
+    await cache.set(cacheKey, rows, 3600);
+    return rows;
+};

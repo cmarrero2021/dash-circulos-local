@@ -45,16 +45,16 @@
         v-for="item in pinnedItems" :key="item.query.id"
         class="pinned-card bg-white rounded-borders shadow-light">
         <!-- Card header -->
-        <div class="row items-center justify-between q-px-md q-py-sm bg-grey-1 border-bottom-dash">
-          <div class="row items-center q-gutter-x-sm">
+        <div class="pinned-card-header row items-start q-px-md q-py-sm bg-grey-1 border-bottom-dash">
+          <div class="col row items-center q-gutter-x-sm q-mb-xs">
             <q-icon name="star" size="16px" color="amber-8" />
             <span class="text-weight-bold text-grey-8 text-subtitle2">{{ item.query.name }}</span>
             <q-badge v-if="item.query.visibility === 'public'" color="green-14" label="Público" dense />
             <q-badge v-else color="amber-14" label="Privado" dense />
           </div>
-          <div class="row items-center q-gutter-xs">
-            <q-badge v-if="item.query.pin_table" color="red-14" icon="grid_on" label="Tabla fijada" dense />
-            <q-badge v-if="item.query.pin_chart" color="red-14" icon="bar_chart" label="Gráfica fijada" dense />
+          <div class="pinned-card-actions row items-center q-gutter-xs">
+            <q-badge v-if="item.query.pin_table" color="red-14" icon="grid_on" label="Tabla fijada" dense class="gt-xs" />
+            <q-badge v-if="item.query.pin_chart" color="red-14" icon="bar_chart" label="Gráfica fijada" dense class="gt-xs" />
             <q-btn-dropdown
               v-if="item.query.pin_table"
               flat dense no-caps size="sm" color="primary" icon="download"
@@ -85,14 +85,14 @@
         <!-- Body: pinned table and/or chart -->
         <div class="pinned-body">
           <template v-if="item.query.pin_table && item.query.pin_chart">
-            <div class="row no-wrap">
-              <div class="col pinned-table-col">
+            <div class="row q-col-gutter-none pinned-both-row">
+              <div class="col-12 col-md-6 pinned-table-col">
                 <div class="pinned-subtitle text-caption text-grey-6 row items-center q-gutter-xs">
                   <q-icon name="grid_on" size="13px" /> Tabla
                 </div>
                 <PivotTable :store="item.store" class="pinned-table-height" />
               </div>
-              <div class="col pinned-chart-col">
+              <div class="col-12 col-md-6 pinned-chart-col">
                 <div class="pinned-subtitle text-caption text-grey-6 row items-center q-gutter-xs">
                   <q-icon name="bar_chart" size="13px" /> Gráfica
                 </div>
@@ -222,6 +222,15 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
+/* Header del card: permite que los badges/acciones bajen en pantallas pequeñas */
+.pinned-card-header {
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.pinned-card-actions {
+  flex-shrink: 0;
+}
+
 .pinned-subtitle {
   font-weight: 600;
   padding: 6px 10px;
@@ -245,9 +254,27 @@ onUnmounted(() => {
 .pinned-table-only-height :deep(.pivot-scroll) {
   flex: none !important;
 }
+
+/* Layout lado a lado (md+): el divisor aparece como borde izquierdo en la columna derecha */
+@media (min-width: 1024px) {
+  .pinned-both-row .pinned-chart-col {
+    border-left: 1px solid #eef2f7;
+  }
+}
+
+/* En móvil (< md): el divisor entre tabla y gráfica es un borde superior */
+@media (max-width: 1023px) {
+  .pinned-both-row .pinned-chart-col {
+    border-top: 1px solid #eef2f7;
+  }
+  .pinned-table-height,
+  .pinned-chart-height {
+    min-height: 320px;
+  }
+}
+
 .pinned-chart-height {
   min-height: 420px;
-  border-left: 1px solid #eef2f7;
 }
 .pinned-chart-only-height {
   min-height: 420px;
@@ -259,5 +286,13 @@ onUnmounted(() => {
 .pinned-chart-height :deep(.pivot-chart-wrapper),
 .pinned-chart-only-height :deep(.pivot-chart-wrapper) {
   height: 100% !important;
+}
+
+/* Altura reducida en pantallas pequeñas para solo-gráfica o solo-tabla */
+@media (max-width: 599px) {
+  .pinned-table-only-height,
+  .pinned-chart-only-height {
+    min-height: 280px;
+  }
 }
 </style>

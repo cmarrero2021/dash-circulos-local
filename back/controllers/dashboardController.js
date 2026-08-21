@@ -128,6 +128,18 @@ exports.getPriorizadosFilterOptions = async (req, res) => {
         res.status(500).send('Error del servidor');
     }
 };
+// ─── Pirámide Poblacional ──────────────────────────────────────────────────────
+
+exports.getPyramideEdad = async (req, res) => {
+    try {
+        const step = req.query.step || 5;
+        const data = await dashboardService.getPyramideEdad(req.user.id, step);
+        res.json(data);
+    } catch (error) {
+        console.error('Error al obtener pirámide de edad:', error.message);
+        res.status(500).send('Error del servidor');
+    }
+};
 
 // ─── CRUD de Consultas Guardadas (REST) ───────────────────────────────────────
 
