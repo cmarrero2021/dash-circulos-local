@@ -38,6 +38,9 @@ router.get('/registros-indicadores-nacionales', dashboardController.getRegistros
 // --- Pirámide Poblacional ---
 router.get('/registros-piramide', dashboardController.getPyramideEdad);
 
+// --- Línea de Tiempo de Registros ---
+router.get('/registros-timeline', dashboardController.getRecordsTimeline);
+
 // --- Endpoints de Priorizados ---
 router.get('/priorizados', dashboardController.getPriorizados);
 router.get('/priorizados/filter-options', dashboardController.getPriorizadosFilterOptions);

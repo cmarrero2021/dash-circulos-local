@@ -380,7 +380,11 @@ v-model:pagination="municipioPagination" :rows="municipioTableRows"
                     </span>
                   </div>
                 </template>
-                <!-- Pirámide Poblacional: fija, no removible, siempre primera -->
+                <!-- Línea de Tiempo de Registros: fija, primera en Indicadores -->
+                <div class="pinned-card bg-white rounded-borders shadow-light q-mb-md">
+                  <RecordsTimeline />
+                </div>
+                <!-- Pirámide Poblacional: fija, no removible -->
                 <div class="pinned-card bg-white rounded-borders shadow-light q-mb-md">
                   <PopulationPyramid />
                 </div>
@@ -444,6 +448,7 @@ import ComunaParroquiaDataVisualizer from 'components/ComunaParroquiaDataVisuali
 import MapaVenezuela from 'components/MapaVenezuela.vue';
 import RegistrosIndicadoresTable from 'components/RegistrosIndicadoresTable.vue';
 import RegistrosDashboard from 'components/RegistrosDashboard.vue';
+import RecordsTimeline from 'components/RecordsTimeline.vue';
 import PopulationPyramid from 'components/PopulationPyramid.vue';
 import PriorizadosTable from 'components/PriorizadosTable.vue';
 import DynamicQueryPanel from 'components/dashboard/DynamicQueryPanel.vue';

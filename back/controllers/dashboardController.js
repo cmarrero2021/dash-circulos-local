@@ -141,6 +141,24 @@ exports.getPyramideEdad = async (req, res) => {
     }
 };
 
+// ─── Línea de Tiempo de Registros ─────────────────────────────────────────────
+
+exports.getRecordsTimeline = async (req, res) => {
+    try {
+        const { period, grouping, startDate, endDate } = req.query;
+        const data = await dashboardService.getRecordsTimeline(req.user.id, {
+            period,
+            grouping,
+            startDate,
+            endDate,
+        });
+        res.json(data);
+    } catch (error) {
+        console.error('Error al obtener línea de tiempo de registros:', error.message);
+        res.status(500).send('Error del servidor');
+    }
+};
+
 // ─── CRUD de Consultas Guardadas (REST) ───────────────────────────────────────
 
 exports.listSavedQueries = async (req, res) => {

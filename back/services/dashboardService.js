@@ -1074,3 +1074,100 @@ exports.getPyramideEdad = async (userId, step = 5) => {
     await cache.set(cacheKey, rows, 3600);
     return rows;
 };
+
+/**
+ * Obtiene la línea de tiempo de registros realizados según período y agrupación.
+ *
+ * @param {number} userId - ID del usuario solicitante
+ * @param {object} options - { period, grouping, startDate, endDate }
+ * @returns {Promise<Array<{periodo: string, orden: string, total: number}>>}
+ */
+exports.getRecordsTimeline = async (userId, options = {}) => {
+    const period = ['current_week', 'current_month', 'current_year', 'custom'].includes(options.period)
+        ? options.period
+        : 'current_month';
+
+    const grouping = ['year', 'month', 'week', 'day'].includes(options.grouping)
+        ? options.grouping
+        : 'day';
+
+    const startDate = options.startDate && /^\d{4}-\d{2}-\d{2}$/.test(options.startDate) ? options.startDate : null;
+    const endDate = options.endDate && /^\d{4}-\d{2}-\d{2}$/.test(options.endDate) ? options.endDate : null;
+
+    const cacheKey = `dashboard:timeline:${userId}:${period}:${grouping}:${startDate || ''}:${endDate || ''}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
+    // Permisos geográficos
+    const { permClause, permParams } = await buildRegistrosPermissionClause(userId);
+    if (permClause === 'WHERE 1 = 0') return [];
+
+    // Construcción de condiciones de fecha
+    const dateConditions = ['create_date IS NOT NULL'];
+    const queryParams = [...permParams];
+    let paramIndex = queryParams.length + 1;
+
+    if (period === 'current_week') {
+        // Semana actual de Domingo a Sábado
+        dateConditions.push(`create_date >= (CURRENT_DATE - (EXTRACT(DOW FROM CURRENT_DATE)::int * INTERVAL '1 day'))::date`);
+        dateConditions.push(`create_date < ((CURRENT_DATE - (EXTRACT(DOW FROM CURRENT_DATE)::int * INTERVAL '1 day'))::date + INTERVAL '7 days')::date`);
+    } else if (period === 'current_month') {
+        dateConditions.push(`create_date >= DATE_TRUNC('month', CURRENT_DATE)::date`);
+        dateConditions.push(`create_date < (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month')::date`);
+    } else if (period === 'current_year') {
+        dateConditions.push(`create_date >= DATE_TRUNC('year', CURRENT_DATE)::date`);
+        dateConditions.push(`create_date < (DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '1 year')::date`);
+    } else if (period === 'custom') {
+        if (startDate) {
+            dateConditions.push(`create_date >= $${paramIndex++}::date`);
+            queryParams.push(startDate);
+        }
+        if (endDate) {
+            dateConditions.push(`create_date < ($${paramIndex++}::date + INTERVAL '1 day')`);
+            queryParams.push(endDate);
+        }
+    }
+
+    const baseDateCond = dateConditions.join(' AND ');
+
+    let whereClause;
+    if (!permClause) {
+        whereClause = `WHERE ${baseDateCond}`;
+    } else {
+        const geoCondition = permClause.replace(/^\s*WHERE\s+/i, '');
+        whereClause = `WHERE ${baseDateCond} AND (${geoCondition})`;
+    }
+
+    // Expresiones de agrupación
+    let selectPeriodo = "TO_CHAR(create_date, 'YYYY-MM-DD')";
+    let selectOrden = "DATE_TRUNC('day', create_date)::date";
+
+    if (grouping === 'year') {
+        selectPeriodo = "TO_CHAR(create_date, 'YYYY')";
+        selectOrden = "DATE_TRUNC('year', create_date)::date";
+    } else if (grouping === 'month') {
+        selectPeriodo = "TO_CHAR(create_date, 'YYYY-MM')";
+        selectOrden = "DATE_TRUNC('month', create_date)::date";
+    } else if (grouping === 'week') {
+        selectPeriodo = `TO_CHAR((DATE_TRUNC('day', create_date) - (EXTRACT(DOW FROM create_date)::int * INTERVAL '1 day'))::date, 'DD/MM/YYYY')
+                         || ' al ' ||
+                         TO_CHAR(((DATE_TRUNC('day', create_date) - (EXTRACT(DOW FROM create_date)::int * INTERVAL '1 day'))::date + INTERVAL '6 days')::date, 'DD/MM/YYYY')`;
+        selectOrden = "(DATE_TRUNC('day', create_date) - (EXTRACT(DOW FROM create_date)::int * INTERVAL '1 day'))::date";
+    }
+
+    const query = `
+        SELECT
+            ${selectPeriodo} AS periodo,
+            ${selectOrden} AS orden,
+            COUNT(*)::integer AS total
+        FROM rm_data_registros
+        ${whereClause}
+        GROUP BY periodo, orden
+        ORDER BY orden ASC
+    `;
+
+    const { rows } = await pool.query(query, queryParams);
+    // Cachear 5 minutos
+    await cache.set(cacheKey, rows, 300);
+    return rows;
+};
