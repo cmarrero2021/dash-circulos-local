@@ -178,7 +178,8 @@
       <!-- TABLE col -->
       <div class="col-12 col-md-5 ppy-table-col">
         <div class="ppy-subtitle text-caption text-grey-6 row items-center q-gutter-xs">
-          <q-icon name="grid_on" size="13px" /> Tabla
+          <q-icon name="grid_on" size="13px" />
+          <span>Tabla</span>
         </div>
 
         <div class="ppy-table-scroll">
@@ -186,22 +187,22 @@
             <thead>
               <tr>
                 <th class="ppy-th ppy-th-dim text-left">Rango</th>
-                <th v-if="displayMode !== 'pct'"    class="ppy-th ppy-th-masc  text-right">♂ Masc.</th>
-                <th v-if="displayMode !== 'values'" class="ppy-th ppy-th-pct   text-right" :style="{ color: mascColor }">♂ %</th>
-                <th v-if="displayMode !== 'pct'"    class="ppy-th ppy-th-fem   text-right">♀ Fem.</th>
-                <th v-if="displayMode !== 'values'" class="ppy-th ppy-th-pct   text-right" :style="{ color: femColor }">♀ %</th>
+                <th v-if="displayMode !== 'pct'"    class="ppy-th text-right" :style="{ color: mascColor }">♂ Masc.</th>
+                <th v-if="displayMode !== 'values'" class="ppy-th ppy-th-pct text-right" :style="{ color: mascColor }">♂ %</th>
+                <th v-if="displayMode !== 'pct'"    class="ppy-th text-right" :style="{ color: femColor }">♀ Fem.</th>
+                <th v-if="displayMode !== 'values'" class="ppy-th ppy-th-pct text-right" :style="{ color: femColor }">♀ %</th>
                 <th v-if="displayMode !== 'pct'"    class="ppy-th ppy-th-total text-right">Total</th>
-                <th v-if="displayMode !== 'values'" class="ppy-th ppy-th-pct   text-right">Total %</th>
+                <th v-if="displayMode !== 'values'" class="ppy-th ppy-th-pct text-right">Total %</th>
               </tr>
             </thead>
 
             <tbody>
               <tr v-for="row in paginatedRows" :key="row.rango" class="ppy-row">
                 <td class="ppy-td ppy-td-dim">{{ row.rango }}</td>
-                <td v-if="displayMode !== 'pct'"    class="ppy-td text-right ppy-td-masc">{{ fmtVal(row.masculino) }}</td>
-                <td v-if="displayMode !== 'values'" class="ppy-td text-right ppy-td-pct">{{ fmtPct(row.masculino) }}</td>
-                <td v-if="displayMode !== 'pct'"    class="ppy-td text-right ppy-td-fem">{{ fmtVal(row.femenino) }}</td>
-                <td v-if="displayMode !== 'values'" class="ppy-td text-right ppy-td-pct">{{ fmtPct(row.femenino) }}</td>
+                <td v-if="displayMode !== 'pct'"    class="ppy-td text-right ppy-td-num" :style="{ color: mascColor }">{{ fmtVal(row.masculino) }}</td>
+                <td v-if="displayMode !== 'values'" class="ppy-td text-right ppy-td-pct" :style="{ color: mascColor }">{{ fmtPct(row.masculino) }}</td>
+                <td v-if="displayMode !== 'pct'"    class="ppy-td text-right ppy-td-num" :style="{ color: femColor }">{{ fmtVal(row.femenino) }}</td>
+                <td v-if="displayMode !== 'values'" class="ppy-td text-right ppy-td-pct" :style="{ color: femColor }">{{ fmtPct(row.femenino) }}</td>
                 <td v-if="displayMode !== 'pct'"    class="ppy-td text-right ppy-td-total">{{ fmtVal(row.total) }}</td>
                 <td v-if="displayMode !== 'values'" class="ppy-td text-right ppy-td-pct">{{ fmtPct(row.total) }}</td>
               </tr>
@@ -210,10 +211,10 @@
             <tfoot>
               <tr class="ppy-footer-row">
                 <td class="ppy-td ppy-td-dim ppy-footer-cell">TOTAL</td>
-                <td v-if="displayMode !== 'pct'"    class="ppy-td text-right ppy-footer-cell ppy-td-masc">{{ fmtVal(grandTotal.masculino) }}</td>
-                <td v-if="displayMode !== 'values'" class="ppy-td text-right ppy-footer-cell ppy-td-pct">100%</td>
-                <td v-if="displayMode !== 'pct'"    class="ppy-td text-right ppy-footer-cell ppy-td-fem">{{ fmtVal(grandTotal.femenino) }}</td>
-                <td v-if="displayMode !== 'values'" class="ppy-td text-right ppy-footer-cell ppy-td-pct">100%</td>
+                <td v-if="displayMode !== 'pct'"    class="ppy-td text-right ppy-footer-cell" :style="{ color: mascColor }">{{ fmtVal(grandTotal.masculino) }}</td>
+                <td v-if="displayMode !== 'values'" class="ppy-td text-right ppy-footer-cell ppy-td-pct" :style="{ color: mascColor }">100%</td>
+                <td v-if="displayMode !== 'pct'"    class="ppy-td text-right ppy-footer-cell" :style="{ color: femColor }">{{ fmtVal(grandTotal.femenino) }}</td>
+                <td v-if="displayMode !== 'values'" class="ppy-td text-right ppy-footer-cell ppy-td-pct" :style="{ color: femColor }">100%</td>
                 <td v-if="displayMode !== 'pct'"    class="ppy-td text-right ppy-footer-cell ppy-td-total">{{ fmtVal(grandTotal.total) }}</td>
                 <td v-if="displayMode !== 'values'" class="ppy-td text-right ppy-footer-cell ppy-td-pct">100%</td>
               </tr>
@@ -233,9 +234,34 @@
       <div class="col-12 col-md-7 ppy-chart-col">
         <div class="ppy-subtitle text-caption text-grey-6 row items-center justify-between">
           <div class="row items-center q-gutter-xs">
-            <q-icon name="bar_chart" size="13px" /> Gráfica de Pirámide
+            <q-icon name="bar_chart" size="13px" />
+            <span>Gráfica de Pirámide</span>
           </div>
           <div class="row items-center q-gutter-xs no-wrap q-pr-sm">
+            <!-- Selector de modo display en la gráfica (Valores / % / Ambos) -->
+            <q-btn-toggle
+              v-model="displayMode"
+              dense flat
+              toggle-color="primary"
+              class="ppy-mode-toggle gt-xs"
+              :options="[
+                { label: 'Valores', value: 'values' },
+                { label: '%',       value: 'pct'    },
+                { label: 'Ambos',   value: 'both'   },
+              ]"
+            />
+
+            <!-- Toggle mostrar etiquetas de datos -->
+            <q-btn
+              flat dense round size="xs"
+              :icon="chartShowLabels ? 'label' : 'label_off'"
+              :color="chartShowLabels ? 'primary' : 'grey-5'"
+              @click="chartShowLabels = !chartShowLabels; nextTick(renderChart);"
+            >
+              <q-tooltip>{{ chartShowLabels ? 'Ocultar etiquetas de datos en barras' : 'Mostrar etiquetas de datos en barras' }}</q-tooltip>
+            </q-btn>
+
+            <!-- Chart height selector -->
             <q-icon name="height" size="13px" class="text-grey-6" />
             <q-select
               v-model="chartHeightOption"
@@ -283,12 +309,13 @@ const ageStep   = ref(5);            // 5 o 10 años
 const displayMode = ref('values');
 const visibleRows = ref(null);       // null = Todas
 const chartHeightOption = ref(420);
+const chartShowLabels   = ref(true); // Mostrar etiquetas de datos en las barras
 const chartCanvas = ref(null);
 let chartInstance = null;
 
 // Colores personalizables por género
 const DEFAULT_MASC = '#4472C4';
-const DEFAULT_FEM  = '#ED7D31';
+const DEFAULT_FEM  = '#ff0000';
 const mascColor = ref(DEFAULT_MASC);
 const femColor  = ref(DEFAULT_FEM);
 
@@ -389,9 +416,13 @@ function fmtPct(val) {
 }
 
 function fmtPoint(absVal) {
-  const n   = Number(absVal);
+  const n = Number(absVal);
+  if (!isFinite(n)) return '';
   const tot = grandTotal.value.total;
-  if (displayMode.value === 'pct') return fmtPct(n);
+  if (displayMode.value === 'pct') {
+    // En modo 'pct', el dataset del gráfico ya contiene el valor normalizado a porcentaje (ej. 11.1)
+    return n.toFixed(1).replace('.', ',') + '%';
+  }
   if (displayMode.value === 'both') {
     const pct = tot ? (n / tot * 100).toFixed(1).replace('.', ',') : '0';
     return `${fmtVal(n)} (${pct}%)`;
@@ -412,7 +443,6 @@ async function fetchData() {
     raw5Rows.value = [];
   } finally {
     loading.value = false;
-    nextTick(renderChart);
   }
 }
 
@@ -463,6 +493,12 @@ function buildChartOptions() {
     indexAxis: 'y',
     responsive: true,
     maintainAspectRatio: false,
+    layout: {
+      padding: {
+        left: 30,
+        right: 30,
+      },
+    },
     plugins: {
       legend: {
         position: 'top',
@@ -471,12 +507,27 @@ function buildChartOptions() {
       tooltip: {
         callbacks: {
           label(ctx) {
-            const absVal = Math.abs(ctx.parsed.x);
+            const raw = ctx.parsed?.x ?? ctx.raw ?? 0;
+            const absVal = Math.abs(Number(raw));
             return `${ctx.dataset.label}: ${fmtPoint(absVal)}`;
           },
         },
       },
-      datalabels: { display: false },
+      datalabels: {
+        display: chartShowLabels.value,
+        anchor: (ctx) => (ctx.datasetIndex === 0 ? 'start' : 'end'),
+        align:  (ctx) => (ctx.datasetIndex === 0 ? 'left' : 'right'),
+        formatter(val, ctx) {
+          const raw = val !== undefined && val !== null ? val : (ctx.parsed?.x ?? 0);
+          const absVal = Math.abs(Number(raw));
+          if (!absVal) return '';
+          return fmtPoint(absVal);
+        },
+        font: { weight: 'bold', size: 10 },
+        color: (ctx) => (ctx.datasetIndex === 0 ? mascColor.value : femColor.value),
+        offset: 4,
+        clip: false,
+      },
     },
     scales: {
       x: {
@@ -499,6 +550,11 @@ function buildChartOptions() {
 function renderChart() {
   if (!chartCanvas.value) return;
 
+  // Limpiar cualquier gráfico previo registrado en este canvas por Chart.js
+  const existing = Chart.getChart(chartCanvas.value);
+  if (existing) {
+    existing.destroy();
+  }
   if (chartInstance) {
     chartInstance.destroy();
     chartInstance = null;
@@ -515,9 +571,20 @@ function renderChart() {
 // ── Exports ───────────────────────────────────────────────────────────────────
 function exportPNG() {
   if (!chartCanvas.value) return;
+  const canvas = chartCanvas.value;
+
+  // Crear un canvas temporal con fondo blanco para que el PNG no sea transparente
+  const offscreen = document.createElement('canvas');
+  offscreen.width = canvas.width;
+  offscreen.height = canvas.height;
+  const ctx = offscreen.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, offscreen.width, offscreen.height);
+  ctx.drawImage(canvas, 0, 0);
+
   const a = document.createElement('a');
-  a.href = chartCanvas.value.toDataURL('image/png');
-  a.download = `piramide-poblacional-${ageStep.value}a.png`;
+  a.href = offscreen.toDataURL('image/png');
+  a.download = `piramide-poblacional-${ageStep.value}a-${displayMode.value}.png`;
   a.click();
 }
 
@@ -672,10 +739,9 @@ onBeforeUnmount(() => {
   font-variant-numeric: tabular-nums;
 }
 .ppy-td-dim   { font-weight: 600; color: #374151; min-width: 80px; }
-.ppy-td-masc  { color: #2655a8; }
-.ppy-td-fem   { color: #b85c1d; }
+.ppy-td-num   { font-weight: 500; }
 .ppy-td-total { font-weight: 700; color: #1d4ed8; }
-.ppy-td-pct   { color: #6b7280; font-size: 11.5px; }
+.ppy-td-pct   { font-size: 11.5px; opacity: 0.9; }
 
 .ppy-footer-row { background: #eff6ff; }
 .ppy-footer-cell { font-weight: 700; font-size: 12px; border-top: 2px solid #bfdbfe; color: #1e40af; }
