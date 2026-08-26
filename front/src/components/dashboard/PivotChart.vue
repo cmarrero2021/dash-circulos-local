@@ -36,6 +36,56 @@
           ]"
         />
 
+        <q-separator vertical inset class="q-mx-xs" />
+
+        <!-- Toggle Valores -->
+        <q-toggle
+          v-model="store.chartShowLabels"
+          label="Valores"
+          dense size="xs"
+          color="primary"
+          class="text-caption text-weight-medium text-grey-8"
+        >
+          <q-tooltip>Mostrar valores numéricos o porcentajes en la gráfica</q-tooltip>
+        </q-toggle>
+
+        <!-- Color texto para Valores (solo si Valores está activo) -->
+        <q-btn
+          v-if="store.chartShowLabels"
+          flat round dense size="sm"
+          icon="palette"
+          :style="{ color: store.chartValueLabelColor || '#e11d48' }"
+        >
+          <q-tooltip>Color de texto de los valores / porcentajes</q-tooltip>
+          <q-popup-proxy cover transition-show="scale" transition-hide="scale">
+            <q-color v-model="store.chartValueLabelColor" no-header-tabs default-view="palette" />
+          </q-popup-proxy>
+        </q-btn>
+
+        <!-- Toggle mostrar etiqueta de la serie -->
+        <q-toggle
+          v-model="store.chartShowSeriesLabel"
+          label="Etiqueta serie"
+          dense size="xs"
+          color="primary"
+          class="text-caption text-weight-medium text-grey-8"
+        >
+          <q-tooltip>Mostrar el nombre de la serie/categoría en cada punto de la gráfica</q-tooltip>
+        </q-toggle>
+
+        <!-- Color texto para Etiqueta serie (solo si Etiqueta serie está activa) -->
+        <q-btn
+          v-if="store.chartShowSeriesLabel"
+          flat round dense size="sm"
+          icon="format_color_text"
+          :style="{ color: store.chartSeriesLabelColor || '#1e3b8b' }"
+        >
+          <q-tooltip>Color de texto de la etiqueta de serie</q-tooltip>
+          <q-popup-proxy cover transition-show="scale" transition-hide="scale">
+            <q-color v-model="store.chartSeriesLabelColor" no-header-tabs default-view="palette" />
+          </q-popup-proxy>
+        </q-btn>
+
         <!-- Chart height selector -->
         <div class="row items-center q-gutter-xs no-wrap">
           <q-icon name="height" size="13px" class="text-grey-6" />
@@ -419,17 +469,54 @@ function buildOptions() {
         },
       },
       datalabels: {
-        display: store.chartShowLabels,
-        anchor: isHorizontal ? 'end' : (isPie ? 'center' : 'end'),
-        align: isHorizontal ? 'right' : (isPie ? 'center' : 'top'),
-        formatter: (val) => {
-          const num = Number(val);
-          if (isNaN(num) || num === 0) return '';
-          return fmtPoint(num);
-        },
-        font: { weight: 'bold', size: 10 },
-        color: isPie ? '#fff' : '#666',
-        offset: 4,
+        labels: {
+          seriesName: {
+            display: () => !!store.chartShowSeriesLabel,
+            anchor: isHorizontal ? 'end' : (isPie ? 'center' : 'end'),
+            align: isHorizontal
+              ? 'right'
+              : (isPie ? (store.chartShowLabels ? 'top' : 'center') : (store.chartShowLabels ? 'top' : 'top')),
+            offset: isHorizontal
+              ? (store.chartShowLabels ? -4 : 4)
+              : (isPie ? (store.chartShowLabels ? -8 : 0) : (store.chartShowLabels ? 14 : 4)),
+            formatter: (val, ctx) => {
+              if (!store.chartShowSeriesLabel) return '';
+              if (isPie) {
+                return ctx.chart.data.labels?.[ctx.dataIndex] || '';
+              } else if (ctx.chart.data.datasets?.length > 1) {
+                return ctx.dataset?.label || '';
+              } else {
+                return ctx.chart.data.labels?.[ctx.dataIndex] || ctx.dataset?.label || '';
+              }
+            },
+            font: { weight: 'bold', size: 10 },
+            color: () => {
+              const defaultSeriesColor = isPie ? '#ffffff' : '#1e3b8b';
+              return store.chartSeriesLabelColor || defaultSeriesColor;
+            },
+          },
+          valueText: {
+            display: () => !!store.chartShowLabels,
+            anchor: isHorizontal ? 'end' : (isPie ? 'center' : 'end'),
+            align: isHorizontal
+              ? 'right'
+              : (isPie ? (store.chartShowSeriesLabel ? 'bottom' : 'center') : (store.chartShowSeriesLabel ? 'bottom' : 'top')),
+            offset: isHorizontal
+              ? (store.chartShowSeriesLabel ? 12 : 4)
+              : (isPie ? (store.chartShowSeriesLabel ? 8 : 0) : (store.chartShowSeriesLabel ? 2 : 4)),
+            formatter: (val) => {
+              if (!store.chartShowLabels) return '';
+              const num = Number(val);
+              if (isNaN(num) || num === 0) return '';
+              return fmtPoint(num);
+            },
+            font: { weight: 'bold', size: 10 },
+            color: () => {
+              const defaultValColor = isPie ? '#ffffff' : '#334155';
+              return store.chartValueLabelColor || defaultValColor;
+            },
+          }
+        }
       },
     },
     scales: isPie ? {} : {
@@ -463,6 +550,10 @@ function shouldRecreate(prev, next) {
   if (!!prev.pivotMode !== !!next.pivotMode) return true;
   if (prev.stacked !== next.stacked) return true;
   if (prev.displayMode !== next.displayMode) return true;
+  if (prev.showLabels !== next.showLabels) return true;
+  if (prev.showSeriesLabel !== next.showSeriesLabel) return true;
+  if (prev.valueLabelColor !== next.valueLabelColor) return true;
+  if (prev.seriesLabelColor !== next.seriesLabelColor) return true;
   return false;
 }
 
@@ -475,6 +566,10 @@ function buildSignature() {
     pivotMode: !!td.hasPivotColumns && store.pivotRows.length === 0,
     stacked: store.chartStacked,
     displayMode: store.pivotDisplayMode,
+    showLabels: store.chartShowLabels,
+    showSeriesLabel: store.chartShowSeriesLabel,
+    valueLabelColor: store.chartValueLabelColor,
+    seriesLabelColor: store.chartSeriesLabelColor,
   };
 }
 
@@ -541,6 +636,9 @@ watch(
     () => store.chartType,
     () => store.chartStacked,
     () => store.chartShowLabels,
+    () => store.chartShowSeriesLabel,
+    () => store.chartValueLabelColor,
+    () => store.chartSeriesLabelColor,
     () => store.chartFill,
     () => store.chartSwapAxes,
     () => ({ ...store.chartCustomColors }),

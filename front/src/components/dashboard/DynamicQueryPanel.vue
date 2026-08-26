@@ -426,7 +426,6 @@ v-if="['bar', 'hbar', 'line'].includes(store.chartType)" v-model="store.chartSta
               <q-toggle
 v-if="store.chartType === 'line'" v-model="store.chartFill" label="Rellenar"
                 dense color="primary" class="text-xs" />
-              <q-toggle v-model="store.chartShowLabels" label="Valores" dense color="primary" class="text-xs" />
               <q-btn
                 flat round dense icon="swap_horiz" class="text-xs"
                 :color="store.chartSwapAxes ? 'primary' : 'grey-7'"

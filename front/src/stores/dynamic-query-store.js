@@ -73,6 +73,9 @@ function dynamicQuerySetup() {
   const chartType = ref('bar');
   const chartStacked = ref(false);
   const chartShowLabels = ref(false);
+  const chartShowSeriesLabel = ref(false);
+  const chartValueLabelColor = ref('');
+  const chartSeriesLabelColor = ref('');
   const chartFill = ref(false);
   const chartCustomColors = ref({});
   // Transpone los ejes del gráfico: las filas pasan a series y las series a etiquetas
@@ -521,6 +524,9 @@ function dynamicQuerySetup() {
     chartType.value = 'bar';
     chartStacked.value = false;
     chartShowLabels.value = false;
+    chartShowSeriesLabel.value = false;
+    chartValueLabelColor.value = '';
+    chartSeriesLabelColor.value = '';
     chartFill.value = false;
     chartSwapAxes.value = false;
     chartCustomColors.value = {};
@@ -568,6 +574,9 @@ function dynamicQuerySetup() {
         type: chartType.value,
         stacked: chartStacked.value,
         showLabels: chartShowLabels.value,
+        showSeriesLabel: chartShowSeriesLabel.value,
+        valueLabelColor: chartValueLabelColor.value,
+        seriesLabelColor: chartSeriesLabelColor.value,
         fill: chartFill.value,
         customColors: chartCustomColors.value,
         customLabels: customLabels.value,
@@ -654,6 +663,9 @@ function dynamicQuerySetup() {
     chartType.value = chart.type || 'bar';
     chartStacked.value = chart.stacked || false;
     chartShowLabels.value = chart.showLabels || false;
+    chartShowSeriesLabel.value = chart.showSeriesLabel || false;
+    chartValueLabelColor.value = chart.valueLabelColor || '';
+    chartSeriesLabelColor.value = chart.seriesLabelColor || '';
     chartFill.value = chart.fill || false;
     chartCustomColors.value = chart.customColors || {};
     customLabels.value = chart.customLabels || {};
@@ -708,7 +720,7 @@ function dynamicQuerySetup() {
     // State
     availableFields, loading, dataLoading,
     pivotRows, pivotColumns, pivotValues, pivotFilters,
-    chartType, chartStacked, chartShowLabels, chartFill, chartSwapAxes, chartCustomColors, customLabels, pivotDisplayMode, pivotTableTitle, chartTitle,
+    chartType, chartStacked, chartShowLabels, chartShowSeriesLabel, chartValueLabelColor, chartSeriesLabelColor, chartFill, chartSwapAxes, chartCustomColors, customLabels, pivotDisplayMode, pivotTableTitle, chartTitle,
     rawData, dataColumns, totalRows,
     savedQueries, currentQueryId, currentQueryName,
     pinTable, pinChart, dataSource, splitMultiValue, enableRanking, rankingCount,
