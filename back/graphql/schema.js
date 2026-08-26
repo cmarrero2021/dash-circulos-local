@@ -67,6 +67,7 @@ const RootQuery = new GraphQLObjectType({
                 values: { type: new GraphQLList(FieldConfigInput) },
                 limit: { type: GraphQLInt },
                 splitMultiValue: { type: GraphQLBoolean, defaultValue: true },
+                topN: { type: GraphQLInt },
             },
             resolve: resolvers.dashboardData,
         },

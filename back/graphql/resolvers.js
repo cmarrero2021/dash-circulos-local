@@ -198,6 +198,7 @@ function buildArgsHash(args) {
         values:          [...(args.values  || [])].sort((a, b) => a.field.localeCompare(b.field)),
         limit:           args.limit || 5000,
         splitMultiValue: args.splitMultiValue !== false,
+        topN:            args.topN || null,
     });
     return crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 16);
 }
@@ -382,13 +383,27 @@ const resolvers = {
                 ? 'GROUP BY ' + groupByParts.join(', ')
                 : '';
 
+            const topN = args.topN && Number(args.topN) > 0 ? Number(args.topN) : null;
+            let orderBySQL = 'ORDER BY 1';
+            let effectiveLimit = Math.min(limit, 10000);
+
+            if (topN) {
+                // En modo ranking (Top N), ordenar de mayor a menor según la primera métrica
+                if (valueFields.length > 0 && groupByParts.length > 0) {
+                    orderBySQL = `ORDER BY ${groupByParts.length + 1} DESC`;
+                } else {
+                    orderBySQL = 'ORDER BY 1 DESC';
+                }
+                effectiveLimit = topN;
+            }
+
             const sql = `
                 SELECT ${selectParts.join(', ')}
                 FROM ${fromSQL}
                 ${whereClause}
                 ${groupBySQL}
-                ORDER BY 1
-                LIMIT ${Math.min(limit, 10000)}
+                ${orderBySQL}
+                LIMIT ${effectiveLimit}
             `;
 
             const result = await client.query(sql, queryParams);

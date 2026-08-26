@@ -57,12 +57,17 @@ En la pestaña correspondiente, asegúrate de estar en el módulo de **Consultas
 3. Arrastra la métrica que deseas contar a **Valores** (por ejemplo: **`Cédula (COUNT)`** o cualquier campo con conteo).
 4. *(Opcional)* Agrega filtros si deseas limitar por un estado o municipio específico.
 
-### Paso 3: Verificar el Interruptor de Desagregación
-Debajo de las cajas de configuración, verás el interruptor:
-> 🔘 **Desagregar multiselección (separar por comas)**
+### Paso 3: Configurar Desagregación y Ranking (Top N)
+Debajo de las cajas de configuración, cuentas con dos controles clave:
 
-* **Activado (por defecto):** Cada enfermedad o habilidad aparecerá en su propia fila individual y limpia.
-* **Desactivado:** Volverá a mostrar las cadenas combinadas exactas tal como fueron ingresadas.
+1. 🔘 **Desagregar multiselección (comas):**
+   * **Activado (por defecto):** Cada enfermedad o habilidad aparecerá en su propia fila individual y limpia.
+   * **Desactivado:** Muestra las combinaciones exactas tal como fueron registradas.
+
+2. 🏆 **Ranking / Top N (Opcional):**
+   * **Desactivado (por defecto):** Muestra el listado completo con todos los resultados en su orden natural.
+   * **Activado:** Ordena automáticamente de **mayor a menor incidencia** y restringe la vista a los **N principales** resultados (por ejemplo: Top 3, Top 5, Top 10 o el número que escribas manualmente).
+   * *Si la cantidad de resultados disponibles es menor al Top seleccionado (por ejemplo, pides un Top 10 pero solo existen 7 enfermedades registradas), el sistema mostrará automáticamente los 7 registros sin omitir ninguno.*
 
 ### Paso 4: Ejecutar la Consulta
 Haz clic en el botón azul **"Ejecutar Consulta Dinámica"**.

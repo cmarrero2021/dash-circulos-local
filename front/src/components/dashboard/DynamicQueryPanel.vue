@@ -329,13 +329,13 @@ v-for="agg in ['SUM', 'COUNT', 'AVG', 'MIN', 'MAX']" :key="agg" v-close-popup cl
         </div>
 
         <!-- Execute action button & options -->
-        <div v-if="store.hasConfig" class="execute-query-action q-my-md row items-center justify-between flex-wrap q-gutter-y-xs">
-          <div class="row items-center q-gutter-x-sm">
+        <div v-if="store.hasConfig" class="execute-query-action q-my-md row items-center justify-between flex-wrap q-gutter-md">
+          <div class="row items-center q-gutter-md flex-wrap">
             <q-toggle
               v-model="store.splitMultiValue"
               dense size="xs"
               color="primary"
-              label="Desagregar multiselección (separar por comas)"
+              label="Desagregar multiselección (comas)"
               class="text-caption text-weight-medium text-grey-8"
               @update:model-value="store.fetchData"
             >
@@ -343,7 +343,59 @@ v-for="agg in ['SUM', 'COUNT', 'AVG', 'MIN', 'MAX']" :key="agg" v-close-popup cl
                 Separa automáticamente valores múltiples (ej. Enfermedades, Discapacidades, Habilidades) para que cada elemento cuente de forma individual.
               </q-tooltip>
             </q-toggle>
+
+            <q-separator vertical inset class="q-mx-xs gt-xs" />
+
+            <!-- Ranking / Top N -->
+            <div class="row items-center q-gutter-xs">
+              <q-toggle
+                v-model="store.enableRanking"
+                dense size="xs"
+                color="amber-9"
+                label="Ranking / Top"
+                class="text-caption text-weight-medium text-grey-8"
+                @update:model-value="store.fetchData"
+              >
+                <q-tooltip>
+                  Limita y ordena los resultados para mostrar sólo los N elementos con mayor incidencia.
+                </q-tooltip>
+              </q-toggle>
+
+              <template v-if="store.enableRanking">
+                <q-input
+                  v-model.number="store.rankingCount"
+                  type="number"
+                  min="1"
+                  max="1000"
+                  dense outlined
+                  class="ranking-input q-ml-xs"
+                  style="width: 78px;"
+                  bg-color="white"
+                  @change="store.fetchData"
+                >
+                  <template #prepend>
+                    <span class="text-caption text-weight-bold text-amber-9">#</span>
+                  </template>
+                </q-input>
+
+                <!-- Botones rápidos de ranking -->
+                <q-btn-group flat dense class="ranking-btn-group q-ml-xs">
+                  <q-btn
+                    v-for="n in [3, 5, 10, 20]"
+                    :key="n"
+                    dense flat size="xs"
+                    :label="`${n}`"
+                    :color="store.rankingCount === n ? 'amber-10' : 'grey-7'"
+                    :class="{ 'bg-amber-2 text-weight-bold': store.rankingCount === n }"
+                    @click="store.rankingCount = n; store.fetchData();"
+                  >
+                    <q-tooltip>Mostrar los {{ n }} principales</q-tooltip>
+                  </q-btn>
+                </q-btn-group>
+              </template>
+            </div>
           </div>
+
           <q-btn
             color="primary" icon="play_arrow" label="Ejecutar Consulta Dinámica" :loading="store.dataLoading"
             unelevated class="execute-animated-btn shadow-md rounded-btn text-weight-bold" @click="store.fetchData" />
@@ -1304,5 +1356,26 @@ onMounted(() => {
   box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05);
   border-radius: 10px;
   border: 1px solid #e2e8f0;
+}
+
+.ranking-input :deep(.q-field__control) {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+.ranking-input :deep(.q-field__marginal) {
+  height: 28px;
+}
+.ranking-btn-group {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+  overflow: hidden;
+}
+.ranking-btn-group .q-btn {
+  padding: 2px 6px;
+  font-size: 11px;
 }
 </style>

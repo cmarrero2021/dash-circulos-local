@@ -111,6 +111,10 @@ function dynamicQuerySetup() {
   // Desagregación automática de columnas de selección múltiple (multivalor)
   const splitMultiValue = ref(true);
 
+  // Ranking (Top N de mayor incidencia)
+  const enableRanking = ref(false);
+  const rankingCount = ref(10);
+
   // ─── Computed ─────────────────────────────────────────────────────────────
   const fieldsByCategory = computed(() => {
     const categories = {};
@@ -132,6 +136,9 @@ function dynamicQuerySetup() {
     columns: pivotColumns.value.map(f => f.key),
     values: pivotValues.value.map(f => ({ field: f.key, aggregation: f.aggregation || 'COUNT' })),
     filters: pivotFilters.value,
+    splitMultiValue: splitMultiValue.value,
+    enableRanking: enableRanking.value,
+    rankingCount: rankingCount.value,
   }));
 
   // ─── Pivot table computed data ────────────────────────────────────────────
@@ -199,8 +206,8 @@ function dynamicQuerySetup() {
       });
 
       const query = `
-        query DashboardData($source: String, $fields: [String], $filters: [FilterInput], $groupBy: [String], $values: [FieldConfigInput], $limit: Int, $splitMultiValue: Boolean) {
-          dashboardData(source: $source, fields: $fields, filters: $filters, groupBy: $groupBy, values: $values, limit: $limit, splitMultiValue: $splitMultiValue) {
+        query DashboardData($source: String, $fields: [String], $filters: [FilterInput], $groupBy: [String], $values: [FieldConfigInput], $limit: Int, $splitMultiValue: Boolean, $topN: Int) {
+          dashboardData(source: $source, fields: $fields, filters: $filters, groupBy: $groupBy, values: $values, limit: $limit, splitMultiValue: $splitMultiValue, topN: $topN) {
             columns
             rows
             totalRows
@@ -218,6 +225,7 @@ function dynamicQuerySetup() {
           values: values.length > 0 ? values : undefined,
           limit: 5000,
           splitMultiValue: splitMultiValue.value,
+          topN: enableRanking.value && rankingCount.value > 0 ? Number(rankingCount.value) : undefined,
         }
       }, {
         headers: {
@@ -267,14 +275,23 @@ function dynamicQuerySetup() {
           };
         }),
       ];
+
+      // Aplicar orden y límite de ranking si está activo
+      let finalBodyRows = rows;
+      if (enableRanking.value && rankingCount.value > 0 && valKeys.length > 0) {
+        const metricKey = valKeys[0];
+        const sorted = [...rows].sort((a, b) => (Number(b[metricKey]) || 0) - (Number(a[metricKey]) || 0));
+        finalBodyRows = sorted.slice(0, Number(rankingCount.value));
+      }
+
       const grandTotals = {};
       valKeys.forEach(vk => { grandTotals[vk] = 0; });
-      rows.forEach(row => {
+      finalBodyRows.forEach(row => {
         valKeys.forEach(vk => {
           grandTotals[vk] += Number(row[vk]) || 0;
         });
       });
-      return { headers, bodyRows: rows, grandTotals, hasPivotColumns: false };
+      return { headers, bodyRows: finalBodyRows, grandTotals, hasPivotColumns: false };
     }
 
     // With column pivoting: need to cross-tab
@@ -335,13 +352,25 @@ function dynamicQuerySetup() {
       return row;
     });
 
+    // Aplicar orden y límite de ranking en modo cruzado si está activo
+    let finalBodyRows = bodyRows;
+    if (enableRanking.value && rankingCount.value > 0) {
+      const valHeaders = headers.filter(h => h.isValue);
+      const sorted = [...bodyRows].sort((a, b) => {
+        const sumA = valHeaders.reduce((s, h) => s + (Number(a[h.key]) || 0), 0);
+        const sumB = valHeaders.reduce((s, h) => s + (Number(b[h.key]) || 0), 0);
+        return sumB - sumA;
+      });
+      finalBodyRows = sorted.slice(0, Number(rankingCount.value));
+    }
+
     // Grand totals
     const grandTotals = {};
     headers.filter(h => h.isValue).forEach(h => {
-      grandTotals[h.key] = bodyRows.reduce((sum, r) => sum + (Number(r[h.key]) || 0), 0);
+      grandTotals[h.key] = finalBodyRows.reduce((sum, r) => sum + (Number(r[h.key]) || 0), 0);
     });
 
-    return { headers, bodyRows, grandTotals, hasPivotColumns: true, colValues };
+    return { headers, bodyRows: finalBodyRows, grandTotals, hasPivotColumns: true, colValues };
   }
 
   // ─── Field drag & drop ────────────────────────────────────────────────────
@@ -502,6 +531,8 @@ function dynamicQuerySetup() {
     pinTable.value = false;
     pinChart.value = false;
     splitMultiValue.value = true;
+    enableRanking.value = false;
+    rankingCount.value = 10;
     currentQueryId.value = null;
     currentQueryName.value = '';
   }
@@ -530,6 +561,8 @@ function dynamicQuerySetup() {
         values: pivotValues.value,
         filters: pivotFilters.value,
         splitMultiValue: splitMultiValue.value,
+        enableRanking: enableRanking.value,
+        rankingCount: rankingCount.value,
       },
       chart_config: {
         type: chartType.value,
@@ -614,6 +647,8 @@ function dynamicQuerySetup() {
     pivotValues.value = config.values || [];
     pivotFilters.value = migrateLegacyFilters(config.filters || []);
     splitMultiValue.value = typeof config.splitMultiValue !== 'undefined' ? !!config.splitMultiValue : true;
+    enableRanking.value = typeof config.enableRanking !== 'undefined' ? !!config.enableRanking : false;
+    rankingCount.value = typeof config.rankingCount !== 'undefined' ? Number(config.rankingCount) : 10;
     dataSource.value = config.source || 'priorizados';
     await loadAvailableFields();
     chartType.value = chart.type || 'bar';
@@ -676,7 +711,7 @@ function dynamicQuerySetup() {
     chartType, chartStacked, chartShowLabels, chartFill, chartSwapAxes, chartCustomColors, customLabels, pivotDisplayMode, pivotTableTitle, chartTitle,
     rawData, dataColumns, totalRows,
     savedQueries, currentQueryId, currentQueryName,
-    pinTable, pinChart, dataSource,
+    pinTable, pinChart, dataSource, splitMultiValue, enableRanking, rankingCount,
     // Computed
     fieldsByCategory, hasConfig, pivotConfig, pivotTableData,
     // Actions
