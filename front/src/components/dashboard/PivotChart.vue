@@ -102,15 +102,13 @@ import {
 } from 'chart.js';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 
-// Register only once across HMR cycles to avoid duplicate-registration warnings
-if (!Chart.registry.plugins.get('datalabels')) {
-  Chart.register(
-    BarController, LineController, PieController, DoughnutController,
-    CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement,
-    Title, Tooltip, Legend, Filler,
-    ChartDataLabels
-  );
-}
+// Registrar controladores, elementos y plugins necesarios
+Chart.register(
+  BarController, LineController, PieController, DoughnutController,
+  CategoryScale, LinearScale, BarElement, LineElement, PointElement, ArcElement,
+  Title, Tooltip, Legend, Filler,
+  ChartDataLabels
+);
 
 const props = defineProps({
   store: { type: Object, default: null },

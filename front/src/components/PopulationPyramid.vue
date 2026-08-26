@@ -293,14 +293,11 @@ import {
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { utils, writeFile } from 'xlsx';
 
-// Registrar Chart.js una sola vez (guard multi-instancia / HMR)
-if (!Chart.registry.plugins.get('datalabels')) {
-  Chart.register(
-    BarController, CategoryScale, LinearScale, BarElement,
-    Title, Tooltip, Legend,
-    ChartDataLabels,
-  );
-}
+Chart.register(
+  BarController, CategoryScale, LinearScale, BarElement,
+  Title, Tooltip, Legend,
+  ChartDataLabels,
+);
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const loading   = ref(false);

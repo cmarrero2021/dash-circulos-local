@@ -64,7 +64,7 @@ const FIELD_MAP_REGISTROS = {
     'condicion_casa': { sql: 'r.condicion_casa', label: 'Condición de la Casa', category: 'Vivienda' },
     'tipo_casa': { sql: 'r.tipo_casa', label: 'Tipo de Casa', category: 'Vivienda' },
     'otro_tipo_casa': { sql: 'r.otro_tipo_casa', label: 'Otro Tipo de Casa', category: 'Vivienda' },
-    'vive_con': { sql: 'r.vive_con', label: 'Vive con', category: 'Vivienda' },
+    'vive_con': { sql: 'r.vive_con', label: 'Vive con', category: 'Vivienda', multiValue: true },
     'other_living_with': { sql: 'r.other_living_with', label: 'Otros con quien Vive', category: 'Vivienda' },
     'is_institutionalized_residency_center': { sql: 'r.is_institutionalized_residency_center', label: 'Reside en Centro (Sí/No)', category: 'Vivienda' },
     'residency_center': { sql: 'r.residency_center', label: 'Centro de Residencia', category: 'Vivienda' },
@@ -79,31 +79,31 @@ const FIELD_MAP_REGISTROS = {
 
     // Salud y Social
     'estatus_tratamiento': { sql: 'r.estatus_tratamiento', label: 'Estatus de Tratamiento', category: 'Salud y Social' },
-    'discapacidades': { sql: 'r.discapacidades', label: 'Discapacidades', category: 'Salud y Social' },
-    'enfermedades': { sql: 'r.enfermedades', label: 'Enfermedades', category: 'Salud y Social' },
+    'discapacidades': { sql: 'r.discapacidades', label: 'Discapacidades', category: 'Salud y Social', multiValue: true },
+    'enfermedades': { sql: 'r.enfermedades', label: 'Enfermedades', category: 'Salud y Social', multiValue: true },
     'otra_enfermedad': { sql: 'r.otra_enfermedad', label: 'Otra Enfermedad', category: 'Salud y Social' },
-    'centros_salud': { sql: 'r.centros_salud', label: 'Centros de Salud', category: 'Salud y Social' },
-    'organizacion_social': { sql: 'r.organizacion_social', label: 'Organización Social', category: 'Salud y Social' },
+    'centros_salud': { sql: 'r.centros_salud', label: 'Centros de Salud', category: 'Salud y Social', multiValue: true },
+    'organizacion_social': { sql: 'r.organizacion_social', label: 'Organización Social', category: 'Salud y Social', multiValue: true },
     'other_social_organization': { sql: 'r.other_social_organization', label: 'Otra Organización Social', category: 'Salud y Social' },
 
     // Educación
     'nivel_educativo': { sql: 'r.nivel_educativo', label: 'Nivel Educativo', category: 'Educación' },
     'compartir_conocimiento': { sql: 'r.compartir_conocimiento', label: 'Comparte Conocimiento', category: 'Educación' },
-    'habilidades': { sql: 'r.habilidades', label: 'Habilidades', category: 'Educación' },
+    'habilidades': { sql: 'r.habilidades', label: 'Habilidades', category: 'Educación', multiValue: true },
     'otra_habiidad': { sql: 'r.otra_habiidad', label: 'Otra Habilidad', category: 'Educación' },
 
     // Socioeconómico
-    'fuente_ingresos': { sql: 'r.fuente_ingresos', label: 'Fuente de Ingresos', category: 'Socioeconómico' },
-    'fuente_gastos': { sql: 'r.fuente_gastos', label: 'Fuente de Gastos', category: 'Socioeconómico' },
+    'fuente_ingresos': { sql: 'r.fuente_ingresos', label: 'Fuente de Ingresos', category: 'Socioeconómico', multiValue: true },
+    'fuente_gastos': { sql: 'r.fuente_gastos', label: 'Fuente de Gastos', category: 'Socioeconómico', multiValue: true },
     'other_expense_source': { sql: 'r.other_expense_source', label: 'Otra Fuente de Gastos', category: 'Socioeconómico' },
     'etnicidad': { sql: 'r.etnicidad', label: 'Etnicidad', category: 'Socioeconómico' },
     'other_ethnicity': { sql: 'r.other_ethnicity', label: 'Otra Etnicidad', category: 'Socioeconómico' },
-    'misiones_sociales': { sql: 'r.misiones_sociales', label: 'Misiones Sociales', category: 'Socioeconómico' },
+    'misiones_sociales': { sql: 'r.misiones_sociales', label: 'Misiones Sociales', category: 'Socioeconómico', multiValue: true },
     'medios_comunicacion': { sql: 'r.medios_comunicacion', label: 'Medios de Comunicación', category: 'Socioeconómico' },
 
     // Registro
     'create_date': { sql: 'r.create_date', label: 'Fecha de Registro', category: 'Registro', date: true },
-    'tipo_actividades': { sql: 'r.tipo_actividades', label: 'Tipo de Actividades', category: 'Registro' },
+    'tipo_actividades': { sql: 'r.tipo_actividades', label: 'Tipo de Actividades', category: 'Registro', multiValue: true },
 };
 
 // Fuentes de datos disponibles para la consulta dinámica:
@@ -191,12 +191,13 @@ function buildFilterCondition(filter, paramIdx, fieldMap = FIELD_MAP) {
  */
 function buildArgsHash(args) {
     const normalized = JSON.stringify({
-        source:  args.source || 'priorizados',
-        fields:  [...(args.fields  || [])].sort(),
-        filters: [...(args.filters || [])].sort((a, b) => a.field.localeCompare(b.field)),
-        groupBy: [...(args.groupBy || [])].sort(),
-        values:  [...(args.values  || [])].sort((a, b) => a.field.localeCompare(b.field)),
-        limit:   args.limit || 5000,
+        source:          args.source || 'priorizados',
+        fields:          [...(args.fields  || [])].sort(),
+        filters:         [...(args.filters || [])].sort((a, b) => a.field.localeCompare(b.field)),
+        groupBy:         [...(args.groupBy || [])].sort(),
+        values:          [...(args.values  || [])].sort((a, b) => a.field.localeCompare(b.field)),
+        limit:           args.limit || 5000,
+        splitMultiValue: args.splitMultiValue !== false,
     });
     return crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 16);
 }
@@ -220,6 +221,7 @@ const resolvers = {
             category: def.category,
             numeric: !!def.numeric,
             date: !!def.date,
+            multiValue: !!def.multiValue,
         }));
         const result = JSON.stringify(fields);
         await cache.set(cacheKey, result, GRAPHQL_FIELDS_TTL);
@@ -253,6 +255,7 @@ const resolvers = {
             const groupByFields = args.groupBy || [];
             const valueFields = args.values || [];
             const limit = args.limit || 5000;
+            const splitMultiValue = args.splitMultiValue !== false;
 
             // 1. Obtener cláusula de permisos obligatorios (seguridad geográfica)
             const { permClause, permParams, nextParamIndex } = await ds.buildPerm(userId);
@@ -315,9 +318,11 @@ const resolvers = {
                 }
             }
 
-            // 3. SELECT y agrupación dinámicos
+            // 3. SELECT, JOINs laterales y agrupación dinámicos
             let selectParts = [];
             let columnNames = [];
+            let lateralJoins = [];
+            let groupByParts = [];
 
             if (groupByFields.length > 0 || valueFields.length > 0) {
                 // Modo Agrupación/Agregación (Pivot)
@@ -325,7 +330,15 @@ const resolvers = {
                     const def = fieldMap[gf];
                     if (def) {
                         const alias = gf.replace('.', '_');
-                        selectParts.push(`${def.sql} AS ${alias}`);
+                        if (def.multiValue && splitMultiValue) {
+                            const uAlias = `u_${alias}`;
+                            lateralJoins.push(`LEFT JOIN LATERAL unnest(string_to_array(NULLIF(TRIM(${def.sql}), ''), ',')) AS ${uAlias}(val) ON true`);
+                            selectParts.push(`COALESCE(NULLIF(TRIM(${uAlias}.val), ''), 'Ninguno/Sin especificar') AS ${alias}`);
+                            groupByParts.push(`COALESCE(NULLIF(TRIM(${uAlias}.val), ''), 'Ninguno/Sin especificar')`);
+                        } else {
+                            selectParts.push(`${def.sql} AS ${alias}`);
+                            groupByParts.push(def.sql);
+                        }
                         columnNames.push(gf);
                     }
                 }
@@ -364,13 +377,14 @@ const resolvers = {
                 columnNames.push('count');
             }
 
-            const groupBySQL = groupByFields.length
-                ? 'GROUP BY ' + groupByFields.map(gf => fieldMap[gf]?.sql).filter(Boolean).join(', ')
+            const fromSQL = `${tableSQL} ${lateralJoins.join(' ')}`;
+            const groupBySQL = groupByParts.length
+                ? 'GROUP BY ' + groupByParts.join(', ')
                 : '';
 
             const sql = `
                 SELECT ${selectParts.join(', ')}
-                FROM ${tableSQL}
+                FROM ${fromSQL}
                 ${whereClause}
                 ${groupBySQL}
                 ORDER BY 1

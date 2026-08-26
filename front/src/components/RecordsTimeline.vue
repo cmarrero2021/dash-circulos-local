@@ -393,14 +393,11 @@ import {
 import ChartDataLabels from 'chartjs-plugin-datalabels';
 import { utils, writeFile } from 'xlsx';
 
-// Registrar plugins y controladores de Chart.js
-if (!Chart.registry.plugins.get('datalabels')) {
-  Chart.register(
-    LineController, BarController, CategoryScale, LinearScale,
-    PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler,
-    ChartDataLabels
-  );
-}
+Chart.register(
+  LineController, BarController, CategoryScale, LinearScale,
+  PointElement, LineElement, BarElement, Title, Tooltip, Legend, Filler,
+  ChartDataLabels
+);
 
 // ── State ─────────────────────────────────────────────────────────────────────
 const loading = ref(false);

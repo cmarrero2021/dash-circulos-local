@@ -108,6 +108,9 @@ function dynamicQuerySetup() {
   const pinTable = ref(false);
   const pinChart = ref(false);
 
+  // Desagregación automática de columnas de selección múltiple (multivalor)
+  const splitMultiValue = ref(true);
+
   // ─── Computed ─────────────────────────────────────────────────────────────
   const fieldsByCategory = computed(() => {
     const categories = {};
@@ -196,8 +199,8 @@ function dynamicQuerySetup() {
       });
 
       const query = `
-        query DashboardData($source: String, $fields: [String], $filters: [FilterInput], $groupBy: [String], $values: [FieldConfigInput], $limit: Int) {
-          dashboardData(source: $source, fields: $fields, filters: $filters, groupBy: $groupBy, values: $values, limit: $limit) {
+        query DashboardData($source: String, $fields: [String], $filters: [FilterInput], $groupBy: [String], $values: [FieldConfigInput], $limit: Int, $splitMultiValue: Boolean) {
+          dashboardData(source: $source, fields: $fields, filters: $filters, groupBy: $groupBy, values: $values, limit: $limit, splitMultiValue: $splitMultiValue) {
             columns
             rows
             totalRows
@@ -214,6 +217,7 @@ function dynamicQuerySetup() {
           groupBy: groupBy.length > 0 ? groupBy : undefined,
           values: values.length > 0 ? values : undefined,
           limit: 5000,
+          splitMultiValue: splitMultiValue.value,
         }
       }, {
         headers: {
@@ -497,6 +501,7 @@ function dynamicQuerySetup() {
     chartTitle.value = '';
     pinTable.value = false;
     pinChart.value = false;
+    splitMultiValue.value = true;
     currentQueryId.value = null;
     currentQueryName.value = '';
   }
@@ -524,6 +529,7 @@ function dynamicQuerySetup() {
         columns: pivotColumns.value,
         values: pivotValues.value,
         filters: pivotFilters.value,
+        splitMultiValue: splitMultiValue.value,
       },
       chart_config: {
         type: chartType.value,
@@ -607,6 +613,7 @@ function dynamicQuerySetup() {
     pivotColumns.value = config.columns || [];
     pivotValues.value = config.values || [];
     pivotFilters.value = migrateLegacyFilters(config.filters || []);
+    splitMultiValue.value = typeof config.splitMultiValue !== 'undefined' ? !!config.splitMultiValue : true;
     dataSource.value = config.source || 'priorizados';
     await loadAvailableFields();
     chartType.value = chart.type || 'bar';

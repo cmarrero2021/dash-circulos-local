@@ -161,9 +161,16 @@ v-for="field in fields" :key="field.key" class="draggable-field-chip row items-c
                   draggable="true" :title="field.label" @dragstart="onDragStart($event, field)">
                   <div class="row items-center q-gutter-xs text-xs">
                     <q-icon
-:name="field.numeric ? 'tag' : field.date ? 'event' : 'text_fields'" size="14px"
+                      :name="field.numeric ? 'tag' : field.date ? 'event' : 'text_fields'" size="14px"
                       class="text-primary opacity-8" />
                     <span class="field-label-text text-weight-medium">{{ field.label }}</span>
+                    <q-badge
+                      v-if="field.multiValue"
+                      color="indigo-1" text-color="indigo-9"
+                      label="Multi" dense class="text-xxs q-px-xs"
+                    >
+                      <q-tooltip>Columna con múltiples valores separados por comas</q-tooltip>
+                    </q-badge>
                   </div>
                   <div class="field-action-quick">
                     <q-btn icon="add" size="6px" round flat color="primary">
@@ -321,11 +328,25 @@ v-for="agg in ['SUM', 'COUNT', 'AVG', 'MIN', 'MAX']" :key="agg" v-close-popup cl
           </div>
         </div>
 
-        <!-- Execute action button -->
-        <div v-if="store.hasConfig" class="execute-query-action q-my-md row justify-end">
+        <!-- Execute action button & options -->
+        <div v-if="store.hasConfig" class="execute-query-action q-my-md row items-center justify-between flex-wrap q-gutter-y-xs">
+          <div class="row items-center q-gutter-x-sm">
+            <q-toggle
+              v-model="store.splitMultiValue"
+              dense size="xs"
+              color="primary"
+              label="Desagregar multiselección (separar por comas)"
+              class="text-caption text-weight-medium text-grey-8"
+              @update:model-value="store.fetchData"
+            >
+              <q-tooltip>
+                Separa automáticamente valores múltiples (ej. Enfermedades, Discapacidades, Habilidades) para que cada elemento cuente de forma individual.
+              </q-tooltip>
+            </q-toggle>
+          </div>
           <q-btn
-color="primary" icon="play_arrow" label="Ejecutar Consulta Dinámica" :loading="store.dataLoading"
-            unelevated class="execute-animated-btn full-width shadow-md rounded-btn text-weight-bold" @click="store.fetchData" />
+            color="primary" icon="play_arrow" label="Ejecutar Consulta Dinámica" :loading="store.dataLoading"
+            unelevated class="execute-animated-btn shadow-md rounded-btn text-weight-bold" @click="store.fetchData" />
         </div>
 
         <!-- Results panel (Table / Charts) -->
