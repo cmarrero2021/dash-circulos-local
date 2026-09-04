@@ -1,0 +1,23 @@
+-- Vista vpriorizados: estructura actual de la vista en la base de datos.
+-- Este archivo es solo referencia; la vista se mantiene directamente en PostgreSQL.
+--
+-- Columnas:
+--   p.id           bigint
+--   p.estado_id    integer
+--   p.estado       text
+--   p.municipio_id integer
+--   p.municipio    text
+--   p.parroquia_id integer
+--   p.parroquia    text
+--   p.nac          character(1)      -- V o E
+--   p.cedula       integer
+--   p.nombre       text
+--   p.telefono     character(11)
+--   p.fecha_nac    date
+--   p.sexo         character(1)      -- M o F
+--   p.comunidad    text
+--   p.patria       text              -- Si / No
+--   p.mayor60      text              -- Si / No
+--   p.registro     text              -- Si / No
+--   p.circulo      text              -- Si / No
+--   p.nuevos       text              -- Si / No

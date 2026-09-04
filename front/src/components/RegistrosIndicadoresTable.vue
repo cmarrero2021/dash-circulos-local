@@ -1,75 +1,86 @@
 <template>
-    <q-card flat bordered style="min-height: 400px;">
-        <q-card-section class="row items-center justify-between">
-            <div class="text-h6">INDICADORES BÁSICOS DE REGISTROS POR ESTADO</div>
-            <q-btn color="grey-7" round flat icon="more_vert">
-                <q-menu cover auto-close>
-                    <q-list style="min-width: 150px">
-                        <q-item clickable @click="exportData('xlsx')">
-                            <q-item-section avatar><q-icon name="description" /></q-item-section>
-                            <q-item-section>Exportar a XLSX</q-item-section>
-                        </q-item>
-                        <q-item clickable @click="exportData('csv')">
-                            <q-item-section avatar><q-icon name="toc" /></q-item-section>
-                            <q-item-section>Exportar a CSV</q-item-section>
-                        </q-item>
-                        <q-item clickable @click="exportData('json')">
-                            <q-item-section avatar><q-icon name="code" /></q-item-section>
-                            <q-item-section>Exportar a JSON</q-item-section>
-                        </q-item>
-                    </q-list>
-                </q-menu>
-            </q-btn>
-        </q-card-section>
+    <q-expansion-item
+        v-model="expanded"
+        dense
+        expand-separator
+        icon="analytics"
+        label="INDICADORES BÁSICOS DE REGISTROS POR ESTADO"
+        header-class="text-subtitle2 text-weight-bold text-grey-8 bg-grey-2"
+        class="indicadores-expansion"
+    >
+        <q-card flat bordered>
+            <q-card-section class="row items-center justify-end q-py-xs">
+                <q-btn color="grey-7" round flat icon="more_vert" size="sm">
+                    <q-menu cover auto-close>
+                        <q-list style="min-width: 150px">
+                            <q-item clickable @click="exportData('xlsx')">
+                                <q-item-section avatar><q-icon name="description" /></q-item-section>
+                                <q-item-section>Exportar a XLSX</q-item-section>
+                            </q-item>
+                            <q-item clickable @click="exportData('csv')">
+                                <q-item-section avatar><q-icon name="toc" /></q-item-section>
+                                <q-item-section>Exportar a CSV</q-item-section>
+                            </q-item>
+                            <q-item clickable @click="exportData('json')">
+                                <q-item-section avatar><q-icon name="code" /></q-item-section>
+                                <q-item-section>Exportar a JSON</q-item-section>
+                            </q-item>
+                        </q-list>
+                    </q-menu>
+                </q-btn>
+            </q-card-section>
 
-        <q-separator />
+            <q-separator />
 
-        <q-card-section>
-            <q-inner-loading :showing="isLoading">
-                <q-spinner-dots size="40px" color="primary" />
-            </q-inner-loading>
+            <q-card-section>
+                <q-inner-loading :showing="isLoading">
+                    <q-spinner-dots size="40px" color="primary" />
+                </q-inner-loading>
 
-            <q-table
-v-show="!isLoading" :rows="tableData" :columns="columns" row-key="estado" flat dense
-                :pagination="{ rowsPerPage: 25 }" class="registros-table">
-                <!-- Custom header with two rows -->
-                <template #header>
-                    <!-- First row: Group headers -->
-                    <tr>
-                        <th rowspan="2" class="text-left bg-grey-3">ESTADO</th>
-                        <th rowspan="2" class="text-right bg-grey-3">REGISTROS</th>
-                        <th colspan="2" class="text-center bg-blue-2">NACIONALIDAD</th>
-                        <th colspan="2" class="text-center bg-green-2">SEXO</th>
-                        <th colspan="3" class="text-center bg-orange-2">PROMEDIO EDAD</th>
-                        <th colspan="5" class="text-center bg-purple-2">NIVEL ACADÉMICO</th>
-                    </tr>
-                    <!-- Second row: Column headers -->
-                    <tr>
-                        <th class="text-right bg-blue-1">VENEZOLANOS</th>
-                        <th class="text-right bg-blue-1">EXTRANJEROS</th>
-                        <th class="text-right bg-green-1">MASCULINOS</th>
-                        <th class="text-right bg-green-1">FEMENINOS</th>
-                        <th class="text-right bg-orange-1">GENERAL</th>
-                        <th class="text-right bg-orange-1">FEMENINO</th>
-                        <th class="text-right bg-orange-1">MASCULINO</th>
-                        <th class="text-right bg-purple-1">NINGUNO</th>
-                        <th class="text-right bg-purple-1">PRIMARIA</th>
-                        <th class="text-right bg-purple-1">SECUNDARIA</th>
-                        <th class="text-right bg-purple-1">UNIVERSIDAD</th>
-                        <th class="text-right bg-purple-1">POSTGRADO</th>
-                    </tr>
-                </template>
-            </q-table>
-        </q-card-section>
-    </q-card>
+                <q-table
+                    v-show="!isLoading" :rows="tableData" :columns="columns" row-key="estado" flat dense
+                    :pagination="{ rowsPerPage: 25 }" class="registros-table">
+                    <!-- Custom header with two rows -->
+                    <template #header>
+                        <!-- First row: Group headers -->
+                        <tr>
+                            <th rowspan="2" class="text-left bg-grey-3">ESTADO</th>
+                            <th rowspan="2" class="text-right bg-grey-3">REGISTROS</th>
+                            <th colspan="2" class="text-center bg-blue-2">NACIONALIDAD</th>
+                            <th colspan="2" class="text-center bg-green-2">SEXO</th>
+                            <th colspan="3" class="text-center bg-orange-2">PROMEDIO EDAD</th>
+                            <th colspan="5" class="text-center bg-purple-2">NIVEL ACADÉMICO</th>
+                        </tr>
+                        <!-- Second row: Column headers -->
+                        <tr>
+                            <th class="text-right bg-blue-1">VENEZOLANOS</th>
+                            <th class="text-right bg-blue-1">EXTRANJEROS</th>
+                            <th class="text-right bg-green-1">MASCULINOS</th>
+                            <th class="text-right bg-green-1">FEMENINOS</th>
+                            <th class="text-right bg-orange-1">GENERAL</th>
+                            <th class="text-right bg-orange-1">FEMENINO</th>
+                            <th class="text-right bg-orange-1">MASCULINO</th>
+                            <th class="text-right bg-purple-1">NINGUNO</th>
+                            <th class="text-right bg-purple-1">PRIMARIA</th>
+                            <th class="text-right bg-purple-1">SECUNDARIA</th>
+                            <th class="text-right bg-purple-1">UNIVERSIDAD</th>
+                            <th class="text-right bg-purple-1">POSTGRADO</th>
+                        </tr>
+                    </template>
+                </q-table>
+            </q-card-section>
+        </q-card>
+    </q-expansion-item>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useDashboardStore } from 'stores/dashboard-store';
 import { storeToRefs } from 'pinia';
 import { utils, writeFile } from 'xlsx';
 import { exportFile } from 'quasar';
+
+const expanded = ref(true);
 
 const dashboardStore = useDashboardStore();
 const { registrosIndicadores, isLoadingRegistrosIndicadores } = storeToRefs(dashboardStore);
@@ -195,5 +206,22 @@ onMounted(() => {
 
 .registros-table :deep(.bg-purple-2) {
     background-color: #e1bee7;
+}
+
+.indicadores-expansion {
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+}
+
+.indicadores-expansion :deep(.q-expansion-item__header) {
+    min-height: 40px;
+    padding: 0 12px;
+    border-radius: 4px 4px 0 0;
+    letter-spacing: 0.04em;
+}
+
+.indicadores-expansion :deep(.q-expansion-item__header .q-item__section--avatar) {
+    min-width: 32px;
+    padding-right: 8px;
 }
 </style>

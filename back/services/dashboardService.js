@@ -1,5 +1,6 @@
 // services/dashboardService.js
 const pool = require('../config/db');
+const { cache } = require('./cacheService');
 const {
     hasNationalDashboardAccess,
     getAllowedStatesForUser,
@@ -7,6 +8,25 @@ const {
 } = require('./geoPermissionsService');
 
 const DASHBOARD_DEADLINE = process.env.DASHBOARD_DEADLINE || '2025-11-30';
+
+// ─── TTL por tipo de dato ─────────────────────────────────────────────────────
+const TTL = {
+    INDICATORS:   120,  // indicadores y datos derivados
+    AGGREGATED:   300,  // datos agregados estables (mapas, estados, municipios)
+    PRIORIZADOS:   30,  // datos paginados de priorizados (alta variabilidad)
+    FILTER_OPT:    60,  // opciones de filtros desplegables
+};
+
+/**
+ * Genera una clave de caché determinista a partir de un prefijo y un objeto de parámetros.
+ */
+const buildCacheKey = (prefix, userId, params = {}) => {
+    const sorted = Object.keys(params).sort().reduce((acc, k) => {
+        acc[k] = params[k];
+        return acc;
+    }, {});
+    return `${prefix}:${userId}:${JSON.stringify(sorted)}`;
+};
 
 const getDaysRemaining = async () => {
     const { rows } = await pool.query(
@@ -103,6 +123,10 @@ const buildFilterClause = async (userId, voluntaryFilters = {}) => {
 
 // --- Funciones de Indicadores ---
 exports.getIndicators = async (userId) => {
+    const cacheKey = `dashboard:indicators:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const diasFaltantes = await getDaysRemaining();
     const hasNationalAccess = await hasNationalDashboardAccess(userId);
 
@@ -110,7 +134,7 @@ exports.getIndicators = async (userId) => {
         const query = `SELECT meta, acumulado, diferencia, dias_faltantes, promedio_necesario, promedio_diario, participantes, promedio FROM vindicadores;`;
         const result = await pool.query(query);
         const row = result.rows[0] || {};
-        return {
+        const data = {
             meta: Number(row.meta ?? 0),
             acumulado: Number(row.acumulado ?? 0),
             diferencia: Number(row.diferencia ?? 0),
@@ -120,6 +144,8 @@ exports.getIndicators = async (userId) => {
             participantes: Number(row.participantes ?? 0),
             promedio: Number(row.promedio ?? 0),
         };
+        await cache.set(cacheKey, data, TTL.INDICATORS);
+        return data;
     }
 
     const allowedStates = await getAllowedStatesForUser(userId);
@@ -168,7 +194,7 @@ exports.getIndicators = async (userId) => {
     const promedio_necesario = diasReferencia > 0 ? Math.trunc(restante / diasReferencia) : restante;
     const promedio_diario = diasConRegistro > 0 ? Math.trunc(acumulado / diasConRegistro) : 0;
 
-    return {
+    const data = {
         meta,
         acumulado,
         diferencia,
@@ -178,10 +204,16 @@ exports.getIndicators = async (userId) => {
         participantes,
         promedio,
     };
-}
+    await cache.set(cacheKey, data, TTL.INDICATORS);
+    return data;
+};
 
 // --- Funciones de Agregación ---
 exports.getCirclesByState = async (userId, filters) => {
+    const cacheKey = buildCacheKey('dashboard:by-state', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
         SELECT *
@@ -189,10 +221,15 @@ exports.getCirclesByState = async (userId, filters) => {
         ORDER BY estado;
     `;
     const result = await pool.query(query, params);
+    await cache.set(cacheKey, result.rows, TTL.AGGREGATED);
     return result.rows;
 };
 
 exports.getCirclesByStateMunicipiosComunas = async (userId, filters = {}) => {
+    const cacheKey = buildCacheKey('dashboard:by-state-mun-com', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
         SELECT estado, municipio, comuna, COUNT(*) as avance
@@ -202,10 +239,15 @@ exports.getCirclesByStateMunicipiosComunas = async (userId, filters = {}) => {
         ORDER BY estado, municipio, comuna;
     `;
     const result = await pool.query(query, params);
+    await cache.set(cacheKey, result.rows, TTL.AGGREGATED);
     return result.rows;
 };
 
 exports.getCirclesByStateMunicipios = async (userId, filters = {}) => {
+    const cacheKey = buildCacheKey('dashboard:by-state-mun', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
         SELECT estado_id, estado, municipio_id, municipio, COUNT(*) as avance
@@ -215,10 +257,15 @@ exports.getCirclesByStateMunicipios = async (userId, filters = {}) => {
         ORDER BY estado, municipio;
     `;
     const result = await pool.query(query, params);
+    await cache.set(cacheKey, result.rows, TTL.AGGREGATED);
     return result.rows;
 };
 
 exports.getCirclesByStateMunicipiosParroquias = async (userId, filters = {}) => {
+    const cacheKey = buildCacheKey('dashboard:by-state-mun-par', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
 
     /**
@@ -277,10 +324,15 @@ exports.getCirclesByStateMunicipiosParroquias = async (userId, filters = {}) => 
         ORDER BY estado, municipio, parroquia;
     `;
     const result = await pool.query(query, params);
+    await cache.set(cacheKey, result.rows, TTL.AGGREGATED);
     return result.rows;
 };
 
 exports.getCirclesByStateMunicipiosParroquiasComunas = async (userId, filters = {}) => {
+    const cacheKey = buildCacheKey('dashboard:by-state-mun-par-com', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
         WITH comunas_filtradas AS (
@@ -300,10 +352,15 @@ exports.getCirclesByStateMunicipiosParroquiasComunas = async (userId, filters = 
         ORDER BY c.estado, c.municipio, c.parroquia, c.comuna;
     `;
     const result = await pool.query(query, params);
+    await cache.set(cacheKey, result.rows, TTL.AGGREGATED);
     return result.rows;
 };
 
 exports.getCirclesByMunicipality = async (userId, filters) => {
+    const cacheKey = buildCacheKey('dashboard:by-municipality', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
         SELECT estado, municipio, COUNT(id) as total_circulos
@@ -311,17 +368,28 @@ exports.getCirclesByMunicipality = async (userId, filters) => {
         GROUP BY estado, municipio ORDER BY estado, municipio;
     `;
     const result = await pool.query(query, params);
+    await cache.set(cacheKey, result.rows, TTL.AGGREGATED);
     return result.rows;
 };
 
 exports.getTotalCircles = async (userId, filters) => {
+    const cacheKey = buildCacheKey('dashboard:total', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `SELECT COUNT(id) as total FROM rm_circulos_remoto ${whereClause}`;
     const result = await pool.query(query, params);
-    return result.rows[0] || { total: 0 };
+    const data = result.rows[0] || { total: 0 };
+    await cache.set(cacheKey, data, TTL.AGGREGATED);
+    return data;
 };
 
 exports.getDailyAverage = async (userId, filters) => {
+    const cacheKey = buildCacheKey('dashboard:daily-avg', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
         SELECT 
@@ -331,6 +399,7 @@ exports.getDailyAverage = async (userId, filters) => {
         FROM rm_circulos_remoto ${whereClause};
     `;
     const result = await pool.query(query, params);
+    await cache.set(cacheKey, result.rows[0], TTL.INDICATORS);
     return result.rows[0];
 };
 
@@ -350,6 +419,10 @@ exports.getRawData = async (userId, filters) => {
 
 // --- Función para certificaciones diarias filtradas por permisos
 exports.getDailyCertifications = async (userId, filters) => {
+    const cacheKey = buildCacheKey('dashboard:daily-cert', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const { whereClause, params } = await buildFilterClause(userId, filters);
     const query = `
         SELECT certificacion::date AS fecha, COUNT(*)::integer AS certificaciones
@@ -359,10 +432,15 @@ exports.getDailyCertifications = async (userId, filters) => {
         ORDER BY fecha DESC;
     `;
     const result = await pool.query(query, params);
+    await cache.set(cacheKey, result.rows, TTL.INDICATORS);
     return result.rows;
 };
 
 exports.getStateIndicatorsView = async (userId, filters = {}) => {
+    const cacheKey = buildCacheKey('dashboard:state-indicators', userId, filters);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const hasNationalAccess = await hasNationalDashboardAccess(userId);
     const params = [];
     let whereClauses = [];
@@ -389,11 +467,16 @@ exports.getStateIndicatorsView = async (userId, filters = {}) => {
         ORDER BY estado_nombre;
     `;
     const { rows } = await pool.query(query, params);
+    await cache.set(cacheKey, rows, TTL.INDICATORS);
     return rows;
 };
 
 // --- Función para obtener datos del mapa (porcentajes por estado) ---
 exports.getMapaEstados = async (userId) => {
+    const cacheKey = `dashboard:mapa:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const hasNationalAccess = await hasNationalDashboardAccess(userId);
     let whereClause = '';
     const params = [];
@@ -417,11 +500,16 @@ exports.getMapaEstados = async (userId) => {
         ORDER BY estado_id;
     `;
     const { rows } = await pool.query(query, params);
+    await cache.set(cacheKey, rows, TTL.AGGREGATED);
     return rows;
 };
 
 // --- Función para obtener participantes por estado (capa de dispersión) ---
 exports.getParticipantesPorEstado = async (userId) => {
+    const cacheKey = `dashboard:participantes:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const hasNationalAccess = await hasNationalDashboardAccess(userId);
     let whereClause = '';
     const params = [];
@@ -443,11 +531,48 @@ exports.getParticipantesPorEstado = async (userId) => {
         ORDER BY state_id;
     `;
     const { rows } = await pool.query(query, params);
+    await cache.set(cacheKey, rows, TTL.AGGREGATED);
+    return rows;
+};
+
+// --- Función para obtener priorizados por estado (capa de dispersión triángulos) ---
+exports.getPriorizadosPorEstado = async (userId) => {
+    const cacheKey = `dashboard:priorizados-estado:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
+    const hasNationalAccess = await hasNationalDashboardAccess(userId);
+    let whereClause = '';
+    const params = [];
+
+    if (!hasNationalAccess) {
+        const allowedStates = await getAllowedStatesForUser(userId);
+        if (!allowedStates.length) return [];
+        params.push(allowedStates);
+        whereClause = `WHERE estado_id = ANY($1)`;
+    }
+
+    const query = `
+        SELECT
+            estado_id AS state_id,
+            estado,
+            COUNT(*) AS priorizados
+        FROM vpriorizados
+        ${whereClause}
+        GROUP BY estado_id, estado
+        ORDER BY estado_id;
+    `;
+    const { rows } = await pool.query(query, params);
+    await cache.set(cacheKey, rows, TTL.AGGREGATED);
     return rows;
 };
 
 // --- Función para obtener indicadores de registros básicos por estado ---
 exports.getRegistrosIndicadoresPorEstado = async (userId) => {
+    const cacheKey = `dashboard:registros-estados:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const hasNationalAccess = await hasNationalDashboardAccess(userId);
     const params = [];
     let whereClause = '';
@@ -484,11 +609,16 @@ exports.getRegistrosIndicadoresPorEstado = async (userId) => {
         ORDER BY estado;
     `;
     const { rows } = await pool.query(query, params);
+    await cache.set(cacheKey, rows, TTL.AGGREGATED);
     return rows;
 };
 
 // --- Función para obtener indicadores de registros básicos nacionales (o del scope del usuario) ---
 exports.getRegistrosIndicadoresNacionales = async (userId) => {
+    const cacheKey = `dashboard:registros-nacionales:${userId}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
     const hasNationalAccess = await hasNationalDashboardAccess(userId);
 
     // Usuarios con acceso nacional: consultan la vista nacional optimizada
@@ -507,7 +637,9 @@ exports.getRegistrosIndicadoresNacionales = async (userId) => {
             LIMIT 1;
         `;
         const { rows } = await pool.query(query);
-        return rows[0] || {};
+        const data = rows[0] || {};
+        await cache.set(cacheKey, data, TTL.AGGREGATED);
+        return data;
     }
 
     // Usuarios con acceso restringido: agregar desde la vista por estados
@@ -529,7 +661,513 @@ exports.getRegistrosIndicadoresNacionales = async (userId) => {
         WHERE estado = ANY(SELECT UPPER(estado) FROM vestados WHERE id = ANY($1))
     `;
     const { rows } = await pool.query(query, [allowedStates]);
-    return rows[0] || {};
+    const data = rows[0] || {};
+    await cache.set(cacheKey, data, TTL.AGGREGATED);
+    return data;
 };
 
+// --- Funciones para Priorizados (server-side pagination + filtering) ---
 
+/**
+ * Construye la cláusula de permisos geográficos para vpriorizados.
+ * Retorna { permClause, permParams, nextParamIndex }.
+ */
+const buildPriorizadosPermissionClause = async (userId) => {
+    const hasNationalAccess = await hasNationalDashboardAccess(userId);
+    if (hasNationalAccess) {
+        return { permClause: '', permParams: [], nextParamIndex: 1 };
+    }
+    const allowedStates = await getAllowedStatesForUser(userId);
+    if (!allowedStates.length) {
+        return { permClause: 'WHERE 1 = 0', permParams: [], nextParamIndex: 1 };
+    }
+    return {
+        permClause: 'WHERE estado_id = ANY($1)',
+        permParams: [allowedStates],
+        nextParamIndex: 2,
+    };
+};
+
+exports.buildPriorizadosPermissionClause = buildPriorizadosPermissionClause;
+
+/**
+ * Construye la cláusula de permisos geográficos para rm_data_registros.
+ * La tabla foránea no tiene estado_id; filtra por nombre de estado (UPPER)
+ * mediante subquery a vestados para hacer la correspondencia por ID.
+ * Retorna { permClause, permParams, nextParamIndex }.
+ */
+const buildRegistrosPermissionClause = async (userId) => {
+    const hasNationalAccess = await hasNationalDashboardAccess(userId);
+    if (hasNationalAccess) {
+        return { permClause: '', permParams: [], nextParamIndex: 1 };
+    }
+    const allowedStates = await getAllowedStatesForUser(userId);
+    if (!allowedStates.length) {
+        return { permClause: 'WHERE 1 = 0', permParams: [], nextParamIndex: 1 };
+    }
+    return {
+        permClause: 'WHERE UPPER(estado) = ANY(SELECT estado FROM vestados WHERE id = ANY($1))',
+        permParams: [allowedStates],
+        nextParamIndex: 2,
+    };
+};
+
+exports.buildRegistrosPermissionClause = buildRegistrosPermissionClause;
+
+/**
+ * Obtiene datos paginados de vpriorizados con filtrado server-side.
+ * @param {number} userId
+ * @param {object} query - Query params del request HTTP
+ * @returns {Promise<{ rows: object[], totalRows: number }>}
+ */
+exports.getPriorizados = async (userId, query = {}) => {
+    // Exportaciones no se cachean (son operaciones puntuales)
+    const isExport = query.export === 'true';
+    if (!isExport) {
+        const cacheKey = buildCacheKey('dashboard:priorizados', userId, query);
+        const cached = await cache.get(cacheKey);
+        if (cached) return cached;
+    }
+
+    const { permClause, permParams, nextParamIndex } = await buildPriorizadosPermissionClause(userId);
+
+    const conditions = [];
+    const params = [...permParams];
+    let pi = nextParamIndex; // param index
+
+    // --- Búsqueda global ---
+    if (query.search && query.search.trim()) {
+        const searchTerm = query.search.trim();
+        conditions.push(`(
+            nombre ILIKE $${pi}
+            OR cedula::text ILIKE $${pi}
+            OR telefono ILIKE $${pi}
+            OR comunidad ILIKE $${pi}
+            OR estado ILIKE $${pi}
+            OR municipio ILIKE $${pi}
+            OR parroquia ILIKE $${pi}
+            OR registro ILIKE $${pi}
+            OR circulo ILIKE $${pi}
+            OR patria ILIKE $${pi}
+            OR validado ILIKE $${pi}
+            OR mayor60 ILIKE $${pi}
+            OR nuevos ILIKE $${pi}
+            OR fallecido ILIKE $${pi}
+            OR excepcional ILIKE $${pi}
+        )`);
+        params.push(`%${searchTerm}%`);
+        pi++;
+    }
+
+    // --- Filtros multi-select ---
+    if (query.estados) {
+        const arr = Array.isArray(query.estados) ? query.estados : query.estados.split(',');
+        if (arr.length > 0) {
+            conditions.push(`estado = ANY($${pi})`);
+            params.push(arr);
+            pi++;
+        }
+    }
+    if (query.municipios) {
+        const arr = Array.isArray(query.municipios) ? query.municipios : query.municipios.split(',');
+        if (arr.length > 0) {
+            conditions.push(`municipio = ANY($${pi})`);
+            params.push(arr);
+            pi++;
+        }
+    }
+    if (query.parroquias) {
+        const arr = Array.isArray(query.parroquias) ? query.parroquias : query.parroquias.split(',');
+        if (arr.length > 0) {
+            conditions.push(`parroquia = ANY($${pi})`);
+            params.push(arr);
+            pi++;
+        }
+    }
+    if (query.comunidades) {
+        const arr = Array.isArray(query.comunidades) ? query.comunidades : query.comunidades.split(',');
+        if (arr.length > 0) {
+            conditions.push(`comunidad = ANY($${pi})`);
+            params.push(arr);
+            pi++;
+        }
+    }
+
+    // --- Filtros toggle (slider) ---
+    if (query.nac && query.nac !== 'Todos') {
+        conditions.push(`nac = $${pi}`);
+        params.push(query.nac);
+        pi++;
+    }
+    if (query.sexo && query.sexo !== 'Todos') {
+        conditions.push(`sexo = $${pi}`);
+        params.push(query.sexo);
+        pi++;
+    }
+    if (query.patria && query.patria !== 'Todos') {
+        conditions.push(`patria = $${pi}`);
+        params.push(query.patria);
+        pi++;
+    }
+    if (query.validado && query.validado !== 'Todos') {
+        conditions.push(`validado = $${pi}`);
+        params.push(query.validado);
+        pi++;
+    }
+    if (query.mayor60 && query.mayor60 !== 'Todos') {
+        conditions.push(`mayor60 = $${pi}`);
+        params.push(query.mayor60);
+        pi++;
+    }
+    if (query.registro && query.registro !== 'Todos') {
+        conditions.push(`registro = $${pi}`);
+        params.push(query.registro);
+        pi++;
+    }
+    if (query.circulo && query.circulo !== 'Todos') {
+        conditions.push(`circulo = $${pi}`);
+        params.push(query.circulo);
+        pi++;
+    }
+    if (query.nuevos && query.nuevos !== 'Todos') {
+        conditions.push(`nuevos = $${pi}`);
+        params.push(query.nuevos);
+        pi++;
+    }
+    if (query.fallecido && query.fallecido !== 'Todos') {
+        conditions.push(`fallecido = $${pi}`);
+        params.push(query.fallecido);
+        pi++;
+    }
+    if (query.excepcional && query.excepcional !== 'Todos') {
+        conditions.push(`excepcional = $${pi}`);
+        params.push(query.excepcional);
+        pi++;
+    }
+
+    // --- Construir WHERE completo ---
+    let whereClause = permClause;
+    if (conditions.length > 0) {
+        const filterSql = conditions.join(' AND ');
+        if (whereClause) {
+            whereClause += ' AND ' + filterSql;
+        } else {
+            whereClause = 'WHERE ' + filterSql;
+        }
+    }
+
+    // --- Ordenación ---
+    const allowedSortCols = [
+        'id', 'estado_id', 'estado', 'municipio_id', 'municipio',
+        'parroquia_id', 'parroquia', 'nac', 'cedula', 'nombre',
+        'telefono', 'fecha_nac', 'sexo', 'comunidad', 'patria',
+        'validado', 'mayor60', 'registro', 'circulo', 'nuevos',
+        'fallecido', 'excepcional',
+    ];
+    let orderClause = 'ORDER BY estado, municipio, parroquia, nombre';
+    if (query.sortBy && allowedSortCols.includes(query.sortBy)) {
+        const dir = query.descending === 'true' ? 'DESC' : 'ASC';
+        orderClause = `ORDER BY ${query.sortBy} ${dir}`;
+    }
+
+    // --- Paginación ---
+    const limit = Math.min(Math.max(parseInt(query.limit, 10) || 50, 1), 500);
+    const page = Math.max(parseInt(query.page, 10) || 1, 1);
+    const offset = (page - 1) * limit;
+
+    // Modo exportación: sin paginación (isExport ya declarado arriba)
+
+    let sql;
+    if (isExport) {
+        sql = `SELECT * FROM vpriorizados ${whereClause} ${orderClause}`;
+    } else {
+        // COUNT(*) OVER() evita un segundo query de conteo
+        sql = `
+            SELECT *, COUNT(*) OVER() AS total_rows
+            FROM vpriorizados
+            ${whereClause}
+            ${orderClause}
+            LIMIT $${pi} OFFSET $${pi + 1}
+        `;
+        params.push(limit, offset);
+    }
+
+    const { rows } = await pool.query(sql, params);
+
+    if (isExport) {
+        return { rows, totalRows: rows.length };
+    }
+
+    const totalRows = rows.length > 0 ? parseInt(rows[0].total_rows, 10) : 0;
+    // Eliminar el campo auxiliar total_rows de cada fila
+    rows.forEach(r => delete r.total_rows);
+
+    const result = { rows, totalRows };
+
+    // Guardar en caché (solo consultas paginadas, no exportaciones)
+    const cacheKey = buildCacheKey('dashboard:priorizados', userId, query);
+    await cache.set(cacheKey, result, TTL.PRIORIZADOS);
+
+    return result;
+};
+
+/**
+ * Obtiene los valores únicos para los filtros desplegables de vpriorizados,
+ * respetando los permisos del usuario y cascada geográfica.
+ * @param {number} userId
+ * @param {object} query - { estados, municipios, parroquias } (comma-separated strings)
+ */
+exports.getPriorizadosFilterOptions = async (userId, query = {}) => {
+    // Verificar caché
+    const cacheKey = buildCacheKey('dashboard:priorizados-fo', userId, query);
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
+    const { permClause, permParams } = await buildPriorizadosPermissionClause(userId);
+    const baseParamCount = permParams.length;
+
+    // Helper: builds a WHERE string appending extra conditions to the permission clause
+    const buildWhere = (extraConditions) => {
+        if (!extraConditions.length) return permClause;
+        const extra = extraConditions.join(' AND ');
+        return permClause ? `${permClause} AND ${extra}` : `WHERE ${extra}`;
+    };
+
+    const distinctQuery = (col, where, params) =>
+        pool.query(
+            `SELECT COALESCE(json_agg(DISTINCT ${col}) FILTER (WHERE ${col} IS NOT NULL), '[]') AS vals FROM vpriorizados ${where}`,
+            params,
+        );
+
+    // --- Estados: solo permisos ---
+    const estRes = await distinctQuery('estado', permClause, permParams);
+
+    // --- Municipios: filtrados por estados seleccionados ---
+    let munVals = [];
+    if (query.estados) {
+        const arr = Array.isArray(query.estados) ? query.estados : query.estados.split(',');
+        const pi = baseParamCount + 1;
+        const where = buildWhere([`estado = ANY($${pi})`]);
+        const res = await distinctQuery('municipio', where, [...permParams, arr]);
+        munVals = res.rows[0]?.vals || [];
+    }
+
+    // --- Parroquias: filtradas por estados + municipios seleccionados ---
+    let parVals = [];
+    if (query.municipios) {
+        const conditions = [];
+        const params = [...permParams];
+        let pi = baseParamCount + 1;
+        if (query.estados) {
+            const arr = Array.isArray(query.estados) ? query.estados : query.estados.split(',');
+            conditions.push(`estado = ANY($${pi})`);
+            params.push(arr);
+            pi++;
+        }
+        const munArr = Array.isArray(query.municipios) ? query.municipios : query.municipios.split(',');
+        conditions.push(`municipio = ANY($${pi})`);
+        params.push(munArr);
+        const where = buildWhere(conditions);
+        const res = await distinctQuery('parroquia', where, params);
+        parVals = res.rows[0]?.vals || [];
+    }
+
+    // --- Comunidades: filtradas por estados + municipios + parroquias seleccionados ---
+    let comVals = [];
+    if (query.parroquias) {
+        const conditions = [];
+        const params = [...permParams];
+        let pi = baseParamCount + 1;
+        if (query.estados) {
+            const arr = Array.isArray(query.estados) ? query.estados : query.estados.split(',');
+            conditions.push(`estado = ANY($${pi})`);
+            params.push(arr);
+            pi++;
+        }
+        if (query.municipios) {
+            const munArr = Array.isArray(query.municipios) ? query.municipios : query.municipios.split(',');
+            conditions.push(`municipio = ANY($${pi})`);
+            params.push(munArr);
+            pi++;
+        }
+        const parArr = Array.isArray(query.parroquias) ? query.parroquias : query.parroquias.split(',');
+        conditions.push(`parroquia = ANY($${pi})`);
+        params.push(parArr);
+        const where = buildWhere(conditions);
+        const res = await distinctQuery('comunidad', where, params);
+        comVals = res.rows[0]?.vals || [];
+    }
+
+    const result = {
+        estados: (estRes.rows[0]?.vals || []).sort(),
+        municipios: munVals.sort(),
+        parroquias: parVals.sort(),
+        comunidades: comVals.sort(),
+    };
+
+    // Guardar en caché
+    await cache.set(cacheKey, result, TTL.FILTER_OPT);
+
+    return result;
+};
+
+// ─── Pirámide Poblacional ──────────────────────────────────────────────────────
+
+/**
+ * Obtiene la distribución de registros por rangos etarios (60 a 100+) y género,
+ * usando la tabla foránea rm_data_registros.
+ *
+ * @param {number} userId  - ID del usuario (para permisos geográficos).
+ * @param {number} step    - Amplitud del rango etario: 5 o 10 (default 5).
+ * @returns {Promise<Array<{rango, grupo_orden, masculino, femenino, total}>>}
+ */
+exports.getPyramideEdad = async (userId, step = 5) => {
+    const stepInt = [5, 10].includes(Number(step)) ? Number(step) : 5;
+    const cacheKey = `dashboard:piramide-edad:${userId}:step${stepInt}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
+    // Permisos geográficos
+    const { permClause, permParams } = await buildRegistrosPermissionClause(userId);
+    if (permClause === 'WHERE 1 = 0') return [];
+
+    const today = new Date();
+    const curYear = today.getFullYear();
+    const cutoffDate = new Date(curYear - 60, today.getMonth(), today.getDate());
+    const cutoffStr = cutoffDate.toISOString().slice(0, 10);
+
+    // Condición de fecha de nacimiento pushable a postgres_fdw
+    const baseCond = `fecha_nacimiento <= '${cutoffStr}'
+              AND fecha_nacimiento >= '1900-01-01'`;
+
+    let whereClause;
+    if (!permClause) {
+        whereClause = `WHERE ${baseCond}`;
+    } else {
+        const geoCondition = permClause.replace(/^\s*WHERE\s+/i, '');
+        whereClause = `WHERE ${baseCond} AND (${geoCondition})`;
+    }
+
+    const query = `
+        SELECT
+            CASE
+                WHEN (${curYear} - SUBSTRING(fecha_nacimiento, 1, 4)::integer) >= 100 THEN '100+'
+                ELSE (FLOOR(((${curYear} - SUBSTRING(fecha_nacimiento, 1, 4)::integer) - 60)::numeric / $1) * $1 + 60)::integer::text
+                     || ' - ' ||
+                     (FLOOR(((${curYear} - SUBSTRING(fecha_nacimiento, 1, 4)::integer) - 60)::numeric / $1) * $1 + 60 + $1 - 1)::integer::text
+            END AS rango,
+            CASE
+                WHEN (${curYear} - SUBSTRING(fecha_nacimiento, 1, 4)::integer) >= 100 THEN 9999
+                ELSE FLOOR(((${curYear} - SUBSTRING(fecha_nacimiento, 1, 4)::integer) - 60)::numeric / $1)::integer
+            END AS grupo_orden,
+            COUNT(*) FILTER (WHERE genero = 'M') AS masculino,
+            COUNT(*) FILTER (WHERE genero = 'F') AS femenino,
+            COUNT(*) AS total
+        FROM rm_data_registros
+        ${whereClause}
+        GROUP BY rango, grupo_orden
+        ORDER BY grupo_orden
+    `;
+
+    const { rows } = await pool.query(query, [stepInt, ...permParams]);
+    // Cachear por 1 hora (datos demográficos muy estables)
+    await cache.set(cacheKey, rows, 3600);
+    return rows;
+};
+
+/**
+ * Obtiene la línea de tiempo de registros realizados según período y agrupación.
+ *
+ * @param {number} userId - ID del usuario solicitante
+ * @param {object} options - { period, grouping, startDate, endDate }
+ * @returns {Promise<Array<{periodo: string, orden: string, total: number}>>}
+ */
+exports.getRecordsTimeline = async (userId, options = {}) => {
+    const period = ['current_week', 'current_month', 'current_year', 'custom'].includes(options.period)
+        ? options.period
+        : 'current_month';
+
+    const grouping = ['year', 'month', 'week', 'day'].includes(options.grouping)
+        ? options.grouping
+        : 'day';
+
+    const startDate = options.startDate && /^\d{4}-\d{2}-\d{2}$/.test(options.startDate) ? options.startDate : null;
+    const endDate = options.endDate && /^\d{4}-\d{2}-\d{2}$/.test(options.endDate) ? options.endDate : null;
+
+    const cacheKey = `dashboard:timeline:${userId}:${period}:${grouping}:${startDate || ''}:${endDate || ''}`;
+    const cached = await cache.get(cacheKey);
+    if (cached) return cached;
+
+    // Permisos geográficos
+    const { permClause, permParams } = await buildRegistrosPermissionClause(userId);
+    if (permClause === 'WHERE 1 = 0') return [];
+
+    // Construcción de condiciones de fecha
+    const dateConditions = ['create_date IS NOT NULL'];
+    const queryParams = [...permParams];
+    let paramIndex = queryParams.length + 1;
+
+    if (period === 'current_week') {
+        // Semana actual de Domingo a Sábado
+        dateConditions.push(`create_date >= (CURRENT_DATE - (EXTRACT(DOW FROM CURRENT_DATE)::int * INTERVAL '1 day'))::date`);
+        dateConditions.push(`create_date < ((CURRENT_DATE - (EXTRACT(DOW FROM CURRENT_DATE)::int * INTERVAL '1 day'))::date + INTERVAL '7 days')::date`);
+    } else if (period === 'current_month') {
+        dateConditions.push(`create_date >= DATE_TRUNC('month', CURRENT_DATE)::date`);
+        dateConditions.push(`create_date < (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month')::date`);
+    } else if (period === 'current_year') {
+        dateConditions.push(`create_date >= DATE_TRUNC('year', CURRENT_DATE)::date`);
+        dateConditions.push(`create_date < (DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '1 year')::date`);
+    } else if (period === 'custom') {
+        if (startDate) {
+            dateConditions.push(`create_date >= $${paramIndex++}::date`);
+            queryParams.push(startDate);
+        }
+        if (endDate) {
+            dateConditions.push(`create_date < ($${paramIndex++}::date + INTERVAL '1 day')`);
+            queryParams.push(endDate);
+        }
+    }
+
+    const baseDateCond = dateConditions.join(' AND ');
+
+    let whereClause;
+    if (!permClause) {
+        whereClause = `WHERE ${baseDateCond}`;
+    } else {
+        const geoCondition = permClause.replace(/^\s*WHERE\s+/i, '');
+        whereClause = `WHERE ${baseDateCond} AND (${geoCondition})`;
+    }
+
+    // Expresiones de agrupación
+    let selectPeriodo = "TO_CHAR(create_date, 'YYYY-MM-DD')";
+    let selectOrden = "DATE_TRUNC('day', create_date)::date";
+
+    if (grouping === 'year') {
+        selectPeriodo = "TO_CHAR(create_date, 'YYYY')";
+        selectOrden = "DATE_TRUNC('year', create_date)::date";
+    } else if (grouping === 'month') {
+        selectPeriodo = "TO_CHAR(create_date, 'YYYY-MM')";
+        selectOrden = "DATE_TRUNC('month', create_date)::date";
+    } else if (grouping === 'week') {
+        selectPeriodo = `TO_CHAR((DATE_TRUNC('day', create_date) - (EXTRACT(DOW FROM create_date)::int * INTERVAL '1 day'))::date, 'DD/MM/YYYY')
+                         || ' al ' ||
+                         TO_CHAR(((DATE_TRUNC('day', create_date) - (EXTRACT(DOW FROM create_date)::int * INTERVAL '1 day'))::date + INTERVAL '6 days')::date, 'DD/MM/YYYY')`;
+        selectOrden = "(DATE_TRUNC('day', create_date) - (EXTRACT(DOW FROM create_date)::int * INTERVAL '1 day'))::date";
+    }
+
+    const query = `
+        SELECT
+            ${selectPeriodo} AS periodo,
+            ${selectOrden} AS orden,
+            COUNT(*)::integer AS total
+        FROM rm_data_registros
+        ${whereClause}
+        GROUP BY periodo, orden
+        ORDER BY orden ASC
+    `;
+
+    const { rows } = await pool.query(query, queryParams);
+    // Cachear 5 minutos
+    await cache.set(cacheKey, rows, 300);
+    return rows;
+};

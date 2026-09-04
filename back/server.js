@@ -12,6 +12,7 @@ dotenv.config({ path: path.join(__dirname, envFile) });
 console.log(`[INFO] Loading environment: ${envFile}`);
 console.log(`[INFO] NODE_ENV: ${process.env.NODE_ENV}`);
 
+const { initCache } = require('./services/cacheService');
 const { startListening } = require('./services/notificationListener');
 const websocketService = require('./services/websocketService');
 const { startMaterializedViewScheduler } = require('./services/materializedViewScheduler');
@@ -79,6 +80,19 @@ app.use('/api/email', emailRoutes);
 if (process.env.NODE_ENV !== 'production') {
   app.use('/api/utility', utilityRoutes); // <-- Añadir
 }
+
+// --- GraphQL Dynamic Queries Endpoint ---
+const { createHandler } = require('graphql-http/lib/use/express');
+const { schema } = require('./graphql/schema');
+const authMiddleware = require('./middleware/authMiddleware');
+
+app.all(['/graphql', '/api/graphql'], authMiddleware, (req, res, next) => {
+  createHandler({
+    schema,
+    context: () => ({ userId: req.user.id })
+  })(req, res, next);
+});
+
 // --- Configuración del Servidor HTTP y WebSocket ---
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -100,8 +114,11 @@ wss.on('connection', (ws) => {
 // --- Inicialización del Servidor ---
 const PORT = process.env.PORT || 3000;
 
-server.listen(PORT, () => {
-  // Server started
-  startListening();
-  startMaterializedViewScheduler();
+// Inicializar caché (Redis o node-cache fallback) antes de arrancar el servidor
+initCache().then(() => {
+  server.listen(PORT, () => {
+    // Server started
+    startListening();
+    startMaterializedViewScheduler();
+  });
 });

@@ -6,15 +6,23 @@
 
         <q-toolbar-title> Dashboard de Círculos </q-toolbar-title>
 
+        <!-- Info de Usuario (siempre visible) -->
+        <div class="text-body2 q-mr-sm text-right gt-xs">
+          {{ authStore.user?.email || 'Usuario' }}
+          <q-chip
+            dense
+            size="sm"
+            color="white"
+            text-color="primary"
+            class="q-ml-xs"
+          >
+            {{ authStore.user?.role || 'Sin rol' }}
+          </q-chip>
+        </div>
+
         <!-- Menú de Usuario -->
         <q-btn-dropdown stretch flat icon="account_circle">
           <q-list>
-            <q-item-label header>
-              {{ authStore.user?.email || 'Usuario' }}
-              <q-chip dense class="q-ml-sm" color="primary" text-color="white">
-                {{ authStore.user?.role || 'Sin rol' }}
-              </q-chip>
-            </q-item-label>
             <q-item v-close-popup clickable @click="handleLogout">
               <q-item-section avatar>
                 <q-icon name="logout" />
