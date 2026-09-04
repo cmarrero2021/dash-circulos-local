@@ -1030,6 +1030,11 @@ async function handleSave() {
   if (ok) {
     showSaveDialog.value = false;
     saveAsNew.value = false;
+    // Si la consulta guardada tiene tabla o gráfica fijada, actualiza el
+    // panel de Tablas y Gráficas Fijadas sin recargar la página.
+    if (store.pinTable || store.pinChart) {
+      emit('pins-updated');
+    }
   }
 }
 

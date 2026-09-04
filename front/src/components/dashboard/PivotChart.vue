@@ -62,8 +62,9 @@
           </q-popup-proxy>
         </q-btn>
 
-        <!-- Toggle mostrar etiqueta de la serie -->
+        <!-- Toggle mostrar etiqueta de la serie (solo si no es torta ni dona) -->
         <q-toggle
+          v-if="store.chartType !== 'pie' && store.chartType !== 'doughnut'"
           v-model="store.chartShowSeriesLabel"
           label="Etiqueta serie"
           dense size="xs"
@@ -73,9 +74,9 @@
           <q-tooltip>Mostrar el nombre de la serie/categoría en cada punto de la gráfica</q-tooltip>
         </q-toggle>
 
-        <!-- Color texto para Etiqueta serie (solo si Etiqueta serie está activa) -->
+        <!-- Color texto para Etiqueta serie (solo si Etiqueta serie está activa y no es torta ni dona) -->
         <q-btn
-          v-if="store.chartShowSeriesLabel"
+          v-if="store.chartType !== 'pie' && store.chartType !== 'doughnut' && store.chartShowSeriesLabel"
           flat round dense size="sm"
           icon="format_color_text"
           :style="{ color: store.chartSeriesLabelColor || '#1e3b8b' }"
@@ -456,7 +457,46 @@ function buildOptions() {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { position: isPie ? 'right' : 'top', labels: { font: { size: 12 } } },
+      legend: {
+        position: isPie ? 'right' : 'top',
+        labels: {
+          font: { size: 12 },
+          // En torta/dona: si el botón Valores está activo, los valores/porcentajes
+          // se colocan horizontalmente junto al nombre de la serie en la leyenda.
+          generateLabels: isPie ? (chart) => {
+            const data = chart.data;
+            const options = chart.legend?.options?.labels || {};
+            if (data.labels?.length && data.datasets?.length) {
+              const dataset = data.datasets[0];
+              return data.labels.map((label, i) => {
+                const meta = chart.getDatasetMeta(0);
+                const style = meta?.controller?.getStyle ? meta.controller.getStyle(i) : {};
+                const num = Number(dataset.data?.[i]) || 0;
+                let text = label;
+                if (store.chartShowLabels) {
+                  text = `${label} - ${fmtPoint(num)}`;
+                }
+                return {
+                  text,
+                  fillStyle: style.backgroundColor || dataset.backgroundColor?.[i],
+                  fontColor: options.color || '#334155',
+                  hidden: !chart.getDataVisibility(i),
+                  lineDash: style.borderDash,
+                  lineDashOffset: style.borderDashOffset,
+                  lineJoin: style.borderJoinStyle,
+                  lineWidth: style.borderWidth,
+                  strokeStyle: style.borderColor || dataset.borderColor?.[i],
+                  textAlign: options.textAlign,
+                  pointStyle: options.pointStyle,
+                  borderRadius: options.useBorderRadius && (options.borderRadius || style.borderRadius),
+                  index: i,
+                };
+              });
+            }
+            return [];
+          } : undefined,
+        },
+      },
       title: { display: false },
       tooltip: {
         callbacks: {
@@ -470,40 +510,50 @@ function buildOptions() {
       },
       datalabels: {
         labels: {
+          // ── Etiqueta de serie (nombre del dataset / categoría) ─────────────
+          // En torta/dona se desactiva (el nombre va en la leyenda).
+          // En barras/líneas funciona con su separación normal.
           seriesName: {
-            display: () => !!store.chartShowSeriesLabel,
-            anchor: isHorizontal ? 'end' : (isPie ? 'center' : 'end'),
-            align: isHorizontal
-              ? 'right'
-              : (isPie ? (store.chartShowLabels ? 'top' : 'center') : (store.chartShowLabels ? 'top' : 'top')),
-            offset: isHorizontal
-              ? (store.chartShowLabels ? -4 : 4)
-              : (isPie ? (store.chartShowLabels ? -8 : 0) : (store.chartShowLabels ? 14 : 4)),
+            display: () => isPie ? false : !!store.chartShowSeriesLabel,
+            anchor: isHorizontal ? 'end' : 'end',
+            align: (() => {
+              const both = store.chartShowLabels && store.chartShowSeriesLabel;
+              if (isHorizontal) return both ? 'top' : 'right';
+              return 'top';
+            })(),
+            offset: (() => {
+              const both = store.chartShowLabels && store.chartShowSeriesLabel;
+              if (isHorizontal) return both ? 0 : 4;
+              return both ? 18 : 4;
+            })(),
             formatter: (val, ctx) => {
               if (!store.chartShowSeriesLabel) return '';
-              if (isPie) {
-                return ctx.chart.data.labels?.[ctx.dataIndex] || '';
-              } else if (ctx.chart.data.datasets?.length > 1) {
-                return ctx.dataset?.label || '';
-              } else {
-                return ctx.chart.data.labels?.[ctx.dataIndex] || ctx.dataset?.label || '';
-              }
+              const num = Number(val);
+              if (isNaN(num) || num === 0) return '';
+              if (ctx.chart.data.datasets?.length > 1) return ctx.dataset?.label || '';
+              return ctx.chart.data.labels?.[ctx.dataIndex] || ctx.dataset?.label || '';
             },
             font: { weight: 'bold', size: 10 },
-            color: () => {
-              const defaultSeriesColor = isPie ? '#ffffff' : '#1e3b8b';
-              return store.chartSeriesLabelColor || defaultSeriesColor;
-            },
+            color: () => store.chartSeriesLabelColor || '#1e3b8b',
+            textStrokeColor: 'rgba(255,255,255,0.85)',
+            textStrokeWidth: 2,
           },
+          // ── Valor numérico ────────────────────────────────────────────────
+          // En torta/dona se desactiva en el canvas (se muestra en la leyenda).
+          // En barras/líneas sigue funcionando como lo hace actualmente.
           valueText: {
-            display: () => !!store.chartShowLabels,
-            anchor: isHorizontal ? 'end' : (isPie ? 'center' : 'end'),
-            align: isHorizontal
-              ? 'right'
-              : (isPie ? (store.chartShowSeriesLabel ? 'bottom' : 'center') : (store.chartShowSeriesLabel ? 'bottom' : 'top')),
-            offset: isHorizontal
-              ? (store.chartShowSeriesLabel ? 12 : 4)
-              : (isPie ? (store.chartShowSeriesLabel ? 8 : 0) : (store.chartShowSeriesLabel ? 2 : 4)),
+            display: () => isPie ? false : !!store.chartShowLabels,
+            anchor: isHorizontal ? 'end' : 'end',
+            align: (() => {
+              const both = store.chartShowLabels && store.chartShowSeriesLabel;
+              if (isHorizontal) return both ? 'bottom' : 'right';
+              return 'top';
+            })(),
+            offset: (() => {
+              const both = store.chartShowLabels && store.chartShowSeriesLabel;
+              if (isHorizontal) return both ? 1 : 4;
+              return both ? 4 : 4;
+            })(),
             formatter: (val) => {
               if (!store.chartShowLabels) return '';
               const num = Number(val);
@@ -511,10 +561,9 @@ function buildOptions() {
               return fmtPoint(num);
             },
             font: { weight: 'bold', size: 10 },
-            color: () => {
-              const defaultValColor = isPie ? '#ffffff' : '#334155';
-              return store.chartValueLabelColor || defaultValColor;
-            },
+            color: () => store.chartValueLabelColor || '#334155',
+            textStrokeColor: 'rgba(255,255,255,0.85)',
+            textStrokeWidth: 2,
           }
         }
       },

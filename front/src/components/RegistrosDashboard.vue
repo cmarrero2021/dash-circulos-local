@@ -42,7 +42,7 @@
     <!-- Pinned items -->
     <div v-if="pinnedItems.length" class="pinned-grid column q-gutter-md">
       <div
-        v-for="item in pinnedItems" :key="item.query.id"
+        v-for="item in pinnedItems" :key="item.uid"
         class="pinned-card bg-white rounded-borders shadow-light">
         <!-- Card header -->
         <div class="pinned-card-header row items-start q-px-md q-py-sm bg-grey-1 border-bottom-dash">
@@ -134,6 +134,10 @@ const loading = ref(false);
 const pinnedItems = ref([]);
 const chartRefs = new Map();
 let storeInstances = [];
+// Contador de generación: se incrementa en cada llamada a loadPinned.
+// Se usa para generar IDs de store únicos (evita reutilizar estado de Pinia)
+// y claves únicas de v-for (fuerza el remontado completo de PivotTable/PivotChart).
+let generation = 0;
 
 // Referencias a los PivotChart montados por item (para export PNG independiente)
 function setChartRef(item, el) {
@@ -169,6 +173,8 @@ async function exportTableExcel(item) {
 // ejecuta la consulta (fetchData) de forma independiente.
 async function loadPinned() {
   loading.value = true;
+  generation++;
+  const gen = generation;
   try {
     const res = await api.get('/dashboard/saved-queries', {
       params: { source: 'registros' }
@@ -178,12 +184,18 @@ async function loadPinned() {
     // Destruye stores previos (estado ya no necesario)
     storeInstances.forEach(s => s.$dispose && s.$dispose());
     storeInstances = [];
+    chartRefs.clear();
 
+    // Crea stores con ID versionado (pinned_{id}_v{gen}) para garantizar que
+    // Pinia NO reutilice el estado de la generación anterior aunque el query.id
+    // sea el mismo. La clave uid = `${id}_${gen}` fuerza el remontado completo
+    // de PivotTable y PivotChart en el v-for.
     pinnedItems.value = queries.map(query => {
-      const store = createDynamicQueryStore(`pinned_${query.id}`)();
+      const storeId = `pinned_${query.id}_v${gen}`;
+      const store = createDynamicQueryStore(storeId)();
       storeInstances.push(store);
       store.loadSavedQuery(query);
-      return { query, store, exporting: false };
+      return { query, store, exporting: false, uid: `${query.id}_${gen}` };
     });
   } catch (err) {
     console.error('Error cargando consultas fijadas:', err);
@@ -197,6 +209,8 @@ onUnmounted(() => {
   storeInstances.forEach(s => s.$dispose && s.$dispose());
   storeInstances = [];
 });
+
+defineExpose({ loadPinned });
 </script>
 
 <style scoped>
